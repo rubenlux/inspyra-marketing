@@ -27,6 +27,7 @@ Toda nueva feature, módulo o decisión arquitectónica debe tener una spec ante
 | 12 | ERP-011 | [12-erp-011-operations-finanzas.md](./12-erp-011-operations-finanzas.md) | Módulo Operations — Finanzas + Facturación + Rentabilidad + Multi-BU | 🟡 DRAFT v1 |
 | 13 | ERP-012 | [13-erp-012-operations-facturacion-cobranza.md](./13-erp-012-operations-facturacion-cobranza.md) | Módulo Operations — Facturación & Cobranza + Recurrentes + Morosidad | 🟡 DRAFT v1 |
 | 14 | ERP-013 | [14-erp-013-operations-tickets-soporte.md](./14-erp-013-operations-tickets-soporte.md) | Módulo Operations — Tickets & Soporte + SLA + Escalación + CSAT | 🟡 DRAFT v1 |
+| 15 | ERP-014 | [15-erp-014-operations-reportes-analytics.md](./15-erp-014-operations-reportes-analytics.md) | Módulo Operations — Reportes & Analytics + 12 dashboards + IA conversacional | 🟡 DRAFT v1 |
 
 ## Convención de nombres
 
