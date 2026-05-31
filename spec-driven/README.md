@@ -17,6 +17,7 @@ Toda nueva feature, módulo o decisión arquitectónica debe tener una spec ante
 | 02 | ERP-001 | [02-erp-001-comercial-prospectos.md](./02-erp-001-comercial-prospectos.md) | Módulo Comercial — Prospectos completo | 🟡 DRAFT v1 |
 | 03 | ERP-002 | [03-erp-002-comercial-campanas.md](./03-erp-002-comercial-campanas.md) | Módulo Comercial — Campañas + Leads + Bots | 🟡 DRAFT v1 |
 | 04 | ERP-003 | [04-erp-003-comercial-seguimiento.md](./04-erp-003-comercial-seguimiento.md) | Módulo Comercial — Seguimiento + Follow-up + IA | 🟡 DRAFT v1 |
+| 05 | ERP-004 | [05-erp-004-comercial-pipeline.md](./05-erp-004-comercial-pipeline.md) | Módulo Comercial — Pipeline + Kanban + Forecast + Auto-onboarding | 🟡 DRAFT v1 |
 
 ## Convención de nombres
 
