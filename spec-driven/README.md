@@ -11,9 +11,10 @@ Toda nueva feature, módulo o decisión arquitectónica debe tener una spec ante
 
 ## Índice de specs
 
-| # | Archivo | Descripción | Estado |
-|---|---|---|---|
-| 01 | [constitution-v1.md](./01-constitution-v1.md) | Propósito, principios, arquitectura y stack | ✅ Aprobada |
+| # | Código | Archivo | Descripción | Estado |
+|---|---|---|---|---|
+| 01 | — | [01-constitution-v1.md](./01-constitution-v1.md) | Propósito, principios, arquitectura y stack | ✅ APPROVED |
+| 02 | ERP-001 | [02-erp-001-comercial-prospectos.md](./02-erp-001-comercial-prospectos.md) | Módulo Comercial — Prospectos completo | 🟡 DRAFT v1 |
 
 ## Convención de nombres
 
