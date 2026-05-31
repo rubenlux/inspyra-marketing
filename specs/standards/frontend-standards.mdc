@@ -1,0 +1,26 @@
+---
+description: Frontend standards for Inspyra marketing and ERP applications
+globs:
+  - "src/**"
+  - "frontend/**"
+alwaysApply: false
+---
+
+# Frontend Standards
+
+Frontend work must follow the Spec Registry:
+
+- `specs/README.md`
+- `specs/security/SEC-001-security-baseline.md`
+- `specs/security/SEC-002-security-testing.md`
+
+Mandatory frontend expectations:
+
+- preserve approved UX unless the active spec explicitly changes it;
+- keep routes, module naming and folder structure aligned with the registry;
+- never expose secrets, API keys, tokens or private endpoints in client bundles;
+- avoid raw HTML rendering; sanitize any HTML or Markdown before display;
+- use `rel="noopener noreferrer"` for external links opened in new tabs;
+- do not store JWT access tokens in `localStorage` unless a security spec explicitly approves it;
+- keep production sourcemaps private or disabled;
+- add tests for meaningful UI behavior, routing, permissions and security-sensitive rendering.

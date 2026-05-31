@@ -1,3 +1,5 @@
+import { lazy, Suspense } from 'react'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import { Navbar } from './components/layout/Navbar'
 import { Footer } from './components/layout/Footer'
 import { Hero } from './components/sections/Hero'
@@ -10,7 +12,9 @@ import { Tech } from './components/sections/Tech'
 import { FAQ } from './components/sections/FAQ'
 import { Contact } from './components/sections/Contact'
 
-function App() {
+const ERPPrototype = lazy(() => import('./erp/ERPPrototype'))
+
+function MarketingHome() {
   return (
     <div className="min-h-screen bg-surface-900">
       <Navbar />
@@ -27,6 +31,23 @@ function App() {
       </main>
       <Footer />
     </div>
+  )
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<MarketingHome />} />
+      <Route path="/erp" element={<Navigate to="/erp/dashboard" replace />} />
+      <Route
+        path="/erp/*"
+        element={
+          <Suspense fallback={<div className="min-h-screen bg-surface-900 text-white" />}>
+            <ERPPrototype />
+          </Suspense>
+        }
+      />
+    </Routes>
   )
 }
 

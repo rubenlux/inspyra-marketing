@@ -1,0 +1,27 @@
+---
+description: Testing standards for Inspyra ERP
+globs:
+  - "src/**"
+  - "backend/**"
+  - "tests/**"
+  - "**/*.test.ts"
+  - "**/*.spec.ts"
+  - "**/*.test.tsx"
+alwaysApply: false
+---
+
+# Testing Standards
+
+Testing work must follow the Spec Registry:
+
+- `specs/README.md`
+- `specs/security/SEC-002-security-testing.md`
+
+Mandatory testing expectations:
+
+- every feature implementation should include matching tests unless the change is documentation-only;
+- security-sensitive changes require attack-path tests, not only happy-path tests;
+- backend tests must cover auth, RBAC, ownership, tenant isolation and validation boundaries;
+- frontend tests must cover routing, critical states and unsafe rendering protections when relevant;
+- regressions from bugs or incidents must include a reproducible failing test before closure;
+- mocks must not contain real credentials, customer secrets or production data.

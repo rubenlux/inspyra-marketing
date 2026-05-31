@@ -1,0 +1,29 @@
+---
+description: Backend standards for Inspyra ERP and related services
+globs:
+  - "backend/**"
+  - "src/api/**"
+  - "src/services/**"
+alwaysApply: false
+---
+
+# Backend Standards
+
+Backend work must comply with:
+
+- `specs/README.md`
+- `specs/security/SEC-001-security-baseline.md`
+- `specs/security/SEC-002-security-testing.md`
+- `spec-driven/24-erp-023-backend-core-foundation.md`
+
+SEC-001 defines required protections. SEC-002 defines the evidence required to validate them.
+
+Mandatory backend expectations:
+
+- validate input schemas strictly and reject unexpected fields;
+- enforce auth, authorization, role checks and ownership checks server-side;
+- prevent IDOR, BOLA and broken function-level authorization;
+- use prepared statements or ORM-safe queries only;
+- never log secrets, passwords, cookies, tokens or authorization headers;
+- enforce strict CORS, content type validation, payload size limits and rate limits;
+- add security tests for auth, permissions, tenant isolation, uploads and critical business logic.

@@ -1,0 +1,27 @@
+# Cursor Rules — Inspyra
+
+Spec Registry is mandatory project context:
+
+- `specs/README.md`
+
+Security specs are mandatory project context:
+
+- `specs/security/SEC-001-security-baseline.md`
+- `specs/security/SEC-002-security-testing.md`
+
+SEC-001 and SEC-002 must travel together: controls require verification, and tests must map back to the baseline.
+
+Development standards:
+
+- `specs/standards/frontend-standards.mdc`
+- `specs/standards/backend-standards.mdc`
+- `specs/standards/testing-standards.mdc`
+- `specs/standards/infra-standards.mdc`
+
+Do not generate production code that bypasses authentication, authorization, tenant ownership, input validation, rate limiting, secret handling, upload validation, logging redaction, or secure deployment requirements.
+
+Frontend work must avoid exposed secrets, unsafe HTML, public sourcemaps in production, unsafe third-party scripts, and insecure external links.
+
+Backend and infrastructure work must follow least privilege, deny-by-default networking, secure headers, strict CORS, safe secrets management, auditability, and release gates.
+
+Priority order in conflicts: security specs, backend/architecture specs, ERP module specs, local implementation details.

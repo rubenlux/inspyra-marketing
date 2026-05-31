@@ -1,0 +1,29 @@
+---
+description: Infrastructure and DevSecOps standards for Inspyra
+globs:
+  - "infra/**"
+  - "docker/**"
+  - "Dockerfile"
+  - "docker-compose*.yml"
+  - ".github/workflows/**"
+alwaysApply: false
+---
+
+# Infrastructure Standards
+
+Infrastructure work must comply with:
+
+- `specs/README.md`
+- `specs/security/SEC-001-security-baseline.md`
+- `specs/security/SEC-002-security-testing.md`
+
+SEC-001 defines required protections. SEC-002 defines the evidence required to validate them.
+
+Mandatory infrastructure expectations:
+
+- public exposure limited to intended HTTP/HTTPS entrypoints;
+- DB, Redis, internal services, metrics and admin docs must not be publicly exposed;
+- use HTTPS, HSTS, secure headers and managed certificate renewal in production;
+- run containers as non-root where possible and avoid privileged mounts such as docker.sock;
+- scan dependencies, containers and secrets in CI/CD;
+- block production release on critical security findings or failed security gates.

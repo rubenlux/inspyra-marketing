@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, Zap, Globe, LogIn } from 'lucide-react'
 import { SITE } from '../../config/site'
-import { useLang, type Lang } from '../../i18n'
+import { useLang } from '../../i18n'
 
 export function Navbar() {
   const { lang, t, setLang } = useLang()
@@ -85,7 +85,7 @@ export function Navbar() {
 
             {/* Login button */}
             <a
-              href="/erp.html"
+              href="/erp/dashboard"
               className="hidden sm:flex items-center gap-1.5 px-4 py-2.5 glass rounded-xl text-sm font-semibold text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200 border border-white/10 hover:border-white/20"
             >
               <LogIn className="w-3.5 h-3.5" />
@@ -131,7 +131,7 @@ export function Navbar() {
                 </button>
               ))}
               <a
-                href="/erp.html"
+                href="/erp/dashboard"
                 className="flex items-center justify-center gap-2 mt-2 px-4 py-3 glass rounded-xl text-sm font-semibold text-white/80 hover:text-white hover:bg-white/10 transition-all border border-white/10"
               >
                 <LogIn className="w-4 h-4" />

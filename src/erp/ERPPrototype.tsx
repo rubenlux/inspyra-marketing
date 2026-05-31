@@ -1,0 +1,4148 @@
+// @ts-nocheck
+import * as React from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import './erp.css'
+
+// Shared icons + small UI atoms used across the ERP.
+// Icons are inline strokes — tabler-style. 16px default.
+
+const Ic = ({ d, size = 16, stroke = 1.6, fill = "none", ...rest }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill}
+       stroke="currentColor" strokeWidth={stroke}
+       strokeLinecap="round" strokeLinejoin="round"
+       style={{ display: "block", flexShrink: 0 }} {...rest}>
+    {d}
+  </svg>
+);
+
+const Icon = {
+  search: (p) => <Ic {...p} d={<><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></>}/>,
+  bell:   (p) => <Ic {...p} d={<><path d="M6 8a6 6 0 1 1 12 0c0 3.5 1 5 2 6H4c1-1 2-2.5 2-6z"/><path d="M10 19a2 2 0 0 0 4 0"/></>}/>,
+  plus:   (p) => <Ic {...p} d={<><path d="M12 5v14M5 12h14"/></>}/>,
+  filter: (p) => <Ic {...p} d={<><path d="M4 5h16l-6 8v6l-4-2v-4z"/></>}/>,
+  sort:   (p) => <Ic {...p} d={<><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3"/></>}/>,
+  more:   (p) => <Ic {...p} d={<><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>}/>,
+  arrowUp: (p) => <Ic {...p} d={<><path d="M12 19V5M5 12l7-7 7 7"/></>}/>,
+  arrowDown: (p) => <Ic {...p} d={<><path d="M12 5v14M5 12l7 7 7-7"/></>}/>,
+  arrowRight: (p) => <Ic {...p} d={<><path d="M5 12h14M13 5l7 7-7 7"/></>}/>,
+  chevronDown: (p) => <Ic {...p} d={<><path d="m6 9 6 6 6-6"/></>}/>,
+  chevronRight: (p) => <Ic {...p} d={<><path d="m9 6 6 6-6 6"/></>}/>,
+  check:  (p) => <Ic {...p} d={<><path d="m5 12 5 5L20 7"/></>}/>,
+  x:      (p) => <Ic {...p} d={<><path d="M6 6l12 12M18 6 6 18"/></>}/>,
+  dot:    (p) => <Ic {...p} d={<><circle cx="12" cy="12" r="3" fill="currentColor"/></>}/>,
+  user:   (p) => <Ic {...p} d={<><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></>}/>,
+  users:  (p) => <Ic {...p} d={<><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M17 11a4 4 0 0 0 0-8"/><path d="M22 21a7 7 0 0 0-5-6.7"/></>}/>,
+  briefcase: (p) => <Ic {...p} d={<><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></>}/>,
+  grid:   (p) => <Ic {...p} d={<><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></>}/>,
+  layers: (p) => <Ic {...p} d={<><path d="m12 3 9 5-9 5-9-5 9-5z"/><path d="m3 13 9 5 9-5M3 18l9 5 9-5"/></>}/>,
+  check2: (p) => <Ic {...p} d={<><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m8 12 3 3 5-6"/></>}/>,
+  flow:   (p) => <Ic {...p} d={<><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><circle cx="5" cy="18" r="2"/><path d="M7 6h10M7 18h10M5 8v8M19 8v8"/></>}/>,
+  server: (p) => <Ic {...p} d={<><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><circle cx="7" cy="7.5" r=".8" fill="currentColor"/><circle cx="7" cy="16.5" r=".8" fill="currentColor"/></>}/>,
+  cube:   (p) => <Ic {...p} d={<><path d="m12 3 9 5v8l-9 5-9-5V8z"/><path d="M3 8l9 5 9-5M12 13v10"/></>}/>,
+  card:   (p) => <Ic {...p} d={<><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M2.5 10h19"/></>}/>,
+  life:   (p) => <Ic {...p} d={<><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="m4.9 4.9 4.3 4.3M14.8 14.8l4.3 4.3M4.9 19.1l4.3-4.3M14.8 9.2l4.3-4.3"/></>}/>,
+  chart:  (p) => <Ic {...p} d={<><path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-3"/></>}/>,
+  cog:    (p) => <Ic {...p} d={<><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.2-1.6l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2.8-1.6L13 2h-4l-.6 2.8a7 7 0 0 0-2.8 1.6l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 3 12c0 .6 0 1.1.2 1.6l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2.8 1.6L9 22h4l.6-2.8a7 7 0 0 0 2.8-1.6l2.4 1 2-3.4-2-1.6c.1-.5.2-1 .2-1.6z"/></>}/>,
+  sparkles: (p) => <Ic {...p} d={<><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></>}/>,
+  beaker: (p) => <Ic {...p} d={<><path d="M9 3v6l-5 9a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3l-5-9V3"/><path d="M8 3h8"/><path d="M6 14h12"/></>}/>,
+  globe:  (p) => <Ic {...p} d={<><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 3 4 6 4 9s-1.5 6-4 9c-2.5-3-4-6-4-9s1.5-6 4-9z"/></>}/>,
+  link:   (p) => <Ic {...p} d={<><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7L11 7"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7L13 17"/></>}/>,
+  trend:  (p) => <Ic {...p} d={<><path d="m3 17 6-6 4 4 8-8"/><path d="M14 7h7v7"/></>}/>,
+  bolt:   (p) => <Ic {...p} d={<><path d="M13 2 4 14h7l-2 8 9-12h-7z"/></>}/>,
+  flag:   (p) => <Ic {...p} d={<><path d="M5 21V4M5 4h12l-2 4 2 4H5"/></>}/>,
+  calendar: (p) => <Ic {...p} d={<><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></>}/>,
+  paperclip: (p) => <Ic {...p} d={<><path d="m21 12-9 9a5 5 0 0 1-7-7l9-9a3 3 0 0 1 4 4l-9 9a1 1 0 0 1-1-1l8-8"/></>}/>,
+  send:   (p) => <Ic {...p} d={<><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></>}/>,
+  doc:    (p) => <Ic {...p} d={<><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h6"/></>}/>,
+  folder: (p) => <Ic {...p} d={<><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></>}/>,
+  history: (p) => <Ic {...p} d={<><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></>}/>,
+  pin:    (p) => <Ic {...p} d={<><path d="M12 17v5"/><path d="m9 3 6 0 1 8 3 2v2H5v-2l3-2 1-8z"/></>}/>,
+  download: (p) => <Ic {...p} d={<><path d="M12 3v12M6 11l6 6 6-6M4 21h16"/></>}/>,
+  external: (p) => <Ic {...p} d={<><path d="M15 3h6v6"/><path d="M10 14 21 3M19 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6"/></>}/>,
+  copy:   (p) => <Ic {...p} d={<><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></>}/>,
+  command: (p) => <Ic {...p} d={<><path d="M6 9V6a2 2 0 1 1 2 2H6zM6 15v3a2 2 0 1 0 2-2H6zM18 9V6a2 2 0 1 0-2 2h2zM18 15v3a2 2 0 1 1-2-2h2zM6 9h12v6H6z"/></>}/>,
+  lightning: (p) => <Ic {...p} d={<><path d="M13 2 4 14h7l-2 8 9-12h-7z"/></>}/>,
+  shield: (p) => <Ic {...p} d={<><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/></>}/>,
+  inbox:  (p) => <Ic {...p} d={<><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13l3.5 7v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/></>}/>,
+  pulse:  (p) => <Ic {...p} d={<><path d="M3 12h4l3-8 4 16 3-8h4"/></>}/>,
+  building: (p) => <Ic {...p} d={<><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M10 21v-3h4v3"/></>}/>,
+  rocket: (p) => <Ic {...p} d={<><path d="M14 4c5 0 6 2 6 6-3 0-4 1-6 3l-4 4-4-4 4-4c2-2 3-3 3-6 0 0 1-3 1 1z"/><path d="m6 16-2 4 4-2"/><circle cx="14" cy="10" r="1.4"/></>}/>,
+  message:(p) => <Ic {...p} d={<><path d="M21 12a8 8 0 1 1-3.4-6.6L21 4l-1.4 3.4A8 8 0 0 1 21 12z"/></>}/>,
+  flow2:  (p) => <Ic {...p} d={<><rect x="3" y="3" width="7" height="5" rx="1.2"/><rect x="14" y="9" width="7" height="5" rx="1.2"/><rect x="3" y="16" width="7" height="5" rx="1.2"/><path d="M10 5.5h2a2 2 0 0 1 2 2v1M10 18.5h2a2 2 0 0 0 2-2v-1"/></>}/>,
+  phone:  (p) => <Ic {...p} d={<><path d="M5 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L19 11l2 5v3a2 2 0 0 1-2 2A16 16 0 0 1 3 5a2 2 0 0 1 2-2z"/></>}/>,
+  whatsapp: (p) => <Ic {...p} d={<><path d="M3 21l1.6-4.5A8 8 0 1 1 8 19.5z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5M9 9.5c0-.6.4-1 1-1s1.4 1.4 1.4 2M14.5 15c.6 0 1-.4 1-1s-1.4-1-2-1"/></>}/>,
+  mail:   (p) => <Ic {...p} d={<><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></>}/>,
+  video:  (p) => <Ic {...p} d={<><rect x="2.5" y="6" width="13" height="12" rx="2"/><path d="m16 10 5.5-3v10L16 14z"/></>}/>,
+  robot:  (p) => <Ic {...p} d={<><rect x="4" y="8" width="16" height="11" rx="2.5"/><path d="M12 8V4M12 4h-1.5M12 4h1.5"/><circle cx="9" cy="13" r="1.2" fill="currentColor"/><circle cx="15" cy="13" r="1.2" fill="currentColor"/><path d="M9.5 16.5h5M2 12v3M22 12v3"/></>}/>,
+  funnel: (p) => <Ic {...p} d={<><path d="M3 5h18l-7 8v6l-4-2v-4z"/></>}/>,
+  fire:   (p) => <Ic {...p} d={<><path d="M12 3c1 3-1 4-1 6a3 3 0 0 0 6 0c0-1 0-2-1-3 2 1 4 4 4 7a8 8 0 0 1-16 0c0-4 3-6 5-8 1 1 1 2 1 3-1-1 1-2 3-2z"/></>}/>,
+  clock:  (p) => <Ic {...p} d={<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>}/>,
+  target: (p) => <Ic {...p} d={<><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></>}/>,
+  refresh:(p) => <Ic {...p} d={<><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/></>}/>,
+  dollar: (p) => <Ic {...p} d={<><path d="M12 2v20M17 6.5c0-2-2-3.5-5-3.5s-5 1.3-5 3.5S9 10 12 10s5 1.3 5 3.5-2 3.5-5 3.5-5-1.5-5-3.5"/></>}/>,
+  eye:    (p) => <Ic {...p} d={<><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></>}/>,
+  calCheck: (p) => <Ic {...p} d={<><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M9 15l2 2 4-4"/></>}/>,
+  zap:    (p) => <Ic {...p} d={<><path d="M13 2 4 14h7l-2 8 9-12h-7z"/></>}/>,
+  play:   (p) => <Ic {...p} d={<><path d="M7 4v16l13-8z"/></>}/>,
+  trophy: (p) => <Ic {...p} d={<><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M9 18h6M10 18l.5-3h3l.5 3M8 21h8"/></>}/>,
+  thumbsDown: (p) => <Ic {...p} d={<><path d="M7 14V3H4v11zM7 14l3 7a2 2 0 0 0 3-2l-1-5h5a2 2 0 0 0 2-2.4l-1.5-6A2 2 0 0 0 17.5 3H7"/></>}/>,
+};
+
+// Badge
+const Badge = ({ tone = "default", dot, children, className = "" }) => (
+  <span className={`badge ${tone === "default" ? "" : tone} ${className}`}>
+    {dot && <span className="dot"/>}
+    {children}
+  </span>
+);
+
+// Sparkline
+const Spark = ({ data, color = "#0B0D12", w = 84, h = 28, fill }) => {
+  const min = Math.min(...data), max = Math.max(...data);
+  const r = max - min || 1;
+  const pts = data.map((v, i) => [(i / (data.length - 1)) * w, h - 2 - ((v - min) / r) * (h - 4)]);
+  const dPath = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+  const dArea = fill ? `${dPath} L${w},${h} L0,${h} Z` : null;
+  return (
+    <svg className="spark" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+      {fill && <path d={dArea} fill={fill}/>}
+      <path d={dPath} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+};
+
+// Avatar
+const Avatar = ({ name = "?", size = "sm", color, ring }) => {
+  const initials = name.split(" ").filter(Boolean).slice(0, 2).map(s => s[0]).join("").toUpperCase();
+  const palette = [
+    "linear-gradient(135deg,#5B5BF7,#22D3EE)",
+    "linear-gradient(135deg,#F472B6,#A78BFA)",
+    "linear-gradient(135deg,#10B981,#22D3EE)",
+    "linear-gradient(135deg,#F59E0B,#EF4444)",
+    "linear-gradient(135deg,#0EA5E9,#5B5BF7)",
+    "linear-gradient(135deg,#1F2128,#4B5363)",
+  ];
+  const idx = (name.charCodeAt(0) + name.length) % palette.length;
+  return (
+    <span className={`avatar ${size}`} style={{ background: color || palette[idx], boxShadow: ring ? "0 0 0 2px var(--surface)" : undefined }}>
+      {initials}
+    </span>
+  );
+};
+
+const AvatarGroup = ({ names = [], size = "sm", extra = 0 }) => (
+  <div className="avatar-group">
+    {names.map((n, i) => <Avatar key={i} name={n} size={size} ring />)}
+    {extra > 0 && (
+      <span className={`avatar ${size}`} style={{ background: "var(--ink-100)", color: "var(--ink-700)" }}>+{extra}</span>
+    )}
+  </div>
+);
+
+// Priority
+const Priority = ({ level = "med" }) => {
+  const lv = { low: 1, med: 2, high: 3, urg: 4 }[level] || 2;
+  const label = { low: "Low", med: "Medium", high: "High", urg: "Urgent" }[level] || "Medium";
+  return (
+    <span className={`pri ${level}`}>
+      <span className={`pri-bar ${lv >= 1 ? "on" : ""}`}/>
+      <span className={`pri-bar ${lv >= 2 ? "on" : ""}`}/>
+      <span className={`pri-bar ${lv >= 3 ? "on" : ""}`}/>
+      <span className={`pri-bar ${lv >= 4 ? "on" : ""}`}/>
+      <span style={{ marginLeft: 4 }}>{label}</span>
+    </span>
+  );
+};
+
+// Progress
+const Progress = ({ value = 50, tone = "" }) => (
+  <div className={`progress ${tone}`}><div style={{ width: value + "%" }}/></div>
+);
+
+// Logo
+const InspyraLogo = ({ size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+    <defs>
+      <linearGradient id="ilg" x1="0" y1="0" x2="32" y2="32">
+        <stop offset="0" stopColor="#5B5BF7"/>
+        <stop offset="1" stopColor="#22D3EE"/>
+      </linearGradient>
+    </defs>
+    <rect x="2" y="2" width="28" height="28" rx="7" fill="url(#ilg)"/>
+    <path d="M11 9v14M16 9v14M21 9v14" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+    <circle cx="11" cy="9" r="2" fill="white"/>
+    <circle cx="21" cy="23" r="2" fill="white"/>
+  </svg>
+);
+
+Object.assign(window, {
+  Icon, Ic, Badge, Spark, Avatar, AvatarGroup, Priority, Progress, InspyraLogo,
+});
+
+
+const NAV = [
+  { group: "Workspace", items: [
+    { id: "dashboard", label: "Dashboard", icon: "grid" },
+  ]},
+  { group: "Comercial", items: [
+    { id: "prospects", label: "Prospectos", icon: "search", badge: "248" },
+    { id: "campaigns", label: "Campañas", icon: "rocket" },
+    { id: "followup", label: "Seguimiento", icon: "inbox", badge: "14" },
+    { id: "pipeline", label: "Pipeline", icon: "flow" },
+    { id: "meetings", label: "Reuniones", icon: "calendar", badge: "5" },
+  ]},
+  { group: "Delivery", items: [
+    { id: "clients", label: "Clientes", icon: "building" },
+    { id: "services", label: "Servicios", icon: "layers" },
+    { id: "projects", label: "Proyectos", icon: "flow2" },
+    { id: "tasks", label: "Tareas", icon: "check2", badge: "32" },
+  ]},
+  { group: "Studio", items: [
+    { id: "lab", label: "Laboratorio IA", icon: "beaker", pin: true },
+  ]},
+  { group: "Operations", items: [
+    { id: "hosting", label: "HostingGuard", icon: "shield" },
+    { id: "billing", label: "Facturación", icon: "card" },
+    { id: "tickets", label: "Tickets", icon: "life", badge: "7" },
+    { id: "reports", label: "Reportes", icon: "chart" },
+  ]},
+  { group: "Account", items: [
+    { id: "settings", label: "Configuración", icon: "cog" },
+  ]},
+];
+
+function Sidebar({ active, onNav }) {
+  return (
+    <aside className="sb">
+      <div className="sb-head">
+        <div className="sb-brand">
+          <InspyraLogo size={22} />
+          <div className="sb-brand-text">
+            <div className="sb-brand-name">Inspyra</div>
+            <div className="sb-brand-sub">ERP — Internal</div>
+          </div>
+        </div>
+        <button className="sb-cmd" title="Search / Command (⌘K)">
+          <Icon.search size={13}/>
+        </button>
+      </div>
+
+      <div className="sb-workspace">
+        <div className="sb-ws">
+          <div className="sb-ws-av">SI</div>
+          <div className="sb-ws-body">
+            <div className="sb-ws-name">Studio Inspyra</div>
+            <div className="sb-ws-meta">12 members · Pro</div>
+          </div>
+          <Icon.chevronDown size={13} stroke={1.8}/>
+        </div>
+      </div>
+
+      <nav className="sb-nav">
+        {NAV.map((g) => (
+          <div key={g.group} className="sb-group">
+            <div className="sb-group-label">{g.group}</div>
+            {g.items.map((it) => {
+              const IconC = Icon[it.icon];
+              const isActive = active === it.id;
+              return (
+                <button
+                  key={it.id}
+                  className={`sb-item ${isActive ? "active" : ""} ${it.pin ? "pin" : ""}`}
+                  onClick={() => onNav(it.id)}
+                >
+                  {IconC && <IconC size={15} stroke={1.6}/>}
+                  <span className="sb-item-label">{it.label}</span>
+                  {it.badge && <span className="sb-item-badge">{it.badge}</span>}
+                  {it.pin && <span className="sb-item-pin">Lab</span>}
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </nav>
+
+      <div className="sb-foot">
+        <div className="sb-user">
+          <Avatar name="Mateo López" size="sm"/>
+          <div className="sb-user-body">
+            <div className="sb-user-name">Mateo López</div>
+            <div className="sb-user-role">Founder · Admin</div>
+          </div>
+          <Icon.more size={14}/>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+// Sidebar styles (scoped via class names)
+const _sbStyles = `
+.sb {
+  background: var(--sb-bg);
+  color: var(--sb-text);
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--sb-border);
+  position: relative;
+  overflow: hidden;
+}
+.sb::before {
+  content: '';
+  position: absolute; top: -120px; left: -80px;
+  width: 360px; height: 360px;
+  background: radial-gradient(circle, rgba(91,91,247,.18), transparent 60%);
+  pointer-events: none;
+}
+.sb-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 14px 10px;
+  position: relative;
+  z-index: 1;
+}
+.sb-brand { display: flex; align-items: center; gap: 9px; flex: 1; }
+.sb-brand-name {
+  font-family: var(--font-display);
+  font-size: 14px; font-weight: 600;
+  color: var(--sb-text-strong);
+  letter-spacing: -0.005em;
+  line-height: 1.1;
+}
+.sb-brand-sub {
+  font-size: 10.5px;
+  color: var(--sb-text-muted);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.sb-cmd {
+  width: 26px; height: 26px;
+  border: 1px solid var(--sb-border);
+  background: var(--sb-bg-2);
+  color: var(--sb-text);
+  border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.sb-cmd:hover { color: white; }
+
+.sb-workspace { padding: 4px 10px 10px; position: relative; z-index: 1; }
+.sb-ws {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px;
+  background: var(--sb-bg-2);
+  border: 1px solid var(--sb-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.sb-ws:hover { background: var(--sb-hover); }
+.sb-ws-av {
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #5B5BF7, #22D3EE);
+  color: white;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: .03em;
+}
+.sb-ws-body { flex: 1; min-width: 0; }
+.sb-ws-name { font-size: 12.5px; font-weight: 600; color: var(--sb-text-strong); }
+.sb-ws-meta { font-size: 10.5px; color: var(--sb-text-muted); }
+
+.sb-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 10px 12px;
+  position: relative; z-index: 1;
+}
+.sb-nav::-webkit-scrollbar { width: 6px; }
+.sb-nav::-webkit-scrollbar-thumb { background: #2A2D36; border: none; }
+
+.sb-group { padding: 10px 0 4px; }
+.sb-group-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--sb-text-muted);
+  padding: 4px 8px 6px;
+  font-weight: 600;
+}
+.sb-item {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: transparent;
+  border: 0;
+  color: var(--sb-text);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  text-align: left;
+  transition: background .12s, color .12s;
+}
+.sb-item:hover { background: var(--sb-hover); color: var(--sb-text-strong); }
+.sb-item.active {
+  background: var(--sb-active);
+  color: var(--sb-text-strong);
+  box-shadow: inset 2px 0 0 var(--primary);
+}
+.sb-item-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-item-badge {
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #2A2D36;
+  color: var(--sb-text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+.sb-item.active .sb-item-badge { background: #3A3D48; color: white; }
+.sb-item.pin {
+  background: linear-gradient(135deg, rgba(91,91,247,.16), rgba(34,211,238,.10));
+  border: 1px solid rgba(91,91,247,.30);
+  color: #DCDCFE;
+}
+.sb-item.pin:hover { background: linear-gradient(135deg, rgba(91,91,247,.26), rgba(34,211,238,.16)); color: white; }
+.sb-item.pin.active { background: linear-gradient(135deg, rgba(91,91,247,.32), rgba(34,211,238,.20)); color: white; border-color: rgba(91,91,247,.5); box-shadow: none; }
+.sb-item-pin {
+  font-size: 9.5px;
+  padding: 1px 6px;
+  background: rgba(255,255,255,.12);
+  border-radius: 4px;
+  letter-spacing: .04em;
+  font-weight: 600;
+  color: #C7C7FE;
+}
+
+.sb-foot { padding: 10px; border-top: 1px solid var(--sb-border); position: relative; z-index: 1; }
+.sb-user {
+  display: flex; align-items: center; gap: 9px;
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.sb-user:hover { background: var(--sb-hover); }
+.sb-user-body { flex: 1; min-width: 0; }
+.sb-user-name { font-size: 12.5px; font-weight: 600; color: var(--sb-text-strong); }
+.sb-user-role { font-size: 10.5px; color: var(--sb-text-muted); }
+`;
+
+if (!document.getElementById("sb-styles")) {
+  const s = document.createElement("style");
+  s.id = "sb-styles";
+  s.textContent = _sbStyles;
+  document.head.appendChild(s);
+}
+
+
+const useStateTB = useState;
+
+const SCREEN_META = {
+  dashboard: { crumbs: ["Workspace", "Dashboard"], title: "Dashboard", sub: "Overview · Today, May 24" },
+  growth:    { crumbs: ["Comercial", "Pipeline"], title: "Pipeline", sub: "Embudo comercial" },
+  prospects: { crumbs: ["Comercial", "Prospectos"], title: "Prospectos", sub: "Lead Discovery · Research Engine" },
+  campaigns: { crumbs: ["Comercial", "Campañas"], title: "Campañas", sub: "Inbound Lead Engine — captación de Inspyra" },
+  followup:  { crumbs: ["Comercial", "Seguimiento"], title: "Seguimiento", sub: "Follow-up Center — tu bandeja comercial diaria" },
+  pipeline:  { crumbs: ["Comercial", "Pipeline"], title: "Pipeline", sub: "Sales Pipeline — todos los leads convergen acá" },
+  meetings:  { crumbs: ["Comercial", "Reuniones"], title: "Reuniones", sub: "Sales Meetings Center — agenda comercial" },
+  clients:   { crumbs: ["Delivery", "Clientes"], title: "Clientes", sub: "Active accounts" },
+  services:  { crumbs: ["Delivery", "Servicios"], title: "Servicios", sub: "Contracted services" },
+  projects:  { crumbs: ["Delivery", "Proyectos"], title: "Proyectos", sub: "Active project board" },
+  tasks:     { crumbs: ["Delivery", "Tareas"], title: "Tareas", sub: "All assigned work" },
+  lab:       { crumbs: ["Studio", "Laboratorio IA"], title: "Laboratorio IA", sub: "Creative AI workspace" },
+  hosting:   { crumbs: ["Operations", "HostingGuard"], title: "HostingGuard", sub: "Deployments & infra" },
+  billing:   { crumbs: ["Operations", "Facturación"], title: "Facturación", sub: "Revenue & invoices" },
+  tickets:   { crumbs: ["Operations", "Tickets"], title: "Tickets", sub: "Support queue" },
+  reports:   { crumbs: ["Operations", "Reportes"], title: "Reportes", sub: "Saved reports" },
+  settings:  { crumbs: ["Account", "Configuración"], title: "Configuración", sub: "Workspace settings" },
+};
+
+function Topbar({ screen }) {
+  const m = SCREEN_META[screen] || SCREEN_META.dashboard;
+  return (
+    <header className="topbar">
+      <div className="topbar-crumbs">
+        {m.crumbs.map((c, i) => (
+          <React.Fragment key={i}>
+            {i > 0 && <span className="crumb-sep">/</span>}
+            <span className={i === m.crumbs.length - 1 ? "crumb-current" : ""}>{c}</span>
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div className="topbar-search">
+        <Icon.search size={14}/>
+        <input placeholder="Search clients, projects, tickets…" />
+        <span className="kbd">⌘K</span>
+      </div>
+
+      <div className="topbar-actions">
+        <button className="btn btn-sm btn-ghost"><Icon.lightning size={14}/> Quick actions</button>
+        <span style={{ width: 1, height: 18, background: "var(--border)" }}/>
+        <button className="icon-btn" title="Inbox"><Icon.inbox size={15}/></button>
+        <button className="icon-btn" title="Notifications"><Icon.bell size={15}/><span className="dot"/></button>
+        <button className="icon-btn" title="Help"><Icon.life size={15}/></button>
+        <Avatar name="Mateo López" size="md"/>
+      </div>
+    </header>
+  );
+}
+
+
+const useStateLogin = useState;
+
+function Login({ onEnter }) {
+  return (
+    <div className="login-stage">
+      <div className="login-form-side">
+        <div className="login-form">
+          <div className="login-brand">
+            <InspyraLogo size={26}/>
+            <div className="name">Inspyra</div>
+            <span className="badge outline" style={{ marginLeft: 6, fontSize: 10, padding: "1px 7px" }}>ERP · Internal</span>
+          </div>
+
+          <div>
+            <h1 className="login-h1">Bienvenido de vuelta.</h1>
+            <p className="login-sub">Operá tu agencia desde un solo lugar — Growth, Delivery, Studio y Operations.</p>
+          </div>
+
+          <div className="field">
+            <label>Email corporativo</label>
+            <input className="input" defaultValue="mateo@inspyra.studio" style={{ height: 40 }}/>
+          </div>
+
+          <div className="field">
+            <div className="row between">
+              <label>Contraseña</label>
+              <a style={{ fontSize: 11.5, color: "var(--primary-700)", textDecoration: "none" }}>¿Olvidaste tu contraseña?</a>
+            </div>
+            <input className="input" type="password" defaultValue="••••••••••••" style={{ height: 40 }}/>
+          </div>
+
+          <label className="row gap-sm" style={{ fontSize: 12.5, color: "var(--ink-700)", cursor: "pointer" }}>
+            <input type="checkbox" defaultChecked/>
+            Mantenerme conectado en este equipo
+          </label>
+
+          <button className="btn btn-brand btn-lg" style={{ width: "100%", justifyContent: "center", height: 42, fontSize: 14 }} onClick={onEnter}>
+            Iniciar sesión <Icon.arrowRight size={14}/>
+          </button>
+
+          <div style={{ position: "relative", textAlign: "center" }}>
+            <div style={{ position: "absolute", inset: "50% 0", height: 1, background: "var(--border)" }}/>
+            <span style={{ position: "relative", background: "var(--bg)", padding: "0 12px", fontSize: 11.5, color: "var(--ink-500)" }}>o continuar con</span>
+          </div>
+
+          <div className="row gap-sm">
+            <button className="btn btn-lg" style={{ flex: 1, justifyContent: "center", height: 40 }}>
+              <span style={{ fontWeight: 700, color: "#4285F4" }}>G</span> Google
+            </button>
+            <button className="btn btn-lg" style={{ flex: 1, justifyContent: "center", height: 40 }}>
+              <Icon.shield size={14}/> SSO Okta
+            </button>
+          </div>
+
+          <div style={{ fontSize: 11.5, color: "var(--ink-500)", textAlign: "center", marginTop: 4 }}>
+            Acceso solo para miembros del equipo. ¿No tenés cuenta? Pedile invitación a tu admin.
+          </div>
+        </div>
+      </div>
+
+      <div className="login-decor">
+        <div className="gridlines"/>
+        {/* floating cards collage */}
+        <div style={{ position: "absolute", top: "12%", right: "10%", width: 280, transform: "rotate(-3deg)" }}>
+          <FloatingCard
+            title="Helia Energy"
+            subtitle="Plataforma SaaS · v2.4 desplegada"
+            footer="hace 2 min · build 1m 48s"
+            accent="#5B5BF7"
+          />
+        </div>
+        <div style={{ position: "absolute", top: "32%", left: "8%", width: 240, transform: "rotate(2deg)" }}>
+          <FloatingCard
+            title="Pipeline · USD 76.3k"
+            subtitle="14 deals · 3 cerca de cierre"
+            footer="Growth Q2"
+            accent="#22D3EE"
+            stat
+          />
+        </div>
+        <div style={{ position: "absolute", bottom: "12%", right: "8%", width: 300, transform: "rotate(2deg)" }}>
+          <FloatingCard
+            title="Content Agent"
+            subtitle="Generó 8 reels · calendario mayo · Helia Energy"
+            footer="Laboratorio IA"
+            accent="#A78BFA"
+            agent
+          />
+        </div>
+
+        <div className="quote">
+          La agencia ya no se mide en horas. Se mide en deploys, ingresos recurrentes y contenido que mueve la aguja.
+          <div className="quote-cite">— Filosofía operativa de Inspyra</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FloatingCard({ title, subtitle, footer, accent, stat, agent }) {
+  return (
+    <div style={{
+      background: "rgba(20,22,28,.85)",
+      backdropFilter: "blur(12px)",
+      border: "1px solid rgba(255,255,255,.08)",
+      borderRadius: 12,
+      padding: "12px 14px",
+      color: "white",
+      boxShadow: "0 24px 60px -16px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.04)",
+    }}>
+      <div className="row between" style={{ marginBottom: 6 }}>
+        <span style={{ width: 22, height: 22, borderRadius: 6, background: accent + "33", border: `1px solid ${accent}55`, display: "inline-flex", alignItems: "center", justifyContent: "center", color: accent }}>
+          {agent ? <Icon.sparkles size={11}/> : stat ? <Icon.trend size={11}/> : <Icon.rocket size={11}/>}
+        </span>
+        <span style={{ fontSize: 10, color: accent, letterSpacing: ".06em", textTransform: "uppercase", fontWeight: 600 }}>{footer.split(" ")[0]}</span>
+      </div>
+      <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 2 }}>{title}</div>
+      <div style={{ fontSize: 11.5, color: "rgba(255,255,255,.55)" }}>{subtitle}</div>
+      {stat && (
+        <div className="row" style={{ gap: 3, marginTop: 8, alignItems: "flex-end", height: 24 }}>
+          {[40, 55, 48, 70, 62, 78, 88, 72, 92, 85].map((v, i) => (
+            <span key={i} style={{ flex: 1, background: i > 6 ? accent : "rgba(255,255,255,.15)", height: v + "%", borderRadius: 1.5 }}/>
+          ))}
+        </div>
+      )}
+      <div style={{ fontSize: 10.5, color: "rgba(255,255,255,.4)", marginTop: 8 }}>{footer}</div>
+    </div>
+  );
+}
+
+
+
+const KPI = ({ icon, label, value, unit, delta, trend, chartColor = "#0B0D12", chartFill }) => {
+  const IconC = Icon[icon];
+  return (
+    <div className="kpi">
+      <div className="kpi-head">
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span className="kpi-icon">{IconC && <IconC size={14}/>}</span>
+          {label}
+        </span>
+        <button className="icon-btn" style={{ width: 22, height: 22, background: "transparent", border: 0 }}>
+          <Icon.more size={14}/>
+        </button>
+      </div>
+      <div className="kpi-value">
+        {value}
+        {unit && <span className="unit">{unit}</span>}
+      </div>
+      <div className="row between">
+        <span className={`kpi-delta ${delta?.dir || "flat"}`}>
+          {delta?.dir === "up" && <Icon.arrowUp size={10} stroke={2.4}/>}
+          {delta?.dir === "down" && <Icon.arrowDown size={10} stroke={2.4}/>}
+          {delta?.value}
+        </span>
+        <Spark data={trend} color={chartColor} fill={chartFill} w={90} h={28}/>
+      </div>
+    </div>
+  );
+};
+
+const PIPELINE = [
+  { name: "Lead", color: "#9CA3AF", deals: [
+    { co: "Aurora Café", contact: "Sofía Vidal", amt: "USD 1.4k", days: "Hoy", svc: "Web + SEO" },
+    { co: "Nordic Studio", contact: "K. Lindqvist", amt: "USD 3.2k", days: "2d", svc: "Branding + Web" },
+    { co: "Veleta Wines", contact: "P. Echeverría", amt: "USD 980", days: "3d", svc: "Redes" },
+    { co: "Helix Robotics", contact: "L. Ortega", amt: "USD 6.4k", days: "5d", svc: "Software" },
+  ]},
+  { name: "Contactado", color: "#A78BFA", deals: [
+    { co: "Bauer & Co", contact: "J. Bauer", amt: "USD 5.8k", days: "1d", svc: "Web · Hosting" },
+    { co: "Lumen Salud", contact: "Dra. M. Roca", amt: "USD 2.7k", days: "2d", svc: "SEO local" },
+    { co: "Forge Legal", contact: "T. Vega", amt: "USD 4.5k", days: "4d", svc: "Web + redes" },
+  ]},
+  { name: "Reunión", color: "#5B5BF7", deals: [
+    { co: "Calá Inmobiliaria", contact: "R. Ferro", amt: "USD 8.2k", days: "Mañana", svc: "Plataforma + SEO" },
+    { co: "Tessera Joyas", contact: "A. Tessera", amt: "USD 3.6k", days: "Hoy", svc: "Tienda online" },
+  ]},
+  { name: "Propuesta", color: "#22D3EE", deals: [
+    { co: "Helia Energy", contact: "F. Cazenave", amt: "USD 14.5k", days: "Vence 3d", svc: "Software + AWS" },
+    { co: "Norte Films", contact: "I. Saavedra", amt: "USD 6.8k", days: "Vence 5d", svc: "Plataforma" },
+    { co: "Mira Cosmetics", contact: "C. Bregman", amt: "USD 4.2k", days: "Vence 1d", svc: "E-commerce" },
+  ]},
+  { name: "Ganado", color: "#10B981", deals: [
+    { co: "Klein Studio", contact: "D. Klein", amt: "USD 9.4k", days: "Cerrado", svc: "Web + SEO + Redes" },
+    { co: "Borealis Tours", contact: "M. Calderón", amt: "USD 5.1k", days: "Cerrado", svc: "Mantenimiento" },
+  ]},
+];
+
+const PROJECTS = [
+  { id: "P-2417", client: "Helia Energy", svc: "Plataforma SaaS", lead: "Mateo López", status: "En desarrollo", tone: "info", due: "12 Jun", pct: 64 },
+  { id: "P-2412", client: "Tessera Joyas", svc: "E-commerce Shopify", lead: "Lucía Romero", status: "Revisión", tone: "warning", due: "29 May", pct: 88 },
+  { id: "P-2408", client: "Calá Inmobiliaria", svc: "Web institucional", lead: "Pablo Ferré", status: "En diseño", tone: "brand", due: "5 Jun", pct: 32 },
+  { id: "P-2404", client: "Klein Studio", svc: "SEO + Redes", lead: "Camila Vega", status: "Mantenimiento", tone: "default", due: "Recurrente", pct: 100 },
+  { id: "P-2399", client: "Borealis Tours", svc: "Hosting + SSL", lead: "Diego Salas", status: "Entregado", tone: "success", due: "—", pct: 100 },
+  { id: "P-2391", client: "Lumen Salud", svc: "Landing + Ads", lead: "Lucía Romero", status: "Pendiente", tone: "default", due: "8 Jun", pct: 8 },
+];
+
+const ACTIVITY = [
+  { who: "Lucía Romero", what: "creó un cliente nuevo", obj: "Aurora Café", time: "hace 12 min", icon: "user", tone: "brand" },
+  { who: "HostingGuard", what: "desplegó", obj: "tessera-joyas.com · v3.2", time: "hace 24 min", icon: "rocket", tone: "success" },
+  { who: "Stripe", what: "recibió pago de", obj: "USD 4,500 — Klein Studio", time: "hace 1 h", icon: "card", tone: "success" },
+  { who: "Diego Salas", what: "resolvió un ticket", obj: "#284 SSL renew — Borealis", time: "hace 2 h", icon: "shield", tone: "default" },
+  { who: "Content Agent", what: "aprobó contenido", obj: "Calendario mayo · Helia Energy", time: "hace 3 h", icon: "sparkles", tone: "brand" },
+  { who: "Pablo Ferré", what: "movió un proyecto a", obj: "Revisión — Tessera Joyas", time: "hace 4 h", icon: "flow", tone: "warning" },
+  { who: "Mateo López", what: "ganó la oportunidad", obj: "Borealis Tours · USD 5.1k", time: "ayer", icon: "trend", tone: "success" },
+];
+
+const UPCOMING = [
+  { kind: "Pago", label: "Helia Energy — Mantenimiento", amount: "USD 1,200", date: "26 May", in: "en 2 días", tone: "warning" },
+  { kind: "Renovación", label: "Klein Studio — Hosting AWS", amount: "USD 480/yr", date: "28 May", in: "en 4 días", tone: "info" },
+  { kind: "SSL", label: "tessera-joyas.com", amount: "Let's Encrypt", date: "30 May", in: "en 6 días", tone: "default" },
+  { kind: "Mantenimiento", label: "Calá Inmobiliaria — Web", amount: "Mensual", date: "1 Jun", in: "en 8 días", tone: "brand" },
+  { kind: "Pago", label: "Forge Legal — Setup", amount: "USD 2,400", date: "5 Jun", in: "atrasado 2d", tone: "danger" },
+];
+
+function Dashboard() {
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Buenos días, Mateo 👋</h1>
+          <p>Resumen de tu agencia · Lunes 24 de mayo, 2026</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.calendar size={14}/> Este mes <Icon.chevronDown size={12}/></button>
+          <button className="btn"><Icon.download size={14}/> Exportar</button>
+          <button className="btn btn-primary"><Icon.plus size={14}/> Nuevo</button>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
+        <KPI icon="sparkles" label="Leads nuevos" value="142" delta={{ dir: "up", value: "+18%" }}
+             trend={[8,11,9,14,16,12,18,22,19,24,21,28]} chartColor="#5B5BF7"/>
+        <KPI icon="building" label="Clientes activos" value="48" delta={{ dir: "up", value: "+3" }}
+             trend={[40,41,42,43,44,44,45,46,46,47,47,48]} chartColor="#10B981"/>
+        <KPI icon="flow" label="Proyectos activos" value="23" delta={{ dir: "flat", value: "Estable" }}
+             trend={[22,24,21,23,22,24,23,22,23,24,23,23]} chartColor="#4B5363"/>
+        <KPI icon="check2" label="Tareas pendientes" value="32" delta={{ dir: "down", value: "−6" }}
+             trend={[44,42,40,38,38,36,34,33,34,32,33,32]} chartColor="#F59E0B"/>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 24 }}>
+        <KPI icon="card" label="Ingresos del mes" value="86,420" unit="USD"
+             delta={{ dir: "up", value: "+24%" }}
+             trend={[18,28,22,35,32,44,48,52,58,66,74,86]} chartColor="#5B5BF7"
+             chartFill="rgba(91,91,247,.10)"/>
+        <KPI icon="trend" label="MRR" value="32,180" unit="USD/mes"
+             delta={{ dir: "up", value: "+8.2%" }}
+             trend={[24,25,25,26,27,28,29,30,30,31,32,32]} chartColor="#22D3EE"
+             chartFill="rgba(34,211,238,.10)"/>
+        <KPI icon="rocket" label="Deployments activos" value="124"
+             delta={{ dir: "up", value: "+12" }}
+             trend={[88,92,96,100,104,108,112,115,118,120,122,124]} chartColor="#0B0D12"/>
+        <KPI icon="life" label="Tickets abiertos" value="7"
+             delta={{ dir: "down", value: "−4" }}
+             trend={[14,12,11,12,10,9,9,8,8,7,7,7]} chartColor="#EF4444"/>
+      </div>
+
+      {/* Pipeline */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header">
+          <div className="card-title">
+            Pipeline comercial
+            <span className="badge outline" style={{ marginLeft: 6 }}>14 deals · USD 76.3k</span>
+          </div>
+          <div className="row gap-sm">
+            <button className="btn btn-sm btn-ghost"><Icon.filter size={13}/> Filtrar</button>
+            <button className="btn btn-sm btn-ghost"><Icon.users size={13}/> Todos</button>
+            <button className="btn btn-sm"><Icon.external size={13}/> Abrir Growth</button>
+          </div>
+        </div>
+        <div className="card-body">
+          <div className="pipeline">
+            {PIPELINE.map((stage) => {
+              const total = stage.deals.reduce((a, d) => a + parseFloat(d.amt.replace(/[^0-9.]/g, "")), 0);
+              return (
+                <div key={stage.name} className="pipeline-col">
+                  <div className="pipeline-col-head">
+                    <div className="h">
+                      <span className="stagebar" style={{ background: stage.color }}/>
+                      {stage.name}
+                      <span className="count">{stage.deals.length}</span>
+                    </div>
+                    <span className="val">USD {total.toFixed(1)}k</span>
+                  </div>
+                  {stage.deals.map((d, i) => (
+                    <div key={i} className="deal">
+                      <div className="deal-name">{d.co}</div>
+                      <div className="deal-meta">
+                        <Avatar name={d.contact} size="sm"/>
+                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.contact}</span>
+                      </div>
+                      <div className="deal-meta">
+                        <Icon.layers size={11}/> {d.svc}
+                      </div>
+                      <div className="deal-foot">
+                        <span className="deal-amount">{d.amt}</span>
+                        <span className="badge outline" style={{ fontSize: 10 }}>{d.days}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "1.5fr 1fr", marginBottom: 16 }}>
+        {/* Last projects */}
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Últimos proyectos</div>
+            <div className="row gap-sm">
+              <button className="btn btn-sm btn-ghost"><Icon.filter size={13}/></button>
+              <button className="btn btn-sm">Ver todos</button>
+            </div>
+          </div>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Proyecto</th>
+                <th>Cliente</th>
+                <th>Estado</th>
+                <th>Responsable</th>
+                <th style={{ width: 90 }}>Deadline</th>
+                <th style={{ width: 110 }}>Progreso</th>
+              </tr>
+            </thead>
+            <tbody>
+              {PROJECTS.map((p) => (
+                <tr key={p.id}>
+                  <td>
+                    <div className="cell-strong">{p.svc}</div>
+                    <div className="cell-muted" style={{ fontSize: 11.5, fontFamily: "var(--font-mono)" }}>{p.id}</div>
+                  </td>
+                  <td className="cell-strong">{p.client}</td>
+                  <td><Badge tone={p.tone} dot>{p.status}</Badge></td>
+                  <td>
+                    <div className="row gap-sm">
+                      <Avatar name={p.lead} size="sm"/>
+                      <span>{p.lead.split(" ")[0]}</span>
+                    </div>
+                  </td>
+                  <td className="cell-muted col-num">{p.due}</td>
+                  <td>
+                    <div className="row gap-sm">
+                      <div style={{ flex: 1 }}><Progress value={p.pct} tone={p.pct === 100 ? "success" : "brand"}/></div>
+                      <span className="col-num" style={{ fontSize: 11.5, color: "var(--ink-500)", width: 28, textAlign: "right" }}>{p.pct}%</span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Activity */}
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Actividad reciente</div>
+            <button className="btn btn-sm btn-ghost"><Icon.more size={14}/></button>
+          </div>
+          <div className="card-body" style={{ paddingTop: 16 }}>
+            <div className="timeline">
+              {ACTIVITY.map((a, i) => {
+                const IconC = Icon[a.icon] || Icon.dot;
+                return (
+                  <div key={i} className="timeline-item">
+                    <span className={`timeline-dot ${a.tone}`}><IconC size={10} stroke={2}/></span>
+                    <div className="timeline-content">
+                      <span className="who">{a.who}</span> {a.what} <span style={{ color: "var(--ink-900)", fontWeight: 500 }}>{a.obj}</span>
+                      <div className="timeline-meta">{a.time}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", marginBottom: 16 }}>
+        {/* Upcoming */}
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Próximos vencimientos</div>
+            <button className="btn btn-sm btn-ghost"><Icon.calendar size={13}/> Próximos 14 días</button>
+          </div>
+          <div style={{ padding: "4px 6px 6px" }}>
+            {UPCOMING.map((u, i) => (
+              <div key={i} className="row" style={{ padding: "10px 12px", borderBottom: i === UPCOMING.length - 1 ? "none" : "1px solid var(--border-soft)", gap: 12 }}>
+                <Badge tone={u.tone}>{u.kind}</Badge>
+                <div style={{ flex: 1 }}>
+                  <div className="cell-strong" style={{ fontSize: 13 }}>{u.label}</div>
+                  <div className="cell-muted" style={{ fontSize: 11.5 }}>{u.amount}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div className="cell-strong" style={{ fontSize: 12.5 }}>{u.date}</div>
+                  <div className="cell-muted" style={{ fontSize: 11 }}>{u.in}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Revenue chart */}
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Ingresos · últimos 6 meses</div>
+            <div className="row gap-sm">
+              <Badge tone="brand" dot>Mensual</Badge>
+              <Badge tone="default" dot>Recurrente</Badge>
+            </div>
+          </div>
+          <div className="card-body">
+            <RevenueChart />
+            <div className="row between" style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--border-soft)" }}>
+              <div>
+                <div className="cell-muted" style={{ fontSize: 11.5 }}>Total semestre</div>
+                <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>USD 412,840</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div className="cell-muted" style={{ fontSize: 11.5 }}>Crecimiento</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--success-ink)" }}>+38.4% vs anterior</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RevenueChart() {
+  const data = [
+    { m: "Dic", a: 42, b: 26 },
+    { m: "Ene", a: 51, b: 28 },
+    { m: "Feb", a: 58, b: 29 },
+    { m: "Mar", a: 67, b: 30 },
+    { m: "Abr", a: 74, b: 31 },
+    { m: "May", a: 86, b: 32 },
+  ];
+  const W = 540, H = 180, P = 24;
+  const max = 100;
+  const xStep = (W - P * 2) / (data.length - 1);
+  const yScale = (v) => H - P - (v / max) * (H - P * 2);
+
+  const lineA = data.map((d, i) => [P + i * xStep, yScale(d.a)]);
+  const lineB = data.map((d, i) => [P + i * xStep, yScale(d.b)]);
+  const pathA = lineA.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+  const pathB = lineB.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+  const areaA = `${pathA} L${W - P},${H - P} L${P},${H - P} Z`;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ display: "block" }}>
+      <defs>
+        <linearGradient id="rev-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#5B5BF7" stopOpacity=".22"/>
+          <stop offset="1" stopColor="#5B5BF7" stopOpacity="0"/>
+        </linearGradient>
+      </defs>
+      {/* gridlines */}
+      {[0, 1, 2, 3].map((i) => (
+        <line key={i} x1={P} x2={W - P} y1={P + i * ((H - P * 2) / 3)} y2={P + i * ((H - P * 2) / 3)}
+              stroke="#EEF0F3" strokeWidth="1"/>
+      ))}
+      <path d={areaA} fill="url(#rev-grad)"/>
+      <path d={pathA} fill="none" stroke="#5B5BF7" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
+      <path d={pathB} fill="none" stroke="#9CA3AF" strokeWidth="1.5" strokeDasharray="3 3"/>
+      {data.map((d, i) => (
+        <g key={i}>
+          <circle cx={lineA[i][0]} cy={lineA[i][1]} r={3.5} fill="white" stroke="#5B5BF7" strokeWidth="2"/>
+          <text x={P + i * xStep} y={H - 6} textAnchor="middle" fill="#6B7280" fontSize="10.5" fontFamily="var(--font-sans)">{d.m}</text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+
+const useStateCom = useState;
+
+/* Sub-navigation shared across all 5 Comercial sections.
+   Reinforces "where am I" + the daily mental model: descubrir → captar → seguir → cerrar → reunirse. */
+const COM_TABS = [
+  { id: "prospects", label: "Prospectos", icon: "search", hint: "Los buscamos nosotros", badge: "248" },
+  { id: "campaigns", label: "Campañas", icon: "rocket", hint: "Captación de Inspyra", badge: null },
+  { id: "followup", label: "Seguimiento", icon: "inbox", hint: "Tu bandeja diaria", badge: "14", alert: true },
+  { id: "pipeline", label: "Pipeline", icon: "funnel", hint: "Embudo de ventas", badge: null },
+  { id: "meetings", label: "Reuniones", icon: "calendar", hint: "Agenda comercial", badge: "5" },
+];
+
+function ComercialTabs({ active, onNav }) {
+  return (
+    <div className="com-tabs">
+      {COM_TABS.map((t) => {
+        const IconC = Icon[t.icon];
+        const on = active === t.id;
+        return (
+          <button key={t.id} className={`com-tab ${on ? "active" : ""}`} onClick={() => onNav?.(t.id)}>
+            <span className="com-tab-ic">{IconC && <IconC size={16}/>}</span>
+            <span className="com-tab-text">
+              <span className="com-tab-label">
+                {t.label}
+                {t.badge && <span className={`com-tab-badge ${t.alert ? "alert" : ""}`}>{t.badge}</span>}
+              </span>
+              <span className="com-tab-hint">{t.hint}</span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* Origin channel — the spec's key differentiator. Every lead shows where it came from. */
+const CHANNELS = {
+  meta:      { label: "Meta Ads", color: "#1877F2", icon: "rocket" },
+  fbmsg:     { label: "FB Messenger", color: "#0084FF", icon: "message" },
+  igdm:      { label: "Instagram DM", color: "#E1306C", icon: "sparkles" },
+  whatsapp:  { label: "WhatsApp", color: "#25D366", icon: "whatsapp" },
+  webform:   { label: "Web Form", color: "#5B5BF7", icon: "globe" },
+  google:    { label: "Google Ads", color: "#F9AB00", icon: "search" },
+  outbound:  { label: "Outbound", color: "#6B7280", icon: "target" },
+  referido:  { label: "Referido", color: "#F59E0B", icon: "users" },
+  organico:  { label: "Orgánico", color: "#10B981", icon: "trend" },
+};
+
+function ChannelTag({ ch, sm }) {
+  const c = CHANNELS[ch] || CHANNELS.outbound;
+  const IconC = Icon[c.icon];
+  return (
+    <span className="channel-tag" style={{ "--ch": c.color, fontSize: sm ? 11 : 11.5 }}>
+      <span className="channel-dot" style={{ background: c.color }}/>
+      {IconC && <IconC size={sm ? 10 : 11}/>}
+      {c.label}
+    </span>
+  );
+}
+
+/* Score de oportunidad — 0..100 with color band */
+function Score({ v }) {
+  const tone = v >= 80 ? "#10B981" : v >= 60 ? "#5B5BF7" : v >= 40 ? "#F59E0B" : "#9CA3AF";
+  return (
+    <span className="score">
+      <span className="score-ring" style={{ "--p": v + "%", "--c": tone }}>
+        <span className="score-num">{v}</span>
+      </span>
+    </span>
+  );
+}
+
+/* Hot/temperature indicator */
+function Temp({ level }) {
+  const map = { hot: { c: "#EF4444", l: "Caliente", i: "fire" }, warm: { c: "#F59E0B", l: "Tibio", i: "clock" }, cold: { c: "#6B7280", l: "Frío", i: "clock" } };
+  const t = map[level] || map.cold;
+  const IconC = Icon[t.i];
+  return (
+    <span className="temp" style={{ color: t.c }}>
+      <IconC size={12}/> {t.l}
+    </span>
+  );
+}
+
+/* Quick-action icon buttons used in Seguimiento */
+function QuickActions({ compact }) {
+  const acts = [
+    { ic: "phone", t: "Llamar", c: "#10B981" },
+    { ic: "whatsapp", t: "WhatsApp", c: "#25D366" },
+    { ic: "mail", t: "Email", c: "#5B5BF7" },
+    { ic: "calendar", t: "Reagendar", c: "#F59E0B" },
+    { ic: "check", t: "Respondido", c: "#6B7280" },
+  ];
+  return (
+    <div className="quick-actions">
+      {acts.map((a) => {
+        const IconC = Icon[a.ic];
+        return (
+          <button key={a.ic} className="qa-btn" title={a.t} style={{ "--qc": a.c }}>
+            <IconC size={14}/>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* THE AUTOMATION FLOW — the lead lifecycle, shown as a horizontal pipeline of automated steps */
+function AutomationFlow({ compact }) {
+  const steps = [
+    { ic: "inbox", t: "Lead entra", s: "Bot captura", c: "#5B5BF7", auto: true },
+    { ic: "zap", t: "Respuesta inmediata", s: "Auto-reply", c: "#22D3EE", auto: true },
+    { ic: "refresh", t: "Sin respuesta", s: "Seguimiento auto", c: "#F59E0B", auto: true },
+    { ic: "users", t: "Responde", s: "Asignación comercial", c: "#A78BFA", auto: false },
+    { ic: "calendar", t: "Agenda", s: "→ Reuniones", c: "#0EA5E9", auto: false },
+    { ic: "doc", t: "Propuesta", s: "→ Pipeline", c: "#5B5BF7", auto: false },
+    { ic: "trophy", t: "Cierre", s: "→ Cliente", c: "#10B981", auto: false },
+  ];
+  return (
+    <div className="auto-flow">
+      {steps.map((st, i) => {
+        const IconC = Icon[st.ic];
+        return (
+          <React.Fragment key={i}>
+            <div className="auto-step">
+              <span className="auto-step-ic" style={{ "--ac": st.c }}>
+                <IconC size={16}/>
+              </span>
+              <div className="auto-step-text">
+                <div className="auto-step-t">{st.t}</div>
+                <div className="auto-step-s">
+                  {st.auto && <span className="auto-badge"><Icon.robot size={9}/> auto</span>}
+                  {st.s}
+                </div>
+              </div>
+            </div>
+            {i < steps.length - 1 && <Icon.chevronRight size={14} className="auto-arrow"/>}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+/* Bots connection strip */
+const BOTS = [
+  { id: "meta", name: "Meta Ads Bot", desc: "Captura leads de anuncios", ch: "meta", on: true, today: 18 },
+  { id: "fbmsg", name: "Messenger Bot", desc: "Captura y clasifica chats", ch: "fbmsg", on: true, today: 7 },
+  { id: "igdm", name: "Instagram DM Bot", desc: "Mensajes comerciales", ch: "igdm", on: true, today: 12 },
+  { id: "whatsapp", name: "WhatsApp Bot", desc: "Clasifica conversaciones", ch: "whatsapp", on: true, today: 24 },
+  { id: "webform", name: "Web Form Bot", desc: "Leads de formularios", ch: "webform", on: true, today: 9 },
+];
+
+function BotsStrip() {
+  return (
+    <div className="bots-strip">
+      {BOTS.map((b) => {
+        const c = CHANNELS[b.ch];
+        const IconC = Icon[c.icon];
+        return (
+          <div key={b.id} className="bot-card">
+            <span className="bot-ic" style={{ background: c.color + "1A", color: c.color }}>
+              <IconC size={16}/>
+            </span>
+            <div className="bot-body">
+              <div className="bot-name">
+                {b.name}
+                <span className="bot-status" style={{ background: b.on ? "var(--success)" : "var(--ink-300)" }}/>
+              </div>
+              <div className="bot-desc">{b.desc}</div>
+            </div>
+            <div className="bot-stat">
+              <div className="bot-stat-n">+{b.today}</div>
+              <div className="bot-stat-l">hoy</div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const _comStyles = `
+.com-tabs {
+  display: flex; gap: 6px;
+  margin-bottom: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 6px;
+  box-shadow: var(--sh-xs);
+}
+.com-tab {
+  flex: 1;
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: var(--r-md);
+  text-align: left;
+  transition: all .14s;
+}
+.com-tab:hover { background: var(--surface-hover); }
+.com-tab.active {
+  background: var(--ink-900);
+  border-color: var(--ink-900);
+}
+.com-tab-ic {
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  background: var(--bg-2);
+  color: var(--ink-700);
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.com-tab.active .com-tab-ic { background: rgba(255,255,255,.12); color: white; }
+.com-tab-text { display: flex; flex-direction: column; min-width: 0; }
+.com-tab-label {
+  font-size: 13.5px; font-weight: 600; color: var(--ink-900);
+  letter-spacing: -0.01em; display: flex; align-items: center; gap: 6px;
+}
+.com-tab.active .com-tab-label { color: white; }
+.com-tab-hint { font-size: 11px; color: var(--ink-500); white-space: nowrap; }
+.com-tab.active .com-tab-hint { color: rgba(255,255,255,.55); }
+.com-tab-badge {
+  font-size: 10px; font-weight: 600;
+  padding: 0 6px; height: 16px;
+  display: inline-flex; align-items: center;
+  background: var(--ink-100); color: var(--ink-600);
+  border-radius: 999px;
+}
+.com-tab-badge.alert { background: var(--danger-soft); color: var(--danger-ink); }
+.com-tab.active .com-tab-badge { background: rgba(255,255,255,.16); color: white; }
+
+.channel-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 500;
+  color: var(--ink-700);
+  white-space: nowrap;
+}
+.channel-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+.score { display: inline-flex; align-items: center; }
+.score-ring {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: conic-gradient(var(--c) var(--p), var(--ink-100) 0);
+  position: relative;
+}
+.score-ring::before {
+  content: ''; position: absolute; inset: 3px;
+  background: var(--surface); border-radius: 50%;
+}
+.score-num {
+  position: relative; z-index: 1;
+  font-size: 11.5px; font-weight: 700;
+  color: var(--ink-900);
+  font-variant-numeric: tabular-nums;
+}
+
+.temp { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 500; }
+
+.quick-actions { display: flex; gap: 4px; }
+.qa-btn {
+  width: 28px; height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-600);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all .12s;
+}
+.qa-btn:hover { background: var(--qc); border-color: var(--qc); color: white; }
+
+.auto-flow {
+  display: flex; align-items: stretch; gap: 4px;
+  overflow-x: auto;
+  padding: 4px 2px;
+}
+.auto-step {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-md);
+  flex: 1; min-width: 150px;
+}
+.auto-step-ic {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: var(--ac); color: white;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px -2px var(--ac);
+}
+.auto-step-t { font-size: 12.5px; font-weight: 600; color: var(--ink-900); }
+.auto-step-s { font-size: 10.5px; color: var(--ink-500); display: flex; align-items: center; gap: 5px; margin-top: 1px; }
+.auto-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: var(--primary-soft); color: var(--primary-700);
+  font-size: 9px; font-weight: 600;
+  padding: 1px 5px; border-radius: 999px;
+}
+.auto-arrow { color: var(--ink-300); flex-shrink: 0; align-self: center; }
+
+.bots-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.bot-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-xs);
+}
+.bot-ic { width: 34px; height: 34px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.bot-body { flex: 1; min-width: 0; }
+.bot-name { font-size: 12.5px; font-weight: 600; color: var(--ink-900); display: flex; align-items: center; gap: 6px; }
+.bot-status { width: 6px; height: 6px; border-radius: 50%; }
+.bot-desc { font-size: 11px; color: var(--ink-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bot-stat { text-align: right; flex-shrink: 0; }
+.bot-stat-n { font-size: 14px; font-weight: 700; color: var(--success-ink); font-variant-numeric: tabular-nums; }
+.bot-stat-l { font-size: 10px; color: var(--ink-400); }
+`;
+
+if (!document.getElementById("com-styles")) {
+  const s = document.createElement("style");
+  s.id = "com-styles";
+  s.textContent = _comStyles;
+  document.head.appendChild(s);
+}
+
+Object.assign(window, { ComercialTabs, ChannelTag, Score, Temp, QuickActions, AutomationFlow, BotsStrip, CHANNELS, COM_TABS });
+
+const useStateProsp = useState;
+
+const PROSPECTS_DATA = [
+  { co: "Estudio Bregman & Asoc.", rubro: "Estudio jurídico", web: "bregman-legal.com.ar", ig: "@bregmanlegal", city: "Buenos Aires", opp: "Web desactualizada · sin SSL · sin SEO", svc: "Web + SEO local", score: 88, state: "Nuevo", last: "—", next: "Hoy 15:00", who: "Lucía Romero" },
+  { co: "Inmobiliaria Calá", rubro: "Inmobiliaria", web: "cala-propiedades.com", ig: "@cala.propiedades", city: "Mar del Plata", opp: "Sin landing por proyecto", svc: "Plataforma + SEO", score: 92, state: "Contactado", last: "Hace 2d", next: "27 May", who: "Mateo López" },
+  { co: "Aurora Café", rubro: "Gastronomía", web: "—", ig: "@aurora.cafe", city: "Córdoba", opp: "Sin web · solo IG", svc: "Web + delivery", score: 71, state: "Reunión", last: "Ayer", next: "Mañana 11:00", who: "Pablo Ferré" },
+  { co: "Helix Robotics", rubro: "Industrial", web: "helixrobotics.io", ig: "—", city: "Rosario", opp: "Sin software interno · alto ticket", svc: "Software a medida", score: 95, state: "Propuesta", last: "Hace 5d", next: "29 May", who: "Mateo López" },
+  { co: "Nordic Studio", rubro: "Arquitectura", web: "nordic-studio.se", ig: "@nordicstudio", city: "Mendoza", opp: "Web lenta · mobile pobre · sin SEO", svc: "Branding + Web", score: 64, state: "Nuevo", last: "—", next: "—", who: "Camila Vega" },
+  { co: "Forge Legal", rubro: "Estudio jurídico", web: "forgelegal.com", ig: "—", city: "La Plata", opp: "Sin presencia digital · sin redes", svc: "Web + redes", score: 79, state: "Contactado", last: "Hace 1d", next: "28 May", who: "Pablo Ferré" },
+  { co: "Lumen Salud", rubro: "Salud", web: "lumensalud.com", ig: "@lumen.salud", city: "Buenos Aires", opp: "Sin agenda online · ads activas", svc: "Plataforma + Ads", score: 84, state: "Reunión", last: "Hoy", next: "30 May", who: "Mateo López" },
+  { co: "Veleta Wines", rubro: "Bodega", web: "veletawines.com", ig: "@veletawines", city: "Mendoza", opp: "Web genérica · sin tienda online", svc: "Branding + E-commerce", score: 58, state: "Nuevo", last: "—", next: "—", who: "Camila Vega" },
+  { co: "Dental Costa", rubro: "Salud · Odontología", web: "dentalcosta.com", ig: "@dental.costa", city: "Mar del Plata", opp: "Redes activas, sin agenda online", svc: "Plataforma + Ads", score: 81, state: "Nuevo", last: "—", next: "—", who: "Sofía Vidal" },
+  { co: "Grupo Andén", rubro: "Inmobiliaria", web: "grupoanden.com.ar", ig: "@grupoanden", city: "Buenos Aires", opp: "Web vieja · sin filtros de búsqueda", svc: "Plataforma + SEO", score: 76, state: "Contactado", last: "Hace 3d", next: "31 May", who: "Sofía Vidal" },
+];
+
+function Prospects({ onNav }) {
+  const [query, setQuery] = useStateProsp("inmobiliarias en Buenos Aires con web desactualizada y sin SEO local");
+  const SUGGESTED = [
+    "clínicas dentales con redes activas pero sin agenda online",
+    "bodegas en Mendoza sin tienda online y con IG fuerte",
+    "estudios jurídicos en La Plata sin presencia digital",
+  ];
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Prospectos</h1>
+          <p>Lead Discovery · los buscamos nosotros (outbound) · 248 prospectos · 12 nuevos esta semana</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.download size={14}/> Exportar CSV</button>
+          <button className="btn"><Icon.users size={14}/> Asignar lote</button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Nuevo prospecto</button>
+        </div>
+      </div>
+
+      <ComercialTabs active="prospects" onNav={onNav}/>
+
+      {/* Research engine hero */}
+      <div className="ai-box" style={{ marginBottom: 16, padding: "16px 18px" }}>
+        <div className="ai-head">
+          <span className="ai-ic"><Icon.search size={13}/></span>
+          <span className="ai-title">Research Engine</span>
+          <Badge tone="brand">Búsqueda inteligente</Badge>
+          <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--ink-500)" }}>IA · Google Maps · LinkedIn · 42 fuentes</span>
+        </div>
+        <div className="row gap-sm" style={{ marginBottom: 10 }}>
+          <button className="seg-btn active">🔍 Buscar con IA</button>
+          <button className="seg-btn">✋ Manual</button>
+          <button className="seg-btn">📥 Importar CSV</button>
+          <button className="seg-btn">🔗 Conectar fuente</button>
+        </div>
+        <div className="ai-input" style={{ background: "var(--bg-2)", borderRadius: "var(--r-md)", padding: "10px 14px" }}>
+          <Icon.sparkles size={16}/>
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Describí qué empresas buscás…"/>
+          <button className="btn btn-brand btn-sm"><Icon.bolt size={13}/> Descubrir</button>
+        </div>
+        <div className="ai-foot">
+          Probá:
+          {SUGGESTED.map((s, i) => (
+            <button key={i} className="ai-suggest" onClick={() => setQuery(s)}>
+              <Icon.sparkles size={11}/> {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* What the engine does — pipeline of enrichment */}
+      <div className="card" style={{ marginBottom: 16, padding: "12px 16px" }}>
+        <div className="row" style={{ gap: 0, justifyContent: "space-between", flexWrap: "wrap" }}>
+          {[
+            { ic: "search", t: "Descubre", s: "Busca empresas por rubro y zona" },
+            { ic: "layers", t: "Enriquece", s: "Web, IG, contacto, tamaño" },
+            { ic: "target", t: "Detecta oportunidad", s: "Qué les falta digitalmente" },
+            { ic: "trend", t: "Califica (score)", s: "Prioridad comercial 0–100" },
+            { ic: "users", t: "Asigna", s: "Reparte al equipo comercial" },
+            { ic: "rocket", t: "Prepara outreach", s: "Listo para contactar" },
+          ].map((st, i, arr) => {
+            const IconC = Icon[st.ic];
+            return (
+              <React.Fragment key={i}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 150 }}>
+                  <span style={{ width: 30, height: 30, borderRadius: 8, background: "var(--primary-soft)", color: "var(--primary-700)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <IconC size={15}/>
+                  </span>
+                  <div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-900)" }}>{st.t}</div>
+                    <div style={{ fontSize: 10.5, color: "var(--ink-500)" }}>{st.s}</div>
+                  </div>
+                </div>
+                {i < arr.length - 1 && <Icon.chevronRight size={14} color="var(--ink-300)" style={{ flexShrink: 0 }}/>}
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
+        <MiniStatP label="Resultados" value="248" sub="+12 esta semana" c="var(--primary)"/>
+        <MiniStatP label="Sin web" value="86" sub="34.7% · oportunidad alta" c="var(--warning)"/>
+        <MiniStatP label="Score ≥ 80" value="64" sub="prioridad comercial" c="var(--success)"/>
+        <MiniStatP label="Listos para outreach" value="38" sub="asignados al equipo" c="var(--secondary)"/>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">
+            Prospectos descubiertos
+            <Badge tone="outline">10 visibles · 248 totales</Badge>
+          </div>
+          <div className="row gap-sm">
+            <div className="topbar-search" style={{ width: 220, height: 30, padding: "4px 10px" }}>
+              <Icon.search size={13}/>
+              <input placeholder="Filtrar empresa..."/>
+            </div>
+            <button className="btn btn-sm"><Icon.filter size={13}/> Filtros</button>
+            <button className="btn btn-sm"><Icon.sort size={13}/> Score</button>
+          </div>
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th style={{ width: 28 }}><input type="checkbox"/></th>
+                <th>Empresa</th>
+                <th>Rubro</th>
+                <th>Ubicación</th>
+                <th>Web · IG</th>
+                <th>Oportunidad detectada</th>
+                <th>Servicio sugerido</th>
+                <th style={{ width: 70 }}>Score</th>
+                <th>Estado</th>
+                <th>Últ. contacto</th>
+                <th>Próx. seguim.</th>
+                <th>Responsable</th>
+                <th style={{ width: 28 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {PROSPECTS_DATA.map((p, i) => (
+                <tr key={i}>
+                  <td><input type="checkbox"/></td>
+                  <td>
+                    <div className="row gap-sm">
+                      <span className="avatar sm" style={{ background: "var(--bg-2)", color: "var(--ink-700)", fontSize: 10 }}>
+                        {p.co.split(" ").slice(0, 2).map(s => s[0]).join("").toUpperCase()}
+                      </span>
+                      <div className="cell-strong">{p.co}</div>
+                    </div>
+                  </td>
+                  <td className="cell-muted">{p.rubro}</td>
+                  <td className="cell-muted">{p.city}</td>
+                  <td>
+                    {p.web !== "—" ? <span className="cell-mono" style={{ color: "var(--primary-700)" }}>{p.web}</span> : <span className="cell-muted">sin web</span>}
+                    <div className="cell-muted" style={{ fontSize: 11 }}>{p.ig}</div>
+                  </td>
+                  <td style={{ maxWidth: 200 }}><span style={{ fontSize: 12.5, color: "var(--ink-800)" }}>{p.opp}</span></td>
+                  <td><Badge tone="brand">{p.svc}</Badge></td>
+                  <td><Score v={p.score}/></td>
+                  <td><StateP s={p.state}/></td>
+                  <td className="cell-muted col-num">{p.last}</td>
+                  <td className="col-num" style={{ color: /Hoy|Mañana/.test(p.next) ? "var(--warning-ink)" : "var(--ink-800)", fontWeight: p.next.includes("Hoy") ? 600 : 400 }}>{p.next}</td>
+                  <td><div className="row gap-sm"><Avatar name={p.who} size="sm"/><span>{p.who.split(" ")[0]}</span></div></td>
+                  <td><button className="icon-btn" style={{ width: 26, height: 26, background: "transparent", border: 0 }}><Icon.more size={14}/></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="row between" style={{ padding: "10px 14px", borderTop: "1px solid var(--border-soft)", fontSize: 12, color: "var(--ink-500)" }}>
+          <span>Mostrando 1–10 de 248 · 38 listos para outreach</span>
+          <div className="row gap-sm">
+            <button className="btn btn-sm btn-ghost">Anterior</button>
+            <button className="btn btn-sm btn-ghost">Siguiente</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StateP({ s }) {
+  const map = { Nuevo: "default", Contactado: "info", Reunión: "brand", Propuesta: "warning", Ganado: "success", Perdido: "danger" };
+  return <Badge tone={map[s] || "default"} dot>{s}</Badge>;
+}
+
+function MiniStatP({ label, value, sub, c }) {
+  return (
+    <div className="card" style={{ padding: "12px 14px" }}>
+      <div className="row" style={{ gap: 8, marginBottom: 4 }}>
+        <span style={{ width: 7, height: 7, borderRadius: 999, background: c }}/>
+        <span style={{ fontSize: 12, color: "var(--ink-500)", fontWeight: 500 }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>{value}</div>
+      <div style={{ fontSize: 11.5, color: "var(--ink-500)", marginTop: 2 }}>{sub}</div>
+    </div>
+  );
+}
+
+// segmented button style
+if (!document.getElementById("seg-styles")) {
+  const s = document.createElement("style");
+  s.id = "seg-styles";
+  s.textContent = `
+  .seg-btn { padding: 6px 12px; border-radius: var(--r-md); border: 1px solid var(--border); background: var(--surface); font-size: 12.5px; font-weight: 500; color: var(--ink-700); }
+  .seg-btn:hover { background: var(--surface-hover); }
+  .seg-btn.active { background: var(--ink-900); color: white; border-color: var(--ink-900); }
+  `;
+  document.head.appendChild(s);
+}
+
+
+
+const CAMP_DATA = [
+  { name: "Inmobiliarias — Lead Magnet", ch: "meta", status: "Activa", budget: 1200, spent: 842, leads: 64, cpl: 13.2, meetings: 9, clients: 3, roas: 4.2 },
+  { name: "Search — Desarrollo web a medida", ch: "google", status: "Activa", budget: 1800, spent: 1340, leads: 48, cpl: 27.9, meetings: 12, clients: 4, roas: 5.1 },
+  { name: "IG — Tiendas online retail", ch: "igdm", status: "Activa", budget: 900, spent: 610, leads: 52, cpl: 11.7, meetings: 7, clients: 2, roas: 3.4 },
+  { name: "Remarketing — visitantes web", ch: "meta", status: "Activa", budget: 400, spent: 280, leads: 28, cpl: 10.0, meetings: 5, clients: 2, roas: 6.8 },
+  { name: "Reactivación leads fríos", ch: "whatsapp", status: "Activa", budget: 0, spent: 0, leads: 34, cpl: 0, meetings: 11, clients: 4, roas: 12.0 },
+  { name: "Clínicas — captación salud", ch: "meta", status: "Pausada", budget: 700, spent: 520, leads: 22, cpl: 23.6, meetings: 3, clients: 1, roas: 2.1 },
+  { name: "Lookalike — clientes top", ch: "meta", status: "Borrador", budget: 1000, spent: 0, leads: 0, cpl: 0, meetings: 0, clients: 0, roas: 0 },
+];
+
+function Campaigns({ onNav }) {
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Campañas</h1>
+          <p>Inbound Lead Engine · captación de <strong>Inspyra</strong> (no de clientes) · 5 activas</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.calendar size={14}/> Mayo 2026 <Icon.chevronDown size={12}/></button>
+          <button className="btn"><Icon.download size={14}/> Exportar</button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Nueva campaña</button>
+        </div>
+      </div>
+
+      <ComercialTabs active="campaigns" onNav={onNav}/>
+
+      {/* Clarity note: these are NOT client campaigns */}
+      <div className="info-banner" style={{ marginBottom: 16 }}>
+        <Icon.eye size={15}/>
+        <span>Estas son las campañas de captación de <strong>Inspyra</strong>. Las campañas <em>de clientes</em> viven dentro de la ficha de cada cliente, en su sección de Servicios.</span>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid" style={{ gridTemplateColumns: "repeat(6, 1fr)", marginBottom: 16 }}>
+        <CampKpi label="Leads generados" value="302" delta="+48 sem" icon="inbox" tone="brand"/>
+        <CampKpi label="CPL medio" value="$16.4" delta="−$2.1" icon="dollar" tone="success"/>
+        <CampKpi label="CTR medio" value="2.8%" delta="+0.3pp" icon="target" tone="info"/>
+        <CampKpi label="Reuniones" value="47" delta="14 sem" icon="calendar" tone="brand"/>
+        <CampKpi label="Coste / reunión" value="$84" delta="−$9" icon="video" tone="success"/>
+        <CampKpi label="Coste / cliente" value="$412" delta="16 nuevos" icon="trophy" tone="info"/>
+      </div>
+
+      {/* Bots / automation capture */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header">
+          <div className="card-title">
+            <Icon.robot size={15}/> Bots de captura
+            <Badge tone="success" dot>5 activos</Badge>
+          </div>
+          <div className="row gap-sm">
+            <span className="cell-muted" style={{ fontSize: 11.5 }}>Cada lead entra automáticamente al Pipeline y dispara respuesta inmediata</span>
+            <button className="btn btn-sm"><Icon.cog size={13}/> Configurar bots</button>
+          </div>
+        </div>
+        <div className="card-body">
+          <BotsStrip/>
+        </div>
+      </div>
+
+      {/* Campaign table */}
+      <div className="card">
+        <div className="card-header">
+          <div className="tabs" style={{ border: 0, padding: 0, margin: "-4px 0" }}>
+            <div className="tab active">Todas <span className="badge outline">12</span></div>
+            <div className="tab">Activas <span className="badge success">5</span></div>
+            <div className="tab">Pausadas <span className="badge warning">1</span></div>
+            <div className="tab">Borradores <span className="badge outline">2</span></div>
+          </div>
+          <div className="topbar-search" style={{ width: 220, height: 30, padding: "4px 10px" }}>
+            <Icon.search size={13}/>
+            <input placeholder="Buscar campaña..."/>
+          </div>
+        </div>
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Campaña</th>
+              <th>Canal</th>
+              <th>Estado</th>
+              <th>Presupuesto</th>
+              <th>Leads</th>
+              <th>CPL</th>
+              <th>Reuniones</th>
+              <th>Clientes</th>
+              <th>ROAS</th>
+              <th style={{ width: 28 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {CAMP_DATA.map((c, i) => (
+              <tr key={i}>
+                <td className="cell-strong">{c.name}</td>
+                <td><ChannelTag ch={c.ch}/></td>
+                <td>
+                  {c.status === "Activa" && <Badge tone="success" dot>Activa</Badge>}
+                  {c.status === "Pausada" && <Badge tone="warning" dot>Pausada</Badge>}
+                  {c.status === "Borrador" && <Badge tone="outline" dot>Borrador</Badge>}
+                </td>
+                <td className="col-num">
+                  {c.budget > 0 ? (
+                    <div>
+                      <div className="cell-strong">${c.spent} <span className="cell-muted" style={{ fontWeight: 400 }}>/ ${c.budget}</span></div>
+                      <div style={{ height: 4, background: "var(--ink-100)", borderRadius: 999, marginTop: 3, width: 80 }}>
+                        <div style={{ height: "100%", width: Math.min(100, c.spent / c.budget * 100) + "%", background: "var(--primary)", borderRadius: 999 }}/>
+                      </div>
+                    </div>
+                  ) : <span className="cell-muted">Orgánico</span>}
+                </td>
+                <td className="col-num cell-strong">{c.leads}</td>
+                <td className="col-num">{c.cpl > 0 ? `$${c.cpl}` : "—"}</td>
+                <td className="col-num cell-strong">{c.meetings}</td>
+                <td className="col-num">
+                  {c.clients > 0 ? <Badge tone="success">{c.clients} nuevos</Badge> : <span className="cell-muted">—</span>}
+                </td>
+                <td className="col-num">
+                  {c.roas > 0 ? <span style={{ fontWeight: 600, color: c.roas >= 4 ? "var(--success-ink)" : c.roas >= 2 ? "var(--warning-ink)" : "var(--danger-ink)" }}>{c.roas}x</span> : <span className="cell-muted">—</span>}
+                </td>
+                <td><button className="icon-btn" style={{ width: 26, height: 26, background: "transparent", border: 0 }}><Icon.more size={14}/></button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function CampKpi({ label, value, delta, icon, tone }) {
+  const IconC = Icon[icon];
+  const tones = { brand: "var(--primary)", success: "var(--success)", info: "var(--info)" };
+  return (
+    <div className="card" style={{ padding: "13px 14px" }}>
+      <div className="row between" style={{ marginBottom: 8 }}>
+        <span style={{ fontSize: 11.5, color: "var(--ink-500)", fontWeight: 500 }}>{label}</span>
+        <span style={{ width: 22, height: 22, borderRadius: 6, background: "var(--bg-2)", color: tones[tone], display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+          {IconC && <IconC size={12}/>}
+        </span>
+      </div>
+      <div style={{ fontSize: 21, fontWeight: 600, fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>{value}</div>
+      <div style={{ fontSize: 11, color: "var(--success-ink)", marginTop: 2, fontWeight: 500 }}>{delta}</div>
+    </div>
+  );
+}
+
+if (!document.getElementById("info-banner-styles")) {
+  const s = document.createElement("style");
+  s.id = "info-banner-styles";
+  s.textContent = `
+  .info-banner {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 16px;
+    background: var(--info-soft);
+    border: 1px solid #BFDBFE;
+    border-radius: var(--r-md);
+    font-size: 12.5px; color: #1E40AF;
+  }
+  .info-banner strong { font-weight: 600; }
+  .info-banner em { font-style: normal; font-weight: 600; }
+  `;
+  document.head.appendChild(s);
+}
+
+
+const useStateFu = useState;
+
+const FU_GROUPS = [
+  {
+    id: "overdue", title: "Follow-ups vencidos", tone: "danger", icon: "flag",
+    desc: "Atrasados — recontactar ya",
+    rows: [
+      { co: "Forge Legal", contact: "T. Vega", ch: "outbound", last: "Hace 6d", next: "Vencido 2d", who: "Pablo Ferré", pri: "urg", temp: "warm", state: "Contactado" },
+      { co: "Veleta Wines", contact: "C. Bregman", ch: "igdm", last: "Hace 8d", next: "Vencido 3d", who: "Camila Vega", pri: "high", temp: "cold", state: "Nuevo" },
+    ],
+  },
+  {
+    id: "today", title: "Seguimientos de hoy", tone: "brand", icon: "calendar",
+    desc: "Programados para hoy",
+    rows: [
+      { co: "Estudio Bregman", contact: "S. Bregman", ch: "outbound", last: "Hace 2d", next: "Hoy 15:00", who: "Lucía Romero", pri: "high", temp: "hot", state: "Reunión" },
+      { co: "Lumen Salud", contact: "Dra. M. Roca", ch: "google", last: "Hoy 09:12", next: "Hoy 17:30", who: "Mateo López", pri: "urg", temp: "hot", state: "Propuesta" },
+      { co: "Aurora Café", contact: "S. Vidal", ch: "igdm", last: "Ayer", next: "Hoy 11:00", who: "Pablo Ferré", pri: "med", temp: "warm", state: "Reunión" },
+    ],
+  },
+  {
+    id: "no24", title: "Sin respuesta · 24h", tone: "warning", icon: "clock",
+    desc: "Esperando respuesta hace 1 día",
+    rows: [
+      { co: "Grupo Andén", contact: "R. Méndez", ch: "meta", last: "Ayer 14:20", next: "Auto en 4h", who: "Sofía Vidal", pri: "med", temp: "warm", state: "Respondió", auto: true },
+      { co: "Dental Costa", contact: "Dr. Costa", ch: "meta", last: "Ayer 10:05", next: "Auto en 8h", who: "Sofía Vidal", pri: "med", temp: "warm", state: "Contactado", auto: true },
+    ],
+  },
+  {
+    id: "no48", title: "Sin respuesta · 48h", tone: "default", icon: "clock",
+    desc: "Riesgo de enfriarse",
+    rows: [
+      { co: "Nordic Studio", contact: "K. Lindqvist", ch: "webform", last: "Hace 2d", next: "Auto enviado", who: "Camila Vega", pri: "low", temp: "cold", state: "Contactado", auto: true },
+      { co: "Helix Robotics", contact: "L. Ortega", ch: "outbound", last: "Hace 2d", next: "Mañana", who: "Mateo López", pri: "high", temp: "warm", state: "Propuesta" },
+    ],
+  },
+];
+
+function Followup({ onNav }) {
+  const [tab, setTab] = useStateFu("all");
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Seguimiento</h1>
+          <p>Follow-up Center · tu bandeja comercial diaria · que ningún lead quede olvidado</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.refresh size={14}/> Auto-seguimiento</button>
+          <button className="btn btn-brand"><Icon.zap size={14}/> Trabajar la cola</button>
+        </div>
+      </div>
+
+      <ComercialTabs active="followup" onNav={onNav}/>
+
+      {/* Daily summary cards */}
+      <div className="grid" style={{ gridTemplateColumns: "repeat(5, 1fr)", marginBottom: 16 }}>
+        <FuStat label="Pendientes hoy" value="14" icon="calendar" tone="brand" big/>
+        <FuStat label="Vencidos" value="4" icon="flag" tone="danger"/>
+        <FuStat label="Sin respuesta 24h" value="6" icon="clock" tone="warning"/>
+        <FuStat label="Leads calientes" value="8" icon="fire" tone="danger"/>
+        <FuStat label="Recontactos auto" value="11" icon="robot" tone="default"/>
+      </div>
+
+      {/* Automation flow context */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header">
+          <div className="card-title"><Icon.robot size={15}/> Flujo automático de seguimiento</div>
+          <Badge tone="brand" dot>Activo</Badge>
+        </div>
+        <div className="card-body" style={{ paddingTop: 14, paddingBottom: 14 }}>
+          <AutomationFlow/>
+        </div>
+      </div>
+
+      {/* The work tray */}
+      <div className="card">
+        <div className="card-header">
+          <div className="tabs" style={{ border: 0, padding: 0, margin: "-4px 0" }}>
+            <div className={`tab ${tab === "all" ? "active" : ""}`} onClick={() => setTab("all")}>Toda la cola <span className="badge outline">14</span></div>
+            <div className={`tab ${tab === "mine" ? "active" : ""}`} onClick={() => setTab("mine")}>Míos <span className="badge brand">6</span></div>
+            <div className={`tab ${tab === "hot" ? "active" : ""}`} onClick={() => setTab("hot")}>Calientes <span className="badge danger">8</span></div>
+          </div>
+          <div className="row gap-sm">
+            <button className="btn btn-sm"><Icon.filter size={13}/> Filtros</button>
+            <button className="btn btn-sm"><Icon.sort size={13}/> Prioridad</button>
+          </div>
+        </div>
+
+        <div style={{ padding: "4px 0" }}>
+          {FU_GROUPS.map((g) => {
+            const IconC = Icon[g.icon];
+            const tones = { danger: "var(--danger)", brand: "var(--primary)", warning: "var(--warning)", default: "var(--ink-400)" };
+            return (
+              <div key={g.id}>
+                <div className="fu-group-head">
+                  <span className="fu-group-ic" style={{ color: tones[g.tone] }}><IconC size={14}/></span>
+                  <span className="fu-group-title">{g.title}</span>
+                  <span className="badge outline">{g.rows.length}</span>
+                  <span className="fu-group-desc">{g.desc}</span>
+                </div>
+                {g.rows.map((r, i) => (
+                  <div key={i} className="fu-row">
+                    <div className="fu-cell-lead">
+                      <span className="avatar sm" style={{ background: "var(--bg-2)", color: "var(--ink-700)", fontSize: 10 }}>
+                        {r.co.split(" ").slice(0, 2).map(s => s[0]).join("").toUpperCase()}
+                      </span>
+                      <div>
+                        <div className="cell-strong">{r.co}</div>
+                        <div className="cell-muted" style={{ fontSize: 11 }}>{r.contact}</div>
+                      </div>
+                    </div>
+                    <div className="fu-cell"><ChannelTag ch={r.ch} sm/></div>
+                    <div className="fu-cell">
+                      <div className="cell-muted" style={{ fontSize: 11 }}>Último</div>
+                      <div style={{ fontSize: 12.5 }}>{r.last}</div>
+                    </div>
+                    <div className="fu-cell">
+                      <div className="cell-muted" style={{ fontSize: 11 }}>Próximo</div>
+                      <div style={{ fontSize: 12.5, color: r.next.includes("Vencido") ? "var(--danger-ink)" : r.next.includes("Hoy") ? "var(--warning-ink)" : "var(--ink-800)", fontWeight: /Vencido|Hoy/.test(r.next) ? 600 : 400, display: "flex", alignItems: "center", gap: 4 }}>
+                        {r.auto && <Icon.robot size={11} color="var(--primary)"/>}
+                        {r.next}
+                      </div>
+                    </div>
+                    <div className="fu-cell"><Temp level={r.temp}/></div>
+                    <div className="fu-cell">
+                      {r.pri === "urg" && <Badge tone="danger" dot>Urgente</Badge>}
+                      {r.pri === "high" && <Badge tone="warning" dot>Alta</Badge>}
+                      {r.pri === "med" && <Badge tone="info" dot>Media</Badge>}
+                      {r.pri === "low" && <Badge tone="outline" dot>Baja</Badge>}
+                    </div>
+                    <div className="fu-cell"><div className="row gap-sm"><Avatar name={r.who} size="sm"/><span style={{ fontSize: 12.5 }}>{r.who.split(" ")[0]}</span></div></div>
+                    <div className="fu-cell-actions"><QuickActions/></div>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FuStat({ label, value, icon, tone, big }) {
+  const IconC = Icon[icon];
+  const tones = { brand: "var(--primary)", danger: "var(--danger)", warning: "var(--warning)", default: "var(--ink-500)" };
+  const softs = { brand: "var(--primary-soft)", danger: "var(--danger-soft)", warning: "var(--warning-soft)", default: "var(--bg-2)" };
+  return (
+    <div className="card" style={{ padding: "14px 16px", borderColor: big ? "var(--primary)" : undefined, boxShadow: big ? "var(--sh-glow)" : "var(--sh-xs)" }}>
+      <div className="row between" style={{ marginBottom: 8 }}>
+        <span style={{ fontSize: 12, color: "var(--ink-500)", fontWeight: 500 }}>{label}</span>
+        <span style={{ width: 24, height: 24, borderRadius: 6, background: softs[tone], color: tones[tone], display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+          {IconC && <IconC size={13}/>}
+        </span>
+      </div>
+      <div style={{ fontSize: 26, fontWeight: 600, fontFamily: "var(--font-display)", letterSpacing: "-0.02em", color: big ? "var(--primary-700)" : "var(--ink-900)" }}>{value}</div>
+    </div>
+  );
+}
+
+if (!document.getElementById("fu-styles")) {
+  const s = document.createElement("style");
+  s.id = "fu-styles";
+  s.textContent = `
+  .fu-group-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 18px 8px;
+    background: var(--surface-2);
+    border-top: 1px solid var(--border-soft);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .fu-group-ic { display: inline-flex; }
+  .fu-group-title { font-size: 12px; font-weight: 600; color: var(--ink-900); }
+  .fu-group-desc { font-size: 11px; color: var(--ink-500); margin-left: 4px; }
+  .fu-row {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr .9fr 1.1fr .9fr .9fr 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 18px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .fu-row:hover { background: var(--surface-2); }
+  .fu-cell-lead { display: flex; align-items: center; gap: 9px; }
+  .fu-cell-actions { display: flex; justify-content: flex-end; }
+  `;
+  document.head.appendChild(s);
+}
+
+
+
+const PIPE_COLS = [
+  { name: "Nuevo", color: "#9CA3AF", cards: [
+    { co: "Dental Costa", contact: "Dr. Costa", ch: "meta", who: "Sofía Vidal", svc: "Plataforma + Ads", val: 3200, last: "Hace 2h" },
+    { co: "Nordic Studio", contact: "K. Lindqvist", ch: "webform", who: "Camila Vega", svc: "Branding + Web", val: 4500, last: "Ayer" },
+    { co: "Veleta Wines", contact: "C. Bregman", ch: "igdm", who: "Camila Vega", svc: "E-commerce", val: 2800, last: "Hace 3d" },
+  ]},
+  { name: "Contactado", color: "#0EA5E9", cards: [
+    { co: "Forge Legal", contact: "T. Vega", ch: "outbound", who: "Pablo Ferré", svc: "Web + redes", val: 4500, last: "Hace 1d" },
+    { co: "Grupo Andén", contact: "R. Méndez", ch: "meta", who: "Sofía Vidal", svc: "Plataforma + SEO", val: 6200, last: "Hace 3d" },
+  ]},
+  { name: "Respondió", color: "#A78BFA", cards: [
+    { co: "Bauer & Co", contact: "J. Bauer", ch: "referido", who: "Camila Vega", svc: "Web · Hosting", val: 5800, last: "Hoy" },
+    { co: "Mira Cosmetics", contact: "C. Bregman", ch: "igdm", who: "Pablo Ferré", svc: "E-commerce", val: 4200, last: "Hace 1d" },
+  ]},
+  { name: "Reunión agendada", color: "#5B5BF7", cards: [
+    { co: "Estudio Bregman", contact: "S. Bregman", ch: "outbound", who: "Lucía Romero", svc: "Web + SEO local", val: 3600, last: "Hoy", hot: true },
+    { co: "Aurora Café", contact: "S. Vidal", ch: "igdm", who: "Pablo Ferré", svc: "Web + delivery", val: 1800, last: "Mañana" },
+  ]},
+  { name: "Propuesta enviada", color: "#22D3EE", cards: [
+    { co: "Helia Energy", contact: "F. Cazenave", ch: "referido", who: "Mateo López", svc: "Software + AWS", val: 14500, last: "Vence 3d", hot: true },
+    { co: "Lumen Salud", contact: "Dra. Roca", ch: "google", who: "Mateo López", svc: "Plataforma + Ads", val: 4200, last: "Vence 1d", hot: true },
+  ]},
+  { name: "Negociación", color: "#F59E0B", cards: [
+    { co: "Helix Robotics", contact: "L. Ortega", ch: "outbound", who: "Mateo López", svc: "Software a medida", val: 41600, last: "Hace 2d", hot: true },
+  ]},
+  { name: "Ganado", color: "#10B981", cards: [
+    { co: "Tessera Joyas", contact: "A. Tessera", ch: "referido", who: "Lucía Romero", svc: "E-commerce", val: 8820, last: "Cerrado" },
+    { co: "Klein Studio", contact: "D. Klein", ch: "organico", who: "Camila Vega", svc: "Web + SEO", val: 9400, last: "Cerrado" },
+  ]},
+  { name: "Perdido / No responde", color: "#EF4444", cards: [
+    { co: "Norte Films", contact: "I. Saavedra", ch: "webform", who: "Lucía Romero", svc: "Plataforma", val: 6800, last: "Sin respuesta" },
+  ]},
+];
+
+function Pipeline({ onNav }) {
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Pipeline</h1>
+          <p>Sales Pipeline · acá convergen <strong>todos</strong> los leads — outbound, campañas, referidos, orgánico, WhatsApp</p>
+        </div>
+        <div className="row gap-sm">
+          <div className="tabs" style={{ border: 0, padding: 0, margin: 0 }}>
+            <div className="tab active">Kanban</div>
+            <div className="tab">Tabla</div>
+            <div className="tab">Forecast</div>
+          </div>
+          <button className="btn"><Icon.filter size={14}/> Filtros</button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Nuevo lead</button>
+        </div>
+      </div>
+
+      <ComercialTabs active="pipeline" onNav={onNav}/>
+
+      {/* Convergence legend */}
+      <div className="card" style={{ marginBottom: 16, padding: "11px 16px" }}>
+        <div className="row" style={{ gap: 18, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11.5, color: "var(--ink-500)", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em" }}>Canal de origen:</span>
+          {["outbound", "meta", "google", "igdm", "fbmsg", "whatsapp", "webform", "referido", "organico"].map((ch) => (
+            <ChannelTag key={ch} ch={ch} sm/>
+          ))}
+        </div>
+      </div>
+
+      {/* Pipeline value summary */}
+      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
+        <PipeStat label="Valor del pipeline" value="USD 118.2k" sub="17 deals abiertos" c="var(--primary)"/>
+        <PipeStat label="Ponderado (probabilidad)" value="USD 64.8k" sub="forecast Q2" c="var(--secondary)"/>
+        <PipeStat label="Tasa de cierre" value="32%" sub="+4pp vs Q1" c="var(--success)"/>
+        <PipeStat label="Ciclo medio" value="18 días" sub="lead → cierre" c="var(--ink-500)"/>
+      </div>
+
+      <div style={{ overflowX: "auto", paddingBottom: 8 }}>
+        <div className="kanban" style={{ gridTemplateColumns: "repeat(8, minmax(240px, 1fr))" }}>
+          {PIPE_COLS.map((col) => {
+            const total = col.cards.reduce((a, c) => a + c.val, 0);
+            return (
+              <div key={col.name} className="kanban-col">
+                <div className="kanban-col-head">
+                  <div className="h">
+                    <span className="stagebar" style={{ background: col.color }}/>
+                    {col.name}
+                    <span style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "1px 6px", borderRadius: 999, fontSize: 11, color: "var(--ink-600)" }}>{col.cards.length}</span>
+                  </div>
+                </div>
+                <div style={{ fontSize: 11, color: "var(--ink-500)", padding: "0 4px 4px", fontVariantNumeric: "tabular-nums" }}>USD {(total / 1000).toFixed(1)}k</div>
+                {col.cards.map((c, i) => (
+                  <div key={i} className="k-card" style={{ borderLeft: c.hot ? "2px solid var(--danger)" : undefined }}>
+                    <div className="row between">
+                      <span className="k-title" style={{ fontSize: 13 }}>{c.co}</span>
+                      {c.hot && <Icon.fire size={13} color="var(--danger)"/>}
+                    </div>
+                    <div className="cell-muted" style={{ fontSize: 11 }}>{c.contact}</div>
+                    <ChannelTag ch={c.ch} sm/>
+                    <div className="row gap-sm">
+                      <span className="k-tag">{c.svc}</span>
+                    </div>
+                    <div className="k-foot">
+                      <span className="deal-amount" style={{ fontSize: 12 }}>USD {(c.val / 1000).toFixed(1)}k</span>
+                      <div className="row gap-sm">
+                        <span style={{ fontSize: 10.5, color: "var(--ink-500)" }}>{c.last}</span>
+                        <Avatar name={c.who} size="sm"/>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <button className="btn btn-sm btn-ghost" style={{ justifyContent: "flex-start", width: "100%" }}><Icon.plus size={12}/> Añadir</button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PipeStat({ label, value, sub, c }) {
+  return (
+    <div className="card" style={{ padding: "14px 16px" }}>
+      <div className="row" style={{ gap: 8, marginBottom: 4 }}>
+        <span style={{ width: 7, height: 7, borderRadius: 999, background: c }}/>
+        <span style={{ fontSize: 12, color: "var(--ink-500)", fontWeight: 500 }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 23, fontWeight: 600, fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>{value}</div>
+      <div style={{ fontSize: 11.5, color: "var(--ink-500)", marginTop: 2 }}>{sub}</div>
+    </div>
+  );
+}
+
+
+const useStateMt = useState;
+
+const MEETINGS = [
+  { co: "Estudio Bregman", contact: "S. Bregman", date: "Hoy", time: "15:00", dur: "30m", who: "Lucía Romero", via: "meet", type: "Discovery", goal: "Entender necesidad web + SEO local", state: "Confirmada", ch: "outbound", prop: null },
+  { co: "Lumen Salud", contact: "Dra. M. Roca", date: "Hoy", time: "17:30", dur: "45m", who: "Mateo López", via: "zoom", type: "Cierre", goal: "Revisar propuesta plataforma + ads", state: "Confirmada", ch: "google", prop: "PROP-118" },
+  { co: "Aurora Café", contact: "S. Vidal", date: "Mañana", time: "11:00", dur: "30m", who: "Pablo Ferré", via: "presencial", type: "Discovery", goal: "Relevar marca y delivery", state: "Confirmada", ch: "igdm", prop: null },
+  { co: "Helix Robotics", contact: "L. Ortega", date: "29 May", time: "10:00", dur: "60m", who: "Mateo López", via: "meet", type: "Demo", goal: "Demo de software a medida", state: "Confirmada", ch: "outbound", prop: "PROP-114" },
+  { co: "Grupo Andén", contact: "R. Méndez", date: "31 May", time: "16:00", dur: "30m", who: "Sofía Vidal", via: "zoom", type: "Seguimiento", goal: "Segunda reunión · objeciones", state: "Por confirmar", ch: "meta", prop: null },
+];
+
+const PAST = [
+  { co: "Tessera Joyas", contact: "A. Tessera", date: "22 May", who: "Lucía Romero", via: "meet", type: "Cierre", outcome: "Ganado", note: "Firmó setup e-commerce USD 8.8k" },
+  { co: "Klein Studio", contact: "D. Klein", date: "20 May", who: "Camila Vega", via: "presencial", type: "Cierre", outcome: "Ganado", note: "Renovó web + SEO" },
+  { co: "Bauer & Co", contact: "J. Bauer", date: "18 May", who: "Camila Vega", via: "zoom", type: "Discovery", outcome: "Avanza", note: "Pide propuesta formal" },
+  { co: "Norte Films", contact: "I. Saavedra", date: "15 May", who: "Lucía Romero", via: "meet", type: "Demo", outcome: "Perdido", note: "Pausó por presupuesto" },
+];
+
+const VIA = {
+  meet: { label: "Google Meet", color: "#00897B", icon: "video" },
+  zoom: { label: "Zoom", color: "#2D8CFF", icon: "video" },
+  presencial: { label: "Presencial", color: "#6B7280", icon: "building" },
+};
+
+function Meetings({ onNav }) {
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Reuniones</h1>
+          <p>Sales Meetings Center · agenda comercial · discovery, demos, cierres y seguimientos</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.calendar size={14}/> Conectar calendario</button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Agendar reunión</button>
+        </div>
+      </div>
+
+      <ComercialTabs active="meetings" onNav={onNav}/>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(5, 1fr)", marginBottom: 16 }}>
+        <MtStat label="Hoy" value="2" icon="calendar" tone="brand" big/>
+        <MtStat label="Esta semana" value="5" icon="calCheck" tone="default"/>
+        <MtStat label="Discovery calls" value="3" icon="phone" tone="info"/>
+        <MtStat label="Cierres" value="2" icon="trophy" tone="success"/>
+        <MtStat label="Por confirmar" value="1" icon="clock" tone="warning"/>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "1.4fr 1fr", gap: 16 }}>
+        {/* Upcoming */}
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Próximas reuniones <Badge tone="brand">5</Badge></div>
+            <button className="btn btn-sm"><Icon.filter size={13}/> Filtros</button>
+          </div>
+          <div style={{ padding: "6px 0" }}>
+            {MEETINGS.map((m, i) => {
+              const via = VIA[m.via];
+              const ViaIc = Icon[via.icon];
+              return (
+                <div key={i} className="mt-row">
+                  <div className="mt-date">
+                    <div className="mt-date-d">{m.date}</div>
+                    <div className="mt-date-t">{m.time}</div>
+                    <div className="mt-date-dur">{m.dur}</div>
+                  </div>
+                  <div className="mt-line" style={{ background: m.state === "Confirmada" ? "var(--success)" : "var(--warning)" }}/>
+                  <div className="mt-body">
+                    <div className="row between">
+                      <div className="row gap-sm">
+                        <span className="cell-strong" style={{ fontSize: 13.5 }}>{m.co}</span>
+                        <Badge tone={m.type === "Cierre" ? "success" : m.type === "Demo" ? "brand" : m.type === "Discovery" ? "info" : "outline"}>{m.type}</Badge>
+                      </div>
+                      <span className="mt-via" style={{ color: via.color }}><ViaIc size={12}/> {via.label}</span>
+                    </div>
+                    <div className="cell-muted" style={{ fontSize: 12, marginTop: 2 }}>{m.contact} · <span style={{ color: "var(--ink-700)" }}>{m.goal}</span></div>
+                    <div className="row between" style={{ marginTop: 8 }}>
+                      <div className="row gap-sm">
+                        <Avatar name={m.who} size="sm"/>
+                        <span style={{ fontSize: 11.5, color: "var(--ink-600)" }}>{m.who.split(" ")[0]}</span>
+                        <ChannelTag ch={m.ch} sm/>
+                        {m.prop && <Badge tone="outline"><Icon.doc size={10}/> {m.prop}</Badge>}
+                      </div>
+                      <div className="row gap-sm">
+                        {m.state === "Por confirmar" && <Badge tone="warning" dot>Por confirmar</Badge>}
+                        <button className="btn btn-sm"><Icon.video size={12}/> Unirse</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Past + mini calendar */}
+        <div className="col" style={{ gap: 16 }}>
+          <div className="card">
+            <div className="card-header"><div className="card-title">Mayo 2026</div><div className="row gap-sm"><button className="icon-btn" style={{ width: 24, height: 24 }}><Icon.chevronRight size={12} style={{ transform: "rotate(180deg)" }}/></button><button className="icon-btn" style={{ width: 24, height: 24 }}><Icon.chevronRight size={12}/></button></div></div>
+            <div className="card-body"><MiniCal/></div>
+          </div>
+
+          <div className="card">
+            <div className="card-header"><div className="card-title">Reuniones realizadas</div><button className="btn btn-sm btn-ghost">Ver todas</button></div>
+            <div style={{ padding: "4px 0" }}>
+              {PAST.map((p, i) => (
+                <div key={i} className="row" style={{ padding: "10px 18px", gap: 10, borderBottom: i === PAST.length - 1 ? "none" : "1px solid var(--border-soft)" }}>
+                  <Avatar name={p.contact} size="sm"/>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="cell-strong" style={{ fontSize: 12.5 }}>{p.co}</div>
+                    <div className="cell-muted" style={{ fontSize: 11 }}>{p.date} · {p.type} · {p.note}</div>
+                  </div>
+                  {p.outcome === "Ganado" && <Badge tone="success" dot>Ganado</Badge>}
+                  {p.outcome === "Avanza" && <Badge tone="info" dot>Avanza</Badge>}
+                  {p.outcome === "Perdido" && <Badge tone="danger" dot>Perdido</Badge>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MtStat({ label, value, icon, tone, big }) {
+  const IconC = Icon[icon];
+  const tones = { brand: "var(--primary)", success: "var(--success)", info: "var(--info)", warning: "var(--warning)", default: "var(--ink-500)" };
+  return (
+    <div className="card" style={{ padding: "14px 16px", borderColor: big ? "var(--primary)" : undefined, boxShadow: big ? "var(--sh-glow)" : "var(--sh-xs)" }}>
+      <div className="row between" style={{ marginBottom: 8 }}>
+        <span style={{ fontSize: 12, color: "var(--ink-500)", fontWeight: 500 }}>{label}</span>
+        <span style={{ width: 24, height: 24, borderRadius: 6, background: "var(--bg-2)", color: tones[tone], display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+          {IconC && <IconC size={13}/>}
+        </span>
+      </div>
+      <div style={{ fontSize: 26, fontWeight: 600, fontFamily: "var(--font-display)", letterSpacing: "-0.02em", color: big ? "var(--primary-700)" : "var(--ink-900)" }}>{value}</div>
+    </div>
+  );
+}
+
+function MiniCal() {
+  const days = ["L", "M", "X", "J", "V", "S", "D"];
+  const events = { 24: 2, 25: 1, 29: 1, 31: 1 };
+  const cells = [];
+  for (let i = 0; i < 3; i++) cells.push(null);
+  for (let d = 1; d <= 31; d++) cells.push(d);
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 6 }}>
+        {days.map((d) => <div key={d} style={{ textAlign: "center", fontSize: 10.5, color: "var(--ink-400)", fontWeight: 600 }}>{d}</div>)}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+        {cells.map((d, i) => (
+          <div key={i} style={{ aspectRatio: "1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderRadius: 7, fontSize: 12, position: "relative",
+            background: d === 24 ? "var(--ink-900)" : events[d] ? "var(--primary-soft)" : "transparent",
+            color: d === 24 ? "white" : d ? "var(--ink-700)" : "transparent",
+            fontWeight: d === 24 ? 600 : 400 }}>
+            {d || ""}
+            {events[d] && d !== 24 && <span style={{ position: "absolute", bottom: 4, width: 4, height: 4, borderRadius: 50, background: "var(--primary)" }}/>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+if (!document.getElementById("mt-styles")) {
+  const s = document.createElement("style");
+  s.id = "mt-styles";
+  s.textContent = `
+  .mt-row { display: flex; gap: 0; padding: 12px 18px; border-bottom: 1px solid var(--border-soft); }
+  .mt-row:hover { background: var(--surface-2); }
+  .mt-date { width: 62px; flex-shrink: 0; text-align: center; }
+  .mt-date-d { font-size: 11.5px; font-weight: 600; color: var(--ink-900); }
+  .mt-date-t { font-size: 16px; font-weight: 700; color: var(--ink-900); font-family: var(--font-display); letter-spacing: -0.02em; }
+  .mt-date-dur { font-size: 10.5px; color: var(--ink-400); }
+  .mt-line { width: 3px; border-radius: 999px; margin: 2px 14px; flex-shrink: 0; }
+  .mt-body { flex: 1; min-width: 0; }
+  .mt-via { font-size: 11px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; }
+  `;
+  document.head.appendChild(s);
+}
+
+
+const useStateCL = useState;
+
+const CLIENTS = [
+  { id: "C-0148", co: "Helia Energy", contact: "F. Cazenave", country: "🇦🇷 AR", svc: ["Software","AWS"], mrr: 2400, total: 28800, status: "Activo", since: "Mar 2024", health: 92, lead: "Mateo López" },
+  { id: "C-0142", co: "Klein Studio", contact: "D. Klein", country: "🇦🇷 AR", svc: ["Web","SEO","Redes"], mrr: 1850, total: 22200, status: "Activo", since: "Ene 2024", health: 88, lead: "Camila Vega" },
+  { id: "C-0139", co: "Tessera Joyas", contact: "A. Tessera", country: "🇦🇷 AR", svc: ["E-commerce","Hosting"], mrr: 980, total: 8820, status: "Onboarding", since: "May 2026", health: 76, lead: "Lucía Romero" },
+  { id: "C-0136", co: "Calá Inmobiliaria", contact: "R. Ferro", country: "🇦🇷 AR", svc: ["Plataforma","SEO"], mrr: 1450, total: 14500, status: "Activo", since: "Ago 2025", health: 81, lead: "Pablo Ferré" },
+  { id: "C-0128", co: "Borealis Tours", contact: "M. Calderón", country: "🇨🇱 CL", svc: ["Hosting","Mantenimiento"], mrr: 380, total: 4560, status: "Activo", since: "Jun 2024", health: 95, lead: "Diego Salas" },
+  { id: "C-0122", co: "Lumen Salud", contact: "Dra. M. Roca", country: "🇦🇷 AR", svc: ["Web","Ads"], mrr: 1200, total: 7200, status: "Activo", since: "Nov 2025", health: 70, lead: "Mateo López" },
+  { id: "C-0117", co: "Norte Films", contact: "I. Saavedra", country: "🇺🇾 UY", svc: ["Plataforma"], mrr: 0, total: 6800, status: "Pausado", since: "Oct 2025", health: 42, lead: "Lucía Romero" },
+  { id: "C-0109", co: "Bauer & Co", contact: "J. Bauer", country: "🇪🇸 ES", svc: ["Web","Hosting"], mrr: 540, total: 11340, status: "Activo", since: "Jul 2023", health: 86, lead: "Camila Vega" },
+  { id: "C-0102", co: "Mira Cosmetics", contact: "C. Bregman", country: "🇲🇽 MX", svc: ["E-commerce","SEO","Redes"], mrr: 2100, total: 25200, status: "Activo", since: "Jun 2023", health: 79, lead: "Pablo Ferré" },
+  { id: "C-0094", co: "Helix Robotics", contact: "L. Ortega", country: "🇦🇷 AR", svc: ["Software a medida"], mrr: 3200, total: 41600, status: "Activo", since: "Abr 2023", health: 94, lead: "Mateo López" },
+];
+
+function HealthBar({ v }) {
+  const tone = v >= 85 ? "success" : v >= 65 ? "brand" : v >= 50 ? "warning" : "danger";
+  return (
+    <div className="row gap-sm" style={{ width: 80 }}>
+      <div style={{ flex: 1 }}><Progress value={v} tone={tone}/></div>
+      <span className="col-num" style={{ fontSize: 11.5, color: "var(--ink-500)", width: 22, textAlign: "right" }}>{v}</span>
+    </div>
+  );
+}
+
+function Clients({ onOpen }) {
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Clientes</h1>
+          <p>48 cuentas activas · MRR USD 32,180 · Health promedio 82</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.filter size={14}/> Filtros</button>
+          <button className="btn"><Icon.download size={14}/> Exportar</button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Nuevo cliente</button>
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
+        <MiniCard label="Activos" value="48" delta="+3 este mes" tone="success"/>
+        <MiniCard label="Onboarding" value="3" delta="2 esta semana" tone="brand"/>
+        <MiniCard label="En riesgo" value="4" delta="health < 50" tone="warning"/>
+        <MiniCard label="Pausados / Lost" value="2" delta="−1 vs anterior" tone="default"/>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <div className="tabs" style={{ border: 0, padding: 0, margin: "-4px 0" }}>
+            <div className="tab active">Todos <span className="badge outline">48</span></div>
+            <div className="tab">Activos <span className="badge outline">42</span></div>
+            <div className="tab">Onboarding <span className="badge outline">3</span></div>
+            <div className="tab">En riesgo <span className="badge danger">4</span></div>
+            <div className="tab">Pausados <span className="badge outline">2</span></div>
+          </div>
+          <div className="row gap-sm">
+            <div className="topbar-search" style={{ width: 240, height: 30, padding: "4px 10px" }}>
+              <Icon.search size={13}/>
+              <input placeholder="Buscar cliente, contacto..."/>
+            </div>
+            <button className="btn btn-sm"><Icon.sort size={13}/></button>
+            <button className="btn btn-sm"><Icon.grid size={13}/></button>
+          </div>
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th style={{ width: 28 }}><input type="checkbox"/></th>
+                <th>Cliente</th>
+                <th>País</th>
+                <th>Servicios</th>
+                <th>MRR</th>
+                <th>Total facturado</th>
+                <th>Health</th>
+                <th>Responsable</th>
+                <th>Desde</th>
+                <th>Estado</th>
+                <th style={{ width: 28 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {CLIENTS.map((c) => (
+                <tr key={c.id} onClick={() => onOpen?.(c)} style={{ cursor: "pointer" }}>
+                  <td><input type="checkbox" onClick={(e) => e.stopPropagation()}/></td>
+                  <td>
+                    <div className="row gap-sm">
+                      <span className="avatar sm" style={{ background: "var(--bg-2)", color: "var(--ink-700)", fontSize: 10 }}>
+                        {c.co.split(" ").slice(0, 2).map(s => s[0]).join("").toUpperCase()}
+                      </span>
+                      <div>
+                        <div className="cell-strong">{c.co}</div>
+                        <div className="cell-muted" style={{ fontSize: 11 }}>{c.contact} · {c.id}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>{c.country}</td>
+                  <td>
+                    <div className="row" style={{ gap: 4, flexWrap: "wrap" }}>
+                      {c.svc.map((s, i) => <Badge key={i} tone="outline" className="">{s}</Badge>)}
+                    </div>
+                  </td>
+                  <td className="cell-strong col-num">{c.mrr > 0 ? `USD ${c.mrr.toLocaleString()}` : "—"}</td>
+                  <td className="col-num cell-muted">USD {c.total.toLocaleString()}</td>
+                  <td><HealthBar v={c.health}/></td>
+                  <td>
+                    <div className="row gap-sm">
+                      <Avatar name={c.lead} size="sm"/>
+                      <span>{c.lead.split(" ")[0]}</span>
+                    </div>
+                  </td>
+                  <td className="cell-muted">{c.since}</td>
+                  <td>
+                    {c.status === "Activo" && <Badge tone="success" dot>Activo</Badge>}
+                    {c.status === "Onboarding" && <Badge tone="brand" dot>Onboarding</Badge>}
+                    {c.status === "Pausado" && <Badge tone="warning" dot>Pausado</Badge>}
+                  </td>
+                  <td><button className="icon-btn" style={{ width: 26, height: 26, background: "transparent", border: 0 }} onClick={(e) => e.stopPropagation()}><Icon.more size={14}/></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MiniCard({ label, value, delta, tone }) {
+  const tones = { success: "var(--success)", brand: "var(--primary)", warning: "var(--warning)", default: "var(--ink-300)" };
+  return (
+    <div className="card" style={{ padding: "14px 16px" }}>
+      <div className="row" style={{ gap: 8, marginBottom: 4 }}>
+        <span style={{ width: 7, height: 7, borderRadius: 999, background: tones[tone] || tones.default }}/>
+        <span style={{ fontSize: 12, color: "var(--ink-500)", fontWeight: 500 }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 24, fontWeight: 600, fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>{value}</div>
+      <div style={{ fontSize: 11.5, color: "var(--ink-500)", marginTop: 2 }}>{delta}</div>
+    </div>
+  );
+}
+
+/* =============== CLIENT DETAIL DRAWER =============== */
+
+function ClientDrawer({ client, onClose }) {
+  if (!client) return null;
+  return (
+    <>
+      <div className="drawer-backdrop" onClick={onClose}/>
+      <div className="drawer">
+        <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--border-soft)" }}>
+          <div className="row between" style={{ marginBottom: 14 }}>
+            <div className="row gap-sm">
+              <span className="cell-mono cell-muted" style={{ fontSize: 11 }}>{client.id}</span>
+              <Badge tone="success" dot>Activo</Badge>
+              <Badge tone="outline">Cliente desde {client.since}</Badge>
+            </div>
+            <div className="row gap-sm">
+              <button className="icon-btn"><Icon.external size={14}/></button>
+              <button className="icon-btn"><Icon.more size={14}/></button>
+              <button className="icon-btn" onClick={onClose}><Icon.x size={14}/></button>
+            </div>
+          </div>
+          <div className="row" style={{ gap: 14 }}>
+            <span className="avatar lg" style={{ background: "linear-gradient(135deg,#5B5BF7,#22D3EE)", fontSize: 16 }}>
+              {client.co.split(" ").slice(0, 2).map(s => s[0]).join("").toUpperCase()}
+            </span>
+            <div style={{ flex: 1 }}>
+              <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 22, letterSpacing: "-0.02em" }}>{client.co}</h2>
+              <div style={{ color: "var(--ink-500)", fontSize: 13 }}>{client.contact} · {client.country} · MRR USD {client.mrr.toLocaleString()}</div>
+            </div>
+          </div>
+          <div className="row" style={{ gap: 8, marginTop: 14 }}>
+            <button className="btn btn-brand btn-sm"><Icon.message size={13}/> Mensaje</button>
+            <button className="btn btn-sm"><Icon.calendar size={13}/> Agendar</button>
+            <button className="btn btn-sm"><Icon.card size={13}/> Facturar</button>
+            <button className="btn btn-sm"><Icon.flow size={13}/> Nuevo proyecto</button>
+          </div>
+        </div>
+
+        <div className="tabs" style={{ padding: "0 24px" }}>
+          <div className="tab active">Resumen</div>
+          <div className="tab">Servicios <span className="badge outline">{client.svc.length}</span></div>
+          <div className="tab">Proyectos <span className="badge outline">2</span></div>
+          <div className="tab">Facturación</div>
+          <div className="tab">Infraestructura</div>
+          <div className="tab">Historial</div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+          <div className="section-title">Información general</div>
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", padding: "14px 18px", gap: "12px 24px" }}>
+              <Field label="Empresa" value={client.co}/>
+              <Field label="Contacto" value={client.contact}/>
+              <Field label="Email" value="contact@" mono/>
+              <Field label="Teléfono" value="+54 11 4567-8901" mono/>
+              <Field label="País" value={client.country}/>
+              <Field label="Industria" value="Energy & Tech"/>
+            </div>
+          </div>
+
+          <div className="section-title">Servicios contratados</div>
+          <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", marginBottom: 16 }}>
+            <ServiceCard name="Software a medida" status="Activo" amount="USD 2,400/mes" icon="cube" tone="brand"/>
+            <ServiceCard name="AWS — Infraestructura" status="Activo" amount="USD 380/mes" icon="server" tone="success"/>
+            <ServiceCard name="SEO técnico" status="Mensual" amount="USD 600/mes" icon="trend" tone="default"/>
+            <ServiceCard name="Mantenimiento" status="Recurrente" amount="USD 200/mes" icon="cog" tone="default"/>
+          </div>
+
+          <div className="section-title">Proyectos activos</div>
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div style={{ padding: "10px 0" }}>
+              <ProjectRow id="P-2417" name="Plataforma SaaS v2" status="En desarrollo" tone="info" pct={64} due="12 Jun" team={["Mateo López","Lucía Romero","Pablo Ferré"]}/>
+              <ProjectRow id="P-2402" name="API Pública v1.0" status="En diseño" tone="brand" pct={22} due="20 Jul" team={["Mateo López","Camila Vega"]}/>
+            </div>
+          </div>
+
+          <div className="section-title">Historial</div>
+          <div className="card" style={{ padding: "14px 18px" }}>
+            <div className="timeline">
+              <TLI tone="success" who="Stripe" what="recibió pago de" obj="USD 2,400 — abril" time="hace 3d"/>
+              <TLI tone="brand" who="Mateo López" what="creó proyecto" obj="API Pública v1.0" time="hace 6d"/>
+              <TLI tone="default" who="HostingGuard" what="renovó SSL en" obj="helia-energy.com" time="hace 2 sem"/>
+              <TLI tone="success" who="Lucía Romero" what="cerró ticket" obj="#271 — performance DB" time="hace 3 sem"/>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Field({ label, value, mono }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: "var(--ink-500)", textTransform: "uppercase", letterSpacing: ".04em", fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 13, color: "var(--ink-900)", fontFamily: mono ? "var(--font-mono)" : "inherit" }}>{value}</div>
+    </div>
+  );
+}
+
+function ServiceCard({ name, status, amount, icon, tone }) {
+  const IconC = Icon[icon];
+  return (
+    <div className="card" style={{ padding: "12px 14px", display: "flex", gap: 12, alignItems: "center" }}>
+      <span className="kpi-icon" style={{ width: 34, height: 34, background: tone === "brand" ? "var(--primary-soft)" : tone === "success" ? "var(--success-soft)" : "var(--bg-2)", color: tone === "brand" ? "var(--primary-700)" : tone === "success" ? "var(--success-ink)" : "var(--ink-700)" }}>
+        {IconC && <IconC size={16}/>}
+      </span>
+      <div style={{ flex: 1 }}>
+        <div className="cell-strong" style={{ fontSize: 13 }}>{name}</div>
+        <div className="cell-muted" style={{ fontSize: 11.5 }}>{status} · {amount}</div>
+      </div>
+      <Icon.chevronRight size={14}/>
+    </div>
+  );
+}
+
+function ProjectRow({ id, name, status, tone, pct, due, team }) {
+  return (
+    <div className="row" style={{ padding: "10px 18px", gap: 12, borderBottom: "1px solid var(--border-soft)" }}>
+      <span className="cell-mono" style={{ fontSize: 10.5, color: "var(--ink-400)", width: 50 }}>{id}</span>
+      <div style={{ flex: 1 }}>
+        <div className="cell-strong" style={{ fontSize: 13 }}>{name}</div>
+        <div className="cell-muted" style={{ fontSize: 11.5 }}>Deadline {due}</div>
+      </div>
+      <Badge tone={tone}>{status}</Badge>
+      <div style={{ width: 90 }}><Progress value={pct} tone="brand"/></div>
+      <AvatarGroup names={team} size="sm"/>
+    </div>
+  );
+}
+
+function TLI({ tone, who, what, obj, time }) {
+  return (
+    <div className="timeline-item">
+      <span className={`timeline-dot ${tone}`}><Icon.dot size={6}/></span>
+      <div className="timeline-content">
+        <span className="who">{who}</span> {what} <span style={{ color: "var(--ink-900)", fontWeight: 500 }}>{obj}</span>
+        <div className="timeline-meta">{time}</div>
+      </div>
+    </div>
+  );
+}
+
+
+
+const PROJ_KANBAN = {
+  "Pendiente": { color: "#9CA3AF", items: [
+    { id: "P-2391", client: "Lumen Salud", name: "Landing + Ads", svc: "Web", lead: "Lucía Romero", team: ["Lucía Romero","Pablo Ferré"], due: "8 Jun", pri: "med" },
+    { id: "P-2388", client: "Veleta Wines", name: "Branding inicial", svc: "Branding", lead: "Camila Vega", team: ["Camila Vega"], due: "15 Jun", pri: "low" },
+  ]},
+  "En diseño": { color: "#A78BFA", items: [
+    { id: "P-2408", client: "Calá Inmobiliaria", name: "Web institucional v2", svc: "Web", lead: "Pablo Ferré", team: ["Pablo Ferré","Camila Vega"], due: "5 Jun", pri: "high", pct: 32 },
+    { id: "P-2402", client: "Helia Energy", name: "API Pública v1.0", svc: "Software", lead: "Mateo López", team: ["Mateo López","Camila Vega"], due: "20 Jul", pri: "med", pct: 22 },
+  ]},
+  "En desarrollo": { color: "#5B5BF7", items: [
+    { id: "P-2417", client: "Helia Energy", name: "Plataforma SaaS v2", svc: "Software", lead: "Mateo López", team: ["Mateo López","Lucía Romero","Pablo Ferré"], due: "12 Jun", pri: "urg", pct: 64 },
+    { id: "P-2410", client: "Norte Films", name: "Catálogo plataforma", svc: "Plataforma", lead: "Lucía Romero", team: ["Lucía Romero","Diego Salas"], due: "30 Jun", pri: "med", pct: 48 },
+    { id: "P-2405", client: "Mira Cosmetics", name: "E-commerce migration", svc: "E-commerce", lead: "Pablo Ferré", team: ["Pablo Ferré"], due: "10 Jun", pri: "high", pct: 71 },
+  ]},
+  "Revisión": { color: "#F59E0B", items: [
+    { id: "P-2412", client: "Tessera Joyas", name: "E-commerce Shopify", svc: "E-commerce", lead: "Lucía Romero", team: ["Lucía Romero","Pablo Ferré"], due: "29 May", pri: "urg", pct: 88 },
+    { id: "P-2406", client: "Bauer & Co", name: "Web corporativa", svc: "Web", lead: "Camila Vega", team: ["Camila Vega"], due: "31 May", pri: "high", pct: 92 },
+  ]},
+  "Entregado": { color: "#10B981", items: [
+    { id: "P-2399", client: "Borealis Tours", name: "Hosting + SSL", svc: "Hosting", lead: "Diego Salas", team: ["Diego Salas"], due: "—", pri: "low", pct: 100 },
+    { id: "P-2395", client: "Klein Studio", name: "Rediseño web", svc: "Web", lead: "Camila Vega", team: ["Camila Vega","Pablo Ferré"], due: "—", pri: "med", pct: 100 },
+  ]},
+  "Mantenimiento": { color: "#4B5363", items: [
+    { id: "P-2404", client: "Klein Studio", name: "SEO + Redes mensual", svc: "SEO", lead: "Camila Vega", team: ["Camila Vega"], due: "Recurr.", pri: "low", pct: 100 },
+    { id: "P-2390", client: "Borealis Tours", name: "Mantenimiento web", svc: "Mant.", lead: "Diego Salas", team: ["Diego Salas"], due: "Recurr.", pri: "low", pct: 100 },
+  ]},
+};
+
+function Projects() {
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Proyectos</h1>
+          <p>23 activos · 6 en revisión · 2 atrasados</p>
+        </div>
+        <div className="row gap-sm">
+          <div className="tabs" style={{ border: 0, padding: 0, margin: 0 }}>
+            <div className="tab active">Kanban</div>
+            <div className="tab">Tabla</div>
+            <div className="tab">Timeline</div>
+            <div className="tab">Calendario</div>
+          </div>
+          <button className="btn"><Icon.filter size={14}/> Filtros</button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Nuevo proyecto</button>
+        </div>
+      </div>
+
+      <div style={{ overflowX: "auto", paddingBottom: 8 }}>
+        <div className="kanban">
+          {Object.entries(PROJ_KANBAN).map(([name, col]) => (
+            <div key={name} className="kanban-col">
+              <div className="kanban-col-head">
+                <div className="h">
+                  <span className="stagebar" style={{ background: col.color }}/>
+                  {name}
+                  <span className="pipeline-col-head" style={{ display: "inline" }}>
+                    <span className="count" style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "1px 6px", borderRadius: 999, fontSize: 11, color: "var(--ink-600)" }}>{col.items.length}</span>
+                  </span>
+                </div>
+                <button className="icon-btn" style={{ width: 22, height: 22, background: "transparent", border: 0 }}><Icon.plus size={13}/></button>
+              </div>
+              {col.items.map((it) => (
+                <div key={it.id} className="k-card">
+                  <div className="row between">
+                    <span className="k-id">{it.id}</span>
+                    <Priority level={it.pri}/>
+                  </div>
+                  <div className="k-title">{it.name}</div>
+                  <div className="row gap-sm">
+                    <span className="k-tag">{it.svc}</span>
+                    <span className="cell-muted" style={{ fontSize: 11 }}>{it.client}</span>
+                  </div>
+                  {it.pct != null && it.pct < 100 && (
+                    <div style={{ marginTop: 2 }}><Progress value={it.pct} tone="brand"/></div>
+                  )}
+                  <div className="k-foot">
+                    <div className="row gap-sm">
+                      <Icon.calendar size={11}/>
+                      <span style={{ fontSize: 11, color: "var(--ink-500)" }}>{it.due}</span>
+                    </div>
+                    <AvatarGroup names={it.team} size="sm" extra={it.team.length > 3 ? it.team.length - 3 : 0}/>
+                  </div>
+                </div>
+              ))}
+              <button className="btn btn-sm btn-ghost" style={{ justifyContent: "flex-start", width: "100%" }}><Icon.plus size={12}/> Añadir</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============== TASKS — Linear-style ============== */
+
+const TASK_COLS = {
+  "Backlog": { color: "#9CA3AF", items: [
+    { id: "INS-412", title: "Refactor del módulo de facturación recurrente", client: "Helia Energy", svc: "Software", pri: "med", due: "—", asn: "Mateo López", labels: ["backend","billing"] },
+    { id: "INS-410", title: "Auditar Lighthouse y mejorar TBT en mobile", client: "Calá Inmobiliaria", svc: "Web", pri: "low", due: "—", asn: "Camila Vega", labels: ["perf"] },
+    { id: "INS-406", title: "Reescribir guías de onboarding del Lab IA", client: "Internal", svc: "Lab", pri: "low", due: "—", asn: "Lucía Romero", labels: ["docs","internal"] },
+  ]},
+  "Todo": { color: "#5B5BF7", items: [
+    { id: "INS-419", title: "Mockups landing Lumen Salud — versión médicos", client: "Lumen Salud", svc: "Web", pri: "high", due: "27 May", asn: "Pablo Ferré", labels: ["design"] },
+    { id: "INS-418", title: "Configurar dominio + SSL para tessera-joyas.com", client: "Tessera Joyas", svc: "Hosting", pri: "urg", due: "Hoy", asn: "Diego Salas", labels: ["devops"] },
+    { id: "INS-417", title: "Setup pipeline CI para nuevo repo API Pública", client: "Helia Energy", svc: "Software", pri: "med", due: "29 May", asn: "Mateo López", labels: ["devops","ci"] },
+  ]},
+  "In progress": { color: "#22D3EE", items: [
+    { id: "INS-421", title: "Migración productos Shopify desde CSV", client: "Tessera Joyas", svc: "E-commerce", pri: "urg", due: "26 May", asn: "Lucía Romero", labels: ["migration"] },
+    { id: "INS-420", title: "Implementar dashboard admin de la SaaS v2", client: "Helia Energy", svc: "Software", pri: "high", due: "5 Jun", asn: "Pablo Ferré", labels: ["frontend","admin"] },
+    { id: "INS-415", title: "Calendario de contenido mayo + reels guion", client: "Klein Studio", svc: "Redes", pri: "med", due: "28 May", asn: "Camila Vega", labels: ["content"] },
+  ]},
+  "Review": { color: "#F59E0B", items: [
+    { id: "INS-423", title: "Cierre QA pago con Stripe — Tessera", client: "Tessera Joyas", svc: "E-commerce", pri: "urg", due: "27 May", asn: "Pablo Ferré", labels: ["qa","payments"] },
+    { id: "INS-414", title: "Revisión copy nueva home Bauer & Co", client: "Bauer & Co", svc: "Web", pri: "med", due: "29 May", asn: "Camila Vega", labels: ["copy"] },
+  ]},
+  "Done": { color: "#10B981", items: [
+    { id: "INS-413", title: "Optimización imágenes home Klein", client: "Klein Studio", svc: "Web", pri: "low", due: "—", asn: "Camila Vega", labels: ["perf"] },
+    { id: "INS-409", title: "Renovación SSL Borealis Tours", client: "Borealis Tours", svc: "Hosting", pri: "med", due: "—", asn: "Diego Salas", labels: ["ssl"] },
+  ]},
+  "Cancelled": { color: "#6B7280", items: [
+    { id: "INS-401", title: "Migrar Norte Films a Wasabi (pausado)", client: "Norte Films", svc: "Plataforma", pri: "low", due: "—", asn: "Diego Salas", labels: ["paused"] },
+  ]},
+};
+
+function Tasks() {
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Tareas</h1>
+          <p>32 abiertas · 6 mías · 4 vencen hoy</p>
+        </div>
+        <div className="row gap-sm">
+          <div className="tabs" style={{ border: 0, padding: 0, margin: 0 }}>
+            <div className="tab active">Board</div>
+            <div className="tab">List</div>
+            <div className="tab">Mías <span className="badge brand">6</span></div>
+          </div>
+          <button className="btn"><Icon.filter size={14}/> Filtros</button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Nueva tarea</button>
+        </div>
+      </div>
+
+      <div style={{ overflowX: "auto", paddingBottom: 8 }}>
+        <div className="kanban">
+          {Object.entries(TASK_COLS).map(([name, col]) => (
+            <div key={name} className="kanban-col">
+              <div className="kanban-col-head">
+                <div className="h">
+                  <span className="stagebar" style={{ background: col.color }}/>
+                  {name}
+                  <span style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "1px 6px", borderRadius: 999, fontSize: 11, color: "var(--ink-600)" }}>{col.items.length}</span>
+                </div>
+                <button className="icon-btn" style={{ width: 22, height: 22, background: "transparent", border: 0 }}><Icon.plus size={13}/></button>
+              </div>
+              {col.items.map((it) => (
+                <div key={it.id} className="k-card">
+                  <div className="row between">
+                    <span className="k-id">{it.id}</span>
+                    <Priority level={it.pri}/>
+                  </div>
+                  <div className="k-title">{it.title}</div>
+                  <div className="row" style={{ gap: 4, flexWrap: "wrap" }}>
+                    {it.labels.map((l, i) => <span key={i} className="k-tag">{l}</span>)}
+                  </div>
+                  <div className="row gap-sm">
+                    <Icon.building size={11}/>
+                    <span style={{ fontSize: 11, color: "var(--ink-500)" }}>{it.client}</span>
+                  </div>
+                  <div className="k-foot">
+                    <div className="row gap-sm">
+                      <Icon.calendar size={11}/>
+                      <span style={{ fontSize: 11, color: it.due === "Hoy" ? "var(--danger-ink)" : "var(--ink-500)", fontWeight: it.due === "Hoy" ? 600 : 400 }}>{it.due}</span>
+                    </div>
+                    <Avatar name={it.asn} size="sm"/>
+                  </div>
+                </div>
+              ))}
+              <button className="btn btn-sm btn-ghost" style={{ justifyContent: "flex-start", width: "100%" }}><Icon.plus size={12}/> Añadir tarea</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+const SERVICES = [
+  { name: "Desarrollo web", icon: "globe", color: "#5B5BF7", count: 18, mrr: 6480, ytd: 78400, churn: 1.2, clients: ["Helia Energy","Calá Inmobiliaria","Klein Studio","Bauer & Co","+14"] },
+  { name: "Software a medida", icon: "cube", color: "#A78BFA", count: 6, mrr: 9800, ytd: 142000, churn: 0, clients: ["Helia Energy","Helix Robotics","Norte Films","+3"] },
+  { name: "SEO", icon: "trend", color: "#22D3EE", count: 12, mrr: 5200, ytd: 58200, churn: 4.1, clients: ["Klein Studio","Lumen Salud","Mira Cosmetics","+9"] },
+  { name: "Redes sociales", icon: "sparkles", color: "#F472B6", count: 9, mrr: 4100, ytd: 41800, churn: 2.8, clients: ["Klein Studio","Mira Cosmetics","Aurora Café","+6"] },
+  { name: "Hosting", icon: "server", color: "#10B981", count: 24, mrr: 2200, ytd: 25400, churn: 0.4, clients: ["Borealis","Tessera","Klein","+21"] },
+  { name: "VPS gestionado", icon: "server", color: "#0EA5E9", count: 8, mrr: 1680, ytd: 18900, churn: 0, clients: ["Helia","Norte Films","+6"] },
+  { name: "AWS Infra", icon: "shield", color: "#F59E0B", count: 4, mrr: 1400, ytd: 16200, churn: 0, clients: ["Helia Energy","Helix Robotics","+2"] },
+  { name: "Mantenimiento", icon: "cog", color: "#6B7280", count: 22, mrr: 1320, ytd: 14200, churn: 1.8, clients: ["Recurrentes","+22"] },
+];
+
+function Services() {
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Servicios</h1>
+          <p>8 categorías · 103 servicios contratados · USD 32,180 MRR</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.filter size={14}/> Filtros</button>
+          <button className="btn"><Icon.download size={14}/> Exportar</button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Nuevo servicio</button>
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
+        <SvcStat label="MRR total" value="32,180" unit="USD" delta="+8.2%" tone="brand"/>
+        <SvcStat label="Servicios activos" value="103" delta="+6 este mes" tone="success"/>
+        <SvcStat label="Churn promedio" value="1.4" unit="%" delta="−0.3pp" tone="success"/>
+        <SvcStat label="LTV promedio" value="14,820" unit="USD" delta="+12%" tone="info"/>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
+        {SERVICES.map((s) => {
+          const IconC = Icon[s.icon];
+          return (
+            <div key={s.name} className="card" style={{ padding: 16, position: "relative", overflow: "hidden" }}>
+              <div style={{ position: "absolute", top: -30, right: -30, width: 110, height: 110, borderRadius: "50%", background: s.color, opacity: .08 }}/>
+              <div className="row between" style={{ marginBottom: 12 }}>
+                <span style={{ width: 36, height: 36, borderRadius: 10, background: s.color + "22", color: s.color, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                  {IconC && <IconC size={18}/>}
+                </span>
+                <button className="icon-btn" style={{ width: 22, height: 22, background: "transparent", border: 0 }}><Icon.more size={14}/></button>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink-900)" }}>{s.name}</div>
+              <div className="row between" style={{ marginTop: 10, alignItems: "baseline" }}>
+                <div>
+                  <div className="cell-muted" style={{ fontSize: 11 }}>Clientes</div>
+                  <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>{s.count}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div className="cell-muted" style={{ fontSize: 11 }}>MRR</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>USD {s.mrr.toLocaleString()}</div>
+                </div>
+              </div>
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border-soft)", display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--ink-500)" }}>
+                <span>YTD <span style={{ color: "var(--ink-800)", fontWeight: 500 }}>USD {s.ytd.toLocaleString()}</span></span>
+                <span>Churn <span style={{ color: s.churn < 2 ? "var(--success-ink)" : "var(--warning-ink)", fontWeight: 500 }}>{s.churn}%</span></span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">Todos los servicios contratados</div>
+          <div className="row gap-sm">
+            <div className="topbar-search" style={{ width: 240, height: 30, padding: "4px 10px" }}>
+              <Icon.search size={13}/>
+              <input placeholder="Buscar servicio o cliente..."/>
+            </div>
+            <button className="btn btn-sm"><Icon.sort size={13}/></button>
+          </div>
+        </div>
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Servicio</th>
+              <th>Cliente</th>
+              <th>Plan</th>
+              <th>Monto</th>
+              <th>Próxima factura</th>
+              <th>Responsable</th>
+              <th>Estado</th>
+              <th style={{ width: 28 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {SVC_ROWS.map((r, i) => (
+              <tr key={i}>
+                <td>
+                  <div className="row gap-sm">
+                    <span style={{ width: 28, height: 28, borderRadius: 8, background: r.color + "22", color: r.color, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                      {React.createElement(Icon[r.icon], { size: 14 })}
+                    </span>
+                    <div>
+                      <div className="cell-strong">{r.svc}</div>
+                      <div className="cell-muted" style={{ fontSize: 11 }}>{r.detail}</div>
+                    </div>
+                  </div>
+                </td>
+                <td className="cell-strong">{r.client}</td>
+                <td><Badge tone="outline">{r.plan}</Badge></td>
+                <td className="col-num cell-strong">USD {r.amount.toLocaleString()}<span className="cell-muted" style={{ fontWeight: 400, fontSize: 11 }}>/{r.unit}</span></td>
+                <td className="cell-muted col-num">{r.next}</td>
+                <td>
+                  <div className="row gap-sm">
+                    <Avatar name={r.who} size="sm"/>
+                    <span>{r.who.split(" ")[0]}</span>
+                  </div>
+                </td>
+                <td>
+                  {r.status === "Activo" && <Badge tone="success" dot>Activo</Badge>}
+                  {r.status === "Trial" && <Badge tone="brand" dot>Trial</Badge>}
+                  {r.status === "Pausado" && <Badge tone="warning" dot>Pausado</Badge>}
+                </td>
+                <td><button className="icon-btn" style={{ width: 26, height: 26, background: "transparent", border: 0 }}><Icon.more size={14}/></button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+const SVC_ROWS = [
+  { svc: "Plataforma SaaS Helia", detail: "Software a medida + AWS", client: "Helia Energy", plan: "Enterprise", amount: 2400, unit: "mes", next: "1 Jun", who: "Mateo López", status: "Activo", icon: "cube", color: "#A78BFA" },
+  { svc: "E-commerce Shopify", detail: "Tienda + integraciones", client: "Tessera Joyas", plan: "Setup", amount: 4500, unit: "único", next: "26 May", who: "Lucía Romero", status: "Activo", icon: "globe", color: "#5B5BF7" },
+  { svc: "SEO técnico mensual", detail: "Auditoría + contenido", client: "Klein Studio", plan: "Growth", amount: 600, unit: "mes", next: "3 Jun", who: "Camila Vega", status: "Activo", icon: "trend", color: "#22D3EE" },
+  { svc: "Hosting AWS gestionado", detail: "EC2 + RDS + CloudFront", client: "Klein Studio", plan: "Pro", amount: 380, unit: "mes", next: "28 May", who: "Diego Salas", status: "Activo", icon: "server", color: "#F59E0B" },
+  { svc: "Redes sociales", detail: "IG + TikTok content", client: "Mira Cosmetics", plan: "Premium", amount: 1800, unit: "mes", next: "1 Jun", who: "Camila Vega", status: "Activo", icon: "sparkles", color: "#F472B6" },
+  { svc: "Web institucional", detail: "Next.js + Sanity CMS", client: "Calá Inmobiliaria", plan: "Setup", amount: 6800, unit: "único", next: "—", who: "Pablo Ferré", status: "Activo", icon: "globe", color: "#5B5BF7" },
+  { svc: "Mantenimiento", detail: "Soporte 5h/mes", client: "Borealis Tours", plan: "Starter", amount: 180, unit: "mes", next: "1 Jun", who: "Diego Salas", status: "Activo", icon: "cog", color: "#6B7280" },
+  { svc: "VPS dedicado", detail: "Hetzner CX42", client: "Norte Films", plan: "Pro", amount: 240, unit: "mes", next: "—", who: "Diego Salas", status: "Pausado", icon: "server", color: "#0EA5E9" },
+  { svc: "Ads management", detail: "Google + Meta Ads", client: "Lumen Salud", plan: "Trial", amount: 850, unit: "mes", next: "30 May", who: "Pablo Ferré", status: "Trial", icon: "rocket", color: "#EF4444" },
+];
+
+function SvcStat({ label, value, unit, delta, tone }) {
+  const tones = { brand: "var(--primary)", success: "var(--success)", info: "var(--info)", warning: "var(--warning)" };
+  return (
+    <div className="card" style={{ padding: "14px 16px" }}>
+      <div className="row" style={{ gap: 8, marginBottom: 4 }}>
+        <span style={{ width: 7, height: 7, borderRadius: 999, background: tones[tone] || "var(--ink-300)" }}/>
+        <span style={{ fontSize: 12, color: "var(--ink-500)", fontWeight: 500 }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 24, fontWeight: 600, fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>
+        {value} {unit && <span style={{ fontSize: 13, color: "var(--ink-400)", fontWeight: 500 }}>{unit}</span>}
+      </div>
+      <div style={{ fontSize: 11.5, color: "var(--success-ink)", marginTop: 2, fontWeight: 500 }}>{delta}</div>
+    </div>
+  );
+}
+
+
+
+const INVOICES = [
+  { id: "INV-2026-0118", client: "Helia Energy", svc: "Plataforma + AWS · Mayo", amount: 2780, due: "1 Jun", status: "Pendiente", emitted: "1 May" },
+  { id: "INV-2026-0117", client: "Klein Studio", svc: "SEO + Hosting · Mayo", amount: 980, due: "28 May", status: "Atrasado", emitted: "1 May" },
+  { id: "INV-2026-0116", client: "Tessera Joyas", svc: "E-commerce Setup", amount: 4500, due: "26 May", status: "Pagado", emitted: "5 May" },
+  { id: "INV-2026-0115", client: "Mira Cosmetics", svc: "Redes + Ads · Mayo", amount: 2650, due: "1 Jun", status: "Pendiente", emitted: "1 May" },
+  { id: "INV-2026-0114", client: "Bauer & Co", svc: "Web corporativa · Hito 2", amount: 3400, due: "—", status: "Pagado", emitted: "20 Abr" },
+  { id: "INV-2026-0113", client: "Calá Inmobiliaria", svc: "Plataforma · Hito 1", amount: 2800, due: "30 May", status: "Pendiente", emitted: "30 Abr" },
+  { id: "INV-2026-0112", client: "Borealis Tours", svc: "Hosting + Mantenimiento", amount: 380, due: "—", status: "Pagado", emitted: "18 Abr" },
+  { id: "INV-2026-0111", client: "Helix Robotics", svc: "Software · Hito 3", amount: 8400, due: "—", status: "Pagado", emitted: "15 Abr" },
+  { id: "INV-2026-0110", client: "Lumen Salud", svc: "Ads + Setup", amount: 850, due: "5 Jun", status: "Borrador", emitted: "—" },
+  { id: "INV-2026-0109", client: "Forge Legal", svc: "Setup inicial", amount: 2400, due: "20 May", status: "Atrasado", emitted: "10 Abr" },
+];
+
+function Billing() {
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Facturación</h1>
+          <p>Mayo 2026 · 18 facturas emitidas · USD 28,140 cobrados</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.calendar size={14}/> Mayo 2026 <Icon.chevronDown size={12}/></button>
+          <button className="btn"><Icon.download size={14}/> Exportar</button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Nueva factura</button>
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
+        <BillStat label="Ingresos del mes" value="86,420" delta="+24% vs Abril" tone="brand"/>
+        <BillStat label="Ingresos recurrentes (MRR)" value="32,180" delta="+8.2%" tone="success"/>
+        <BillStat label="Pagos pendientes" value="14,580" delta="6 facturas" tone="warning"/>
+        <BillStat label="Atrasados" value="3,380" delta="2 facturas" tone="danger"/>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "1.7fr 1fr", marginBottom: 16 }}>
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Cashflow · últimos 12 meses</div>
+            <div className="row gap-sm">
+              <Badge tone="brand" dot>Facturado</Badge>
+              <Badge tone="success" dot>Cobrado</Badge>
+              <Badge tone="warning" dot>Pendiente</Badge>
+            </div>
+          </div>
+          <div className="card-body">
+            <CashflowChart/>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Mix de ingresos · mayo</div>
+          </div>
+          <div className="card-body">
+            <DonutMix/>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <div className="tabs" style={{ border: 0, padding: 0, margin: "-4px 0" }}>
+            <div className="tab active">Todas <span className="badge outline">126</span></div>
+            <div className="tab">Pendientes <span className="badge warning">6</span></div>
+            <div className="tab">Atrasadas <span className="badge danger">2</span></div>
+            <div className="tab">Pagadas <span className="badge success">114</span></div>
+            <div className="tab">Borradores <span className="badge outline">4</span></div>
+          </div>
+          <div className="row gap-sm">
+            <div className="topbar-search" style={{ width: 240, height: 30, padding: "4px 10px" }}>
+              <Icon.search size={13}/>
+              <input placeholder="Buscar factura, cliente..."/>
+            </div>
+            <button className="btn btn-sm"><Icon.filter size={13}/></button>
+          </div>
+        </div>
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Factura</th>
+              <th>Cliente</th>
+              <th>Concepto</th>
+              <th>Monto</th>
+              <th>Emitida</th>
+              <th>Vencimiento</th>
+              <th>Estado</th>
+              <th style={{ width: 40 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {INVOICES.map((inv) => (
+              <tr key={inv.id}>
+                <td><span className="cell-mono" style={{ color: "var(--ink-900)", fontWeight: 500 }}>{inv.id}</span></td>
+                <td className="cell-strong">{inv.client}</td>
+                <td className="cell-muted">{inv.svc}</td>
+                <td className="cell-strong col-num">USD {inv.amount.toLocaleString()}</td>
+                <td className="cell-muted col-num">{inv.emitted}</td>
+                <td className={`col-num ${inv.status === "Atrasado" ? "" : "cell-muted"}`} style={{ color: inv.status === "Atrasado" ? "var(--danger-ink)" : undefined, fontWeight: inv.status === "Atrasado" ? 600 : undefined }}>{inv.due}</td>
+                <td>
+                  {inv.status === "Pagado" && <Badge tone="success" dot>Pagado</Badge>}
+                  {inv.status === "Pendiente" && <Badge tone="warning" dot>Pendiente</Badge>}
+                  {inv.status === "Atrasado" && <Badge tone="danger" dot>Atrasado</Badge>}
+                  {inv.status === "Borrador" && <Badge tone="outline" dot>Borrador</Badge>}
+                </td>
+                <td>
+                  <div className="row gap-sm">
+                    <button className="icon-btn" style={{ width: 26, height: 26 }}><Icon.download size={13}/></button>
+                    <button className="icon-btn" style={{ width: 26, height: 26, background: "transparent", border: 0 }}><Icon.more size={14}/></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function BillStat({ label, value, delta, tone }) {
+  const tones = { brand: "var(--primary)", success: "var(--success)", warning: "var(--warning)", danger: "var(--danger)" };
+  const inks = { brand: "var(--primary-700)", success: "var(--success-ink)", warning: "var(--warning-ink)", danger: "var(--danger-ink)" };
+  return (
+    <div className="card" style={{ padding: "14px 16px", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: tones[tone] }}/>
+      <div className="row between" style={{ marginBottom: 4 }}>
+        <span style={{ fontSize: 12, color: "var(--ink-500)", fontWeight: 500 }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 24, fontWeight: 600, fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>
+        USD <span style={{ fontVariantNumeric: "tabular-nums" }}>{value}</span>
+      </div>
+      <div style={{ fontSize: 11.5, color: inks[tone], marginTop: 2, fontWeight: 500 }}>{delta}</div>
+    </div>
+  );
+}
+
+function CashflowChart() {
+  const months = ["Jun","Jul","Ago","Sep","Oct","Nov","Dic","Ene","Feb","Mar","Abr","May"];
+  const billed = [38,42,46,52,48,58,42,51,58,67,74,86];
+  const paid   = [34,40,43,49,45,55,40,48,55,63,68,72];
+  const W = 720, H = 220, P = 28;
+  const max = 100;
+  const bw = (W - P * 2) / months.length - 6;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H}>
+      {[0, 25, 50, 75, 100].map((g) => (
+        <g key={g}>
+          <line x1={P} x2={W - P} y1={H - P - (g / max) * (H - P * 2)} y2={H - P - (g / max) * (H - P * 2)} stroke="#EEF0F3"/>
+          <text x={P - 8} y={H - P - (g / max) * (H - P * 2) + 3} textAnchor="end" fontSize="10" fill="#98A0AE">{g}k</text>
+        </g>
+      ))}
+      {months.map((m, i) => {
+        const x = P + i * ((W - P * 2) / months.length) + 3;
+        const yB = H - P - (billed[i] / max) * (H - P * 2);
+        const yP = H - P - (paid[i] / max) * (H - P * 2);
+        return (
+          <g key={i}>
+            <rect x={x} y={yB} width={bw * .45} height={H - P - yB} rx={2} fill="#E1E4E9"/>
+            <rect x={x + bw * .5} y={yP} width={bw * .45} height={H - P - yP} rx={2} fill="#5B5BF7"/>
+            <text x={x + bw / 2} y={H - 8} textAnchor="middle" fontSize="10.5" fill="#6B7280">{m}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function DonutMix() {
+  const slices = [
+    { name: "Software", v: 38, c: "#A78BFA" },
+    { name: "Web", v: 22, c: "#5B5BF7" },
+    { name: "E-commerce", v: 14, c: "#22D3EE" },
+    { name: "SEO", v: 9, c: "#10B981" },
+    { name: "Hosting", v: 8, c: "#F59E0B" },
+    { name: "Redes", v: 6, c: "#F472B6" },
+    { name: "Otros", v: 3, c: "#9CA3AF" },
+  ];
+  const total = slices.reduce((a, s) => a + s.v, 0);
+  const R = 70, r = 50, CX = 90, CY = 90;
+  let a0 = -Math.PI / 2;
+  const arcs = slices.map((s) => {
+    const a1 = a0 + (s.v / total) * Math.PI * 2;
+    const x0 = CX + Math.cos(a0) * R, y0 = CY + Math.sin(a0) * R;
+    const x1 = CX + Math.cos(a1) * R, y1 = CY + Math.sin(a1) * R;
+    const xi0 = CX + Math.cos(a0) * r, yi0 = CY + Math.sin(a0) * r;
+    const xi1 = CX + Math.cos(a1) * r, yi1 = CY + Math.sin(a1) * r;
+    const lg = a1 - a0 > Math.PI ? 1 : 0;
+    const d = `M${x0},${y0} A${R},${R} 0 ${lg} 1 ${x1},${y1} L${xi1},${yi1} A${r},${r} 0 ${lg} 0 ${xi0},${yi0} Z`;
+    a0 = a1;
+    return { d, ...s };
+  });
+  return (
+    <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+      <svg width="180" height="180" viewBox="0 0 180 180">
+        {arcs.map((a, i) => <path key={i} d={a.d} fill={a.c}/>)}
+        <text x={CX} y={CY - 4} textAnchor="middle" fontSize="11" fill="#6B7280">Total</text>
+        <text x={CX} y={CY + 14} textAnchor="middle" fontSize="16" fontWeight="600" fill="#0B0D12" fontFamily="var(--font-display)">86.4k</text>
+      </svg>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+        {slices.map((s) => (
+          <div key={s.name} className="row between" style={{ fontSize: 12.5 }}>
+            <span className="row gap-sm"><span style={{ width: 8, height: 8, borderRadius: 2, background: s.c }}/> {s.name}</span>
+            <span style={{ color: "var(--ink-500)", fontVariantNumeric: "tabular-nums" }}>{s.v}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+
+const DEPLOYS = [
+  { status: "live", domain: "helia-energy.app", svc: "Plataforma SaaS · Next.js", client: "Helia Energy", branch: "main", build: "2m 14s", uptime: "99.99%", ssl: "Valid · 78d", cpu: 32, mem: 58 },
+  { status: "live", domain: "tessera-joyas.com", svc: "E-commerce · Shopify Hydrogen", client: "Tessera Joyas", branch: "main", build: "1m 48s", uptime: "99.97%", ssl: "Valid · 42d", cpu: 12, mem: 22 },
+  { status: "warn", domain: "lumen-salud.com", svc: "Landing · Astro", client: "Lumen Salud", branch: "main", build: "42s", uptime: "99.82%", ssl: "Expira 12d", cpu: 8, mem: 18 },
+  { status: "live", domain: "klein-studio.io", svc: "Portfolio · Next.js", client: "Klein Studio", branch: "main", build: "1m 06s", uptime: "100%", ssl: "Valid · 90d", cpu: 4, mem: 12 },
+  { status: "live", domain: "cala-propiedades.com", svc: "Plataforma · Remix", client: "Calá Inmobiliaria", branch: "main", build: "3m 02s", uptime: "99.94%", ssl: "Valid · 156d", cpu: 18, mem: 34 },
+  { status: "down", domain: "norte-films.tv", svc: "Catálogo · Sveltekit", client: "Norte Films", branch: "staging", build: "Failed", uptime: "—", ssl: "—", cpu: 0, mem: 0 },
+  { status: "live", domain: "borealis-tours.com", svc: "Web · Astro", client: "Borealis Tours", branch: "main", build: "38s", uptime: "99.99%", ssl: "Valid · 64d", cpu: 2, mem: 8 },
+  { status: "live", domain: "helix-robotics.io", svc: "Software · Node API", client: "Helix Robotics", branch: "main", build: "2m 48s", uptime: "99.98%", ssl: "Valid · 112d", cpu: 44, mem: 62 },
+  { status: "live", domain: "mira-cosmetics.com", svc: "Shopify Plus", client: "Mira Cosmetics", branch: "main", build: "1m 12s", uptime: "99.95%", ssl: "Valid · 88d", cpu: 22, mem: 28 },
+];
+
+const LOGS = [
+  { t: "12:42:08", lv: "INFO", svc: "tessera-joyas.com", msg: "Build #1284 succeeded · deployed to production" },
+  { t: "12:38:47", lv: "WARN", svc: "lumen-salud.com", msg: "SSL certificate expires in 12 days · auto-renew scheduled" },
+  { t: "12:34:21", lv: "ERROR", svc: "norte-films.tv", msg: "Build failed · TypeError in catalog/loader.ts:42" },
+  { t: "12:18:55", lv: "INFO", svc: "helia-energy.app", msg: "Deploy #2418 · main@a4f1e2c → production" },
+  { t: "11:54:02", lv: "INFO", svc: "klein-studio.io", msg: "Health check OK · response 84ms" },
+  { t: "11:32:18", lv: "INFO", svc: "cala-propiedades.com", msg: "Cache invalidated · 132 keys purged" },
+  { t: "10:48:09", lv: "WARN", svc: "helia-energy.app", msg: "DB CPU spike · 78% sustained 4min" },
+  { t: "10:18:21", lv: "INFO", svc: "borealis-tours.com", msg: "Sitemap regenerated · 218 URLs" },
+];
+
+function HostingGuard() {
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1 className="row gap-sm"><Icon.shield size={22} stroke={1.8}/> HostingGuard</h1>
+          <p>Panel interno · 124 deployments · 9 dominios primarios · región AR + US-East</p>
+        </div>
+        <div className="row gap-sm">
+          <Badge tone="success" dot>Todos los sistemas operando</Badge>
+          <button className="btn"><Icon.history size={14}/> Audit log</button>
+          <button className="btn btn-brand"><Icon.rocket size={14}/> Nuevo deploy</button>
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(5, 1fr)", marginBottom: 16 }}>
+        <HgStat label="Deployments activos" value="124" trend="up" delta="+12 hoy" icon="rocket" tone="brand"/>
+        <HgStat label="Uptime medio (30d)" value="99.94%" trend="up" delta="+0.02pp" icon="pulse" tone="success"/>
+        <HgStat label="SSL próximos a expirar" value="3" trend="flat" delta="auto-renew" icon="shield" tone="warning"/>
+        <HgStat label="Builds (24h)" value="42" trend="up" delta="2 failed" icon="bolt" tone="info"/>
+        <HgStat label="Bandwidth (mes)" value="412" unit="GB" delta="68% del límite" icon="globe" tone="default"/>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "1.5fr 1fr", marginBottom: 16 }}>
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Tráfico · últimas 24h</div>
+            <div className="row gap-sm">
+              <Badge tone="brand" dot>Requests</Badge>
+              <Badge tone="cyan" dot>Bandwidth</Badge>
+            </div>
+          </div>
+          <div className="card-body">
+            <TrafficChart/>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Uso de recursos</div>
+            <span className="cell-muted" style={{ fontSize: 11 }}>Promedio fleet</span>
+          </div>
+          <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <Resource name="CPU" value={36} max="64 vCPU" color="#5B5BF7"/>
+            <Resource name="RAM" value={48} max="128 GB" color="#22D3EE"/>
+            <Resource name="Storage" value={28} max="2 TB" color="#10B981"/>
+            <Resource name="Egress" value={68} max="600 GB/mes" color="#F59E0B"/>
+            <Resource name="Builds" value={42} max="200/mes" color="#A78BFA"/>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header">
+          <div className="card-title">Deployments activos</div>
+          <div className="row gap-sm">
+            <div className="topbar-search" style={{ width: 240, height: 30, padding: "4px 10px" }}>
+              <Icon.search size={13}/>
+              <input placeholder="Buscar dominio o cliente..."/>
+            </div>
+            <button className="btn btn-sm"><Icon.filter size={13}/> Filtros</button>
+          </div>
+        </div>
+        <div>
+          <div className="hg-row hg-head">
+            <span/>
+            <span>Dominio · Servicio</span>
+            <span>Cliente · Branch</span>
+            <span>Último build</span>
+            <span>Uptime</span>
+            <span>SSL</span>
+            <span>Recursos (CPU/RAM)</span>
+            <span/>
+          </div>
+          {DEPLOYS.map((d) => (
+            <div key={d.domain} className="hg-row">
+              <span className={`status-dot ${d.status}`}/>
+              <div>
+                <div className="cell-strong cell-mono" style={{ fontSize: 12.5 }}>{d.domain}</div>
+                <div className="cell-muted" style={{ fontSize: 11.5 }}>{d.svc}</div>
+              </div>
+              <div>
+                <div className="cell-strong" style={{ fontSize: 13 }}>{d.client}</div>
+                <div className="cell-muted cell-mono" style={{ fontSize: 11 }}>{d.branch}</div>
+              </div>
+              <div>
+                <div className={`cell-mono ${d.build === "Failed" ? "" : "cell-strong"}`} style={{ fontSize: 12.5, color: d.build === "Failed" ? "var(--danger-ink)" : undefined, fontWeight: d.build === "Failed" ? 600 : undefined }}>{d.build}</div>
+                <div className="cell-muted" style={{ fontSize: 11 }}>hace 12 min</div>
+              </div>
+              <div className="col-num cell-strong" style={{ fontSize: 13 }}>{d.uptime}</div>
+              <div>
+                {d.ssl === "—" ? <span className="cell-muted">—</span> :
+                  d.ssl.startsWith("Expira") ? <Badge tone="warning" dot>{d.ssl}</Badge> : <span style={{ fontSize: 12, color: "var(--success-ink)" }}>● {d.ssl}</span>}
+              </div>
+              <MiniGauges cpu={d.cpu} mem={d.mem}/>
+              <button className="icon-btn" style={{ width: 26, height: 26, background: "transparent", border: 0 }}><Icon.more size={14}/></button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "1.4fr 1fr", marginBottom: 16 }}>
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Logs en vivo</div>
+            <div className="row gap-sm">
+              <Badge tone="success" dot>Stream activo</Badge>
+              <button className="btn btn-sm btn-ghost"><Icon.filter size={13}/> Filtrar</button>
+              <button className="btn btn-sm btn-ghost"><Icon.download size={13}/></button>
+            </div>
+          </div>
+          <div style={{ background: "#0E0F13", color: "#D6D9E1", fontFamily: "var(--font-mono)", fontSize: 12, padding: "14px 18px", borderRadius: "0 0 var(--r-lg) var(--r-lg)" }}>
+            {LOGS.map((l, i) => (
+              <div key={i} style={{ padding: "3px 0", display: "flex", gap: 12 }}>
+                <span style={{ color: "#5C626F" }}>{l.t}</span>
+                <span style={{ color: l.lv === "ERROR" ? "#F87171" : l.lv === "WARN" ? "#FCD34D" : "#86EFAC", width: 50 }}>{l.lv}</span>
+                <span style={{ color: "#A78BFA", width: 180 }}>{l.svc}</span>
+                <span>{l.msg}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">SSL & Dominios</div>
+            <button className="btn btn-sm btn-ghost">Ver todos</button>
+          </div>
+          <div style={{ padding: "4px 0" }}>
+            <SslRow domain="lumen-salud.com" days={12} tone="warning"/>
+            <SslRow domain="tessera-joyas.com" days={42} tone="default"/>
+            <SslRow domain="cala-propiedades.com" days={156} tone="default"/>
+            <SslRow domain="borealis-tours.com" days={64} tone="default"/>
+            <SslRow domain="helia-energy.app" days={78} tone="default"/>
+            <SslRow domain="klein-studio.io" days={90} tone="default"/>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HgStat({ label, value, unit, delta, icon, tone }) {
+  const IconC = Icon[icon];
+  const tones = { brand: "var(--primary)", success: "var(--success)", warning: "var(--warning)", info: "var(--info)", default: "var(--ink-500)" };
+  return (
+    <div className="card" style={{ padding: "14px 16px" }}>
+      <div className="row between" style={{ marginBottom: 10 }}>
+        <span style={{ fontSize: 12, color: "var(--ink-500)", fontWeight: 500 }}>{label}</span>
+        <span style={{ width: 24, height: 24, borderRadius: 6, background: "var(--bg-2)", color: tones[tone], display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+          {IconC && <IconC size={13}/>}
+        </span>
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>
+        {value} {unit && <span style={{ fontSize: 12, color: "var(--ink-400)" }}>{unit}</span>}
+      </div>
+      <div style={{ fontSize: 11.5, color: "var(--ink-500)", marginTop: 2 }}>{delta}</div>
+    </div>
+  );
+}
+
+function Resource({ name, value, max, color }) {
+  return (
+    <div>
+      <div className="row between" style={{ marginBottom: 5, fontSize: 12 }}>
+        <span style={{ color: "var(--ink-700)", fontWeight: 500 }}>{name}</span>
+        <span style={{ color: "var(--ink-500)", fontVariantNumeric: "tabular-nums" }}>{value}% <span style={{ color: "var(--ink-400)" }}>· {max}</span></span>
+      </div>
+      <div style={{ height: 6, background: "var(--ink-100)", borderRadius: 999, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: value + "%", background: color, borderRadius: 999 }}/>
+      </div>
+    </div>
+  );
+}
+
+function MiniGauges({ cpu, mem }) {
+  return (
+    <div className="row gap-sm" style={{ alignItems: "center", fontSize: 11 }}>
+      <span style={{ width: 28, color: "var(--ink-500)" }}>CPU</span>
+      <div style={{ flex: 1, height: 4, background: "var(--ink-100)", borderRadius: 999, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: cpu + "%", background: cpu > 70 ? "var(--danger)" : cpu > 40 ? "var(--warning)" : "var(--primary)" }}/>
+      </div>
+      <span style={{ width: 24, color: "var(--ink-700)", fontVariantNumeric: "tabular-nums" }}>{cpu}%</span>
+      <span style={{ width: 28, color: "var(--ink-500)" }}>MEM</span>
+      <div style={{ flex: 1, height: 4, background: "var(--ink-100)", borderRadius: 999, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: mem + "%", background: mem > 70 ? "var(--danger)" : mem > 40 ? "var(--warning)" : "var(--secondary)" }}/>
+      </div>
+      <span style={{ width: 24, color: "var(--ink-700)", fontVariantNumeric: "tabular-nums" }}>{mem}%</span>
+    </div>
+  );
+}
+
+function SslRow({ domain, days, tone }) {
+  return (
+    <div className="row" style={{ padding: "10px 18px", gap: 12, borderBottom: "1px solid var(--border-soft)" }}>
+      <span className={`status-dot ${tone === "warning" ? "warn" : "live"}`}/>
+      <span className="cell-mono" style={{ flex: 1, fontSize: 12.5, color: "var(--ink-900)" }}>{domain}</span>
+      <span style={{ fontSize: 11.5, color: tone === "warning" ? "var(--warning-ink)" : "var(--ink-500)", fontWeight: tone === "warning" ? 600 : 400 }}>
+        {tone === "warning" ? `Expira en ${days}d` : `Valid · ${days}d`}
+      </span>
+      <button className="btn btn-sm btn-ghost">{tone === "warning" ? "Renovar" : "Detalles"}</button>
+    </div>
+  );
+}
+
+function TrafficChart() {
+  const W = 720, H = 180, P = 24;
+  const reqs = [40,38,42,55,68,72,76,82,88,84,78,72,65,62,58,55,52,58,62,66,72,68,60,52];
+  const bw   = [22,18,24,30,36,40,44,48,52,56,52,48,45,42,38,34,32,38,42,46,50,46,38,32];
+  const max = 100;
+  const xs = (W - P * 2) / (reqs.length - 1);
+  const yScale = (v) => H - P - (v / max) * (H - P * 2);
+  const pathR = reqs.map((v, i) => (i ? "L" : "M") + (P + i * xs).toFixed(1) + "," + yScale(v).toFixed(1)).join(" ");
+  const pathB = bw.map((v, i) => (i ? "L" : "M") + (P + i * xs).toFixed(1) + "," + yScale(v).toFixed(1)).join(" ");
+  const area = `${pathR} L${W - P},${H - P} L${P},${H - P} Z`;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H}>
+      <defs>
+        <linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#5B5BF7" stopOpacity=".24"/>
+          <stop offset="1" stopColor="#5B5BF7" stopOpacity="0"/>
+        </linearGradient>
+      </defs>
+      {[0, 1, 2, 3].map((i) => (
+        <line key={i} x1={P} x2={W - P} y1={P + i * ((H - P * 2) / 3)} y2={P + i * ((H - P * 2) / 3)} stroke="#EEF0F3"/>
+      ))}
+      <path d={area} fill="url(#tg)"/>
+      <path d={pathR} fill="none" stroke="#5B5BF7" strokeWidth="2"/>
+      <path d={pathB} fill="none" stroke="#22D3EE" strokeWidth="1.6" strokeDasharray="4 3"/>
+      {[0, 6, 12, 18, 23].map((i) => (
+        <text key={i} x={P + i * xs} y={H - 6} textAnchor="middle" fontSize="10.5" fill="#6B7280">{`${i.toString().padStart(2, "0")}:00`}</text>
+      ))}
+    </svg>
+  );
+}
+
+
+const useStateLab = useState;
+
+const LAB_CLIENTS = [
+  { name: "Helia Energy", dot: "#5B5BF7", count: 18, active: true },
+  { name: "Tessera Joyas", dot: "#F472B6", count: 12 },
+  { name: "Klein Studio", dot: "#22D3EE", count: 9 },
+  { name: "Calá Inmobiliaria", dot: "#10B981", count: 7 },
+  { name: "Mira Cosmetics", dot: "#F59E0B", count: 14 },
+  { name: "Bauer & Co", dot: "#A78BFA", count: 4 },
+  { name: "Lumen Salud", dot: "#0EA5E9", count: 6 },
+  { name: "Borealis Tours", dot: "#EF4444", count: 3 },
+];
+
+const PINNED = [
+  { name: "Estrategia 2026", icon: "pin" },
+  { name: "Calendario Q2", icon: "calendar" },
+  { name: "Tone of voice — Helia", icon: "sparkles" },
+];
+
+const AGENTS = [
+  { id: "marketing", name: "Marketing", desc: "Estrategia, campañas, ads", ic: "rocket",      bg: "linear-gradient(135deg,#F472B6,#A78BFA)" },
+  { id: "content",   name: "Content",   desc: "Copy, posts, guiones",      ic: "sparkles",    bg: "linear-gradient(135deg,#5B5BF7,#22D3EE)", active: true },
+  { id: "seo",       name: "SEO",       desc: "Keywords, contenido, audit", ic: "trend",      bg: "linear-gradient(135deg,#10B981,#22D3EE)" },
+  { id: "business",  name: "Business",  desc: "Pricing, propuestas, deals", ic: "briefcase",  bg: "linear-gradient(135deg,#F59E0B,#EF4444)" },
+  { id: "web",       name: "Web",       desc: "UI, copy, landing",          ic: "globe",      bg: "linear-gradient(135deg,#22D3EE,#5B5BF7)" },
+  { id: "software",  name: "Software",  desc: "Specs, código, arquitectura", ic: "cube",      bg: "linear-gradient(135deg,#A78BFA,#5B5BF7)" },
+  { id: "research",  name: "Research",  desc: "Mercados, competencia, datos", ic: "search",   bg: "linear-gradient(135deg,#0EA5E9,#10B981)" },
+];
+
+function Lab() {
+  const [agent, setAgent] = useStateLab("content");
+  const [client, setClient] = useStateLab("Helia Energy");
+  const cur = AGENTS.find(a => a.id === agent);
+
+  return (
+    <div className="lab">
+      {/* LEFT SIDEBAR — clients & history */}
+      <aside className="lab-sidebar">
+        <div className="row between" style={{ padding: "4px 8px 10px", borderBottom: "1px solid #1E2026", marginBottom: 8 }}>
+          <div className="row gap-sm">
+            <span style={{ width: 26, height: 26, borderRadius: 8, background: "linear-gradient(135deg,#5B5BF7,#22D3EE)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+              <Icon.beaker size={14} color="white"/>
+            </span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "white", letterSpacing: "-0.005em" }}>Laboratorio</div>
+              <div style={{ fontSize: 10.5, color: "#5C626F", letterSpacing: ".05em", textTransform: "uppercase" }}>Studio AI · v2</div>
+            </div>
+          </div>
+          <button className="icon-btn" style={{ background: "#16181F", border: "1px solid #2A2D36", color: "#B7BCC6", width: 26, height: 26 }}>
+            <Icon.plus size={13}/>
+          </button>
+        </div>
+
+        <div className="lab-section-title">Pinned</div>
+        {PINNED.map((p) => (
+          <div key={p.name} className="lab-item">
+            <Icon.pin size={13} stroke={1.6}/>
+            <span style={{ flex: 1, fontSize: 12.5 }}>{p.name}</span>
+          </div>
+        ))}
+
+        <div className="lab-section-title" style={{ marginTop: 8 }}>Clientes</div>
+        {LAB_CLIENTS.map((c) => (
+          <div key={c.name} className={`lab-item ${c.name === client ? "active" : ""}`} onClick={() => setClient(c.name)}>
+            <span className="lab-dot" style={{ background: c.dot }}/>
+            <span style={{ flex: 1, fontSize: 12.5 }}>{c.name}</span>
+            <span className="lab-meta">{c.count}</span>
+          </div>
+        ))}
+
+        <div className="lab-section-title" style={{ marginTop: 8 }}>Recientes</div>
+        {[
+          { t: "Campaña reels mayo · Helia", time: "hace 12m" },
+          { t: "Storytelling marca · Tessera", time: "hace 1h" },
+          { t: "Auditoría SEO local · Calá", time: "hace 3h" },
+          { t: "Brief landing · Lumen Salud", time: "ayer" },
+          { t: "Tone of voice · Klein", time: "ayer" },
+          { t: "Brief de pricing · Helix", time: "2 días" },
+        ].map((r, i) => (
+          <div key={i} className="lab-item">
+            <Icon.message size={13} stroke={1.6}/>
+            <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+              <div style={{ fontSize: 12.5, color: "#D6D9E1", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.t}</div>
+              <div style={{ fontSize: 10.5, color: "#5C626F" }}>{r.time}</div>
+            </div>
+          </div>
+        ))}
+      </aside>
+
+      {/* CENTER — chat workspace */}
+      <main className="lab-main">
+        <div className="lab-topbar">
+          <div className="title">
+            <Icon.message size={15}/> Campaña reels mayo
+          </div>
+          <span className="agent-pill">
+            <span style={{ width: 8, height: 8, borderRadius: 50, background: "linear-gradient(135deg,#5B5BF7,#22D3EE)" }}/>
+            {cur.name} Agent
+          </span>
+          <span className="badge" style={{ background: "#16181F", color: "#B7BCC6", border: "1px solid #2A2D36" }}>
+            Cliente: <span style={{ color: "white", fontWeight: 500, marginLeft: 4 }}>{client}</span>
+          </span>
+          <div style={{ marginLeft: "auto" }} className="row gap-sm">
+            <button className="btn btn-sm" style={{ background: "#16181F", color: "#B7BCC6", borderColor: "#2A2D36" }}><Icon.history size={13}/> Historial</button>
+            <button className="btn btn-sm" style={{ background: "#16181F", color: "#B7BCC6", borderColor: "#2A2D36" }}><Icon.users size={13}/> Compartir</button>
+            <button className="btn btn-sm" style={{ background: "#16181F", color: "#B7BCC6", borderColor: "#2A2D36" }}><Icon.more size={13}/></button>
+          </div>
+        </div>
+
+        <div className="lab-chat">
+          <div className="lab-msg user">
+            <div className="lab-msg-av">ML</div>
+            <div className="lab-msg-body">
+              <div className="lab-msg-who">Mateo López · hace 4 min</div>
+              <p style={{ margin: 0 }}>Necesito una campaña de reels para mayo de Helia Energy. La marca es B2B pero queremos sonar humanos. Foco en transición energética, casos de uso reales y educación. 8 piezas con guion corto, hook y CTA.</p>
+              <div className="row gap-sm" style={{ marginTop: 8, flexWrap: "wrap" }}>
+                <span className="chip"><Icon.paperclip size={11}/> brief-helia-q2.pdf</span>
+                <span className="chip"><Icon.doc size={11}/> tone-of-voice.md</span>
+                <span className="chip" style={{ background: "rgba(91,91,247,.18)", border: "1px solid rgba(91,91,247,.35)", color: "#C7C7FE" }}><Icon.building size={11}/> Helia Energy</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="lab-msg agent">
+            <div className="lab-msg-av">CA</div>
+            <div className="lab-msg-body">
+              <div className="lab-msg-who">Content Agent · usando Claude Sonnet · pensando 6s</div>
+              <p style={{ margin: 0 }}>Listo. Generé 8 piezas estructuradas en 3 ejes: <strong style={{ color: "white" }}>educación</strong> (3), <strong style={{ color: "white" }}>casos reales</strong> (3) y <strong style={{ color: "white" }}>visión de marca</strong> (2). Cada una con hook (3s), desarrollo (15s) y CTA (5s).</p>
+              <p style={{ marginTop: 10, marginBottom: 0 }}>El tono es directo, técnico pero accesible. Reemplacé "soluciones energéticas" por verbos concretos (ver panel derecho). ¿Querés que ajuste algo antes de exportar al calendario?</p>
+              <div className="row gap-sm" style={{ marginTop: 12, flexWrap: "wrap" }}>
+                <button className="chip" style={{ cursor: "pointer", background: "rgba(91,91,247,.18)", border: "1px solid rgba(91,91,247,.35)", color: "#C7C7FE" }}>
+                  <Icon.bolt size={11}/> Ajustar tono
+                </button>
+                <button className="chip" style={{ cursor: "pointer" }}>
+                  <Icon.calendar size={11}/> Enviar al calendario
+                </button>
+                <button className="chip" style={{ cursor: "pointer" }}>
+                  <Icon.copy size={11}/> Copiar todo
+                </button>
+                <button className="chip" style={{ cursor: "pointer" }}>
+                  <Icon.flag size={11}/> Crear tarea
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="lab-msg user">
+            <div className="lab-msg-av">ML</div>
+            <div className="lab-msg-body">
+              <div className="lab-msg-who">Mateo López · hace 1 min</div>
+              <p style={{ margin: 0 }}>Buenísimo. ¿Podés generar también los thumbnails sugeridos y un calendario de publicación L–V? Y crear tareas para Camila para producción de cada reel.</p>
+            </div>
+          </div>
+
+          <div className="lab-msg agent">
+            <div className="lab-msg-av">
+              <Icon.sparkles size={12}/>
+            </div>
+            <div className="lab-msg-body">
+              <div className="lab-msg-who">Content Agent · trabajando…</div>
+              <div style={{ padding: "10px 12px", background: "#16181F", border: "1px solid #2A2D36", borderRadius: 10, fontSize: 12.5, color: "#B7BCC6" }}>
+                <div className="row gap-sm" style={{ marginBottom: 6 }}>
+                  <span style={{ width: 14, height: 14, borderRadius: 4, background: "rgba(91,91,247,.2)", color: "#C7C7FE", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><Icon.check size={9} stroke={2.4}/></span>
+                  Generando 8 thumbnails con prompt brief
+                </div>
+                <div className="row gap-sm" style={{ marginBottom: 6 }}>
+                  <span style={{ width: 14, height: 14, borderRadius: 4, background: "rgba(91,91,247,.2)", color: "#C7C7FE", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><Icon.check size={9} stroke={2.4}/></span>
+                  Calendario L–V (semana 1 de junio)
+                </div>
+                <div className="row gap-sm">
+                  <span style={{ width: 14, height: 14, borderRadius: 50, border: "1.5px solid #5B5BF7", borderRightColor: "transparent", animation: "spin 0.8s linear infinite" }}/>
+                  Creando 8 tareas asignadas a <strong style={{ color: "white" }}>Camila Vega</strong>…
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="lab-composer">
+          <div className="lab-input">
+            <textarea placeholder={`Continuar con ${cur.name} Agent · escribí tu mensaje…`} defaultValue=""/>
+            <div className="lab-input-foot">
+              <span className="lab-tool-chip"><Icon.paperclip size={11}/> Adjuntar</span>
+              <span className="lab-tool-chip"><Icon.building size={11}/> {client}</span>
+              <span className="lab-tool-chip"><Icon.bolt size={11}/> {cur.name} Agent</span>
+              <span className="lab-tool-chip" style={{ color: "#5C626F" }}><Icon.command size={11}/> ⌘ + Enter</span>
+              <button className="lab-send"><Icon.send size={12}/> Enviar</button>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* RIGHT — outputs */}
+      <aside className="lab-right">
+        <div className="lab-right-head">
+          <div className="h"><Icon.sparkles size={14}/> Outputs</div>
+          <div className="row gap-sm">
+            <button className="icon-btn" style={{ background: "#16181F", border: "1px solid #2A2D36", color: "#B7BCC6", width: 26, height: 26 }}>
+              <Icon.folder size={12}/>
+            </button>
+            <button className="icon-btn" style={{ background: "#16181F", border: "1px solid #2A2D36", color: "#B7BCC6", width: 26, height: 26 }}>
+              <Icon.download size={12}/>
+            </button>
+          </div>
+        </div>
+
+        <div style={{ padding: "12px 18px 8px" }}>
+          <div className="lab-section-title" style={{ padding: 0, color: "#5C626F" }}>Agentes</div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: "0 12px 12px" }}>
+          {AGENTS.map((a) => {
+            const Ico = Icon[a.ic];
+            return (
+              <button key={a.id} className={`agent-card ${a.id === agent ? "active" : ""}`} onClick={() => setAgent(a.id)} style={{ background: a.id === agent ? undefined : undefined }}>
+                <span className="ag-ic" style={{ background: a.bg }}><Ico size={14} color="white"/></span>
+                <div style={{ minWidth: 0 }}>
+                  <div className="ag-name">{a.name}</div>
+                  <div className="ag-desc" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.desc}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ padding: "8px 18px 6px" }}>
+          <div className="row between">
+            <div className="lab-section-title" style={{ padding: 0, color: "#5C626F" }}>Generados</div>
+            <span style={{ fontSize: 10.5, color: "#5C626F" }}>5 ítems</span>
+          </div>
+        </div>
+
+        <div style={{ overflowY: "auto", flex: 1, paddingBottom: 16 }}>
+          <Output type="Calendario" title="Calendario reels mayo" body="L: Educación · transición energética · 30s reel. M: Caso real · cliente industrial · 25s. X: Mito vs realidad solar · 20s. J: Behind the scenes · 35s. V: Tip del experto · 18s." />
+          <Output type="Copy" title="Hooks · 8 piezas" body="1. 'Tu factura no baja porque…'  2. 'Vimos esta planta y nos sorprendió'  3. 'Mito: los paneles no rinden si…'  4. '4 datos que no te dijeron sobre…'  5. 'Cómo Helia ayudó a [cliente]…'" />
+          <Output type="Visual" title="Thumbnails sugeridos" body={null} thumbs/>
+          <Output type="SEO" title="Cluster keywords · Q2" body="energía solar industrial · contratos PPA · autoconsumo empresas · transición energética B2B · paneles solares para fábricas · ROI energético…" />
+          <Output type="Tareas" title="8 tareas creadas para Camila" body={null} tasks/>
+        </div>
+      </aside>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
+function Output({ type, title, body, thumbs, tasks }) {
+  return (
+    <div className="lab-output">
+      <div className="lo-head">
+        <span className="lo-type">{type}</span>
+        <span className="lo-title">{title}</span>
+      </div>
+      {body && <div className="lo-body">{body}</div>}
+      {thumbs && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginTop: 6 }}>
+          {[
+            "linear-gradient(135deg,#5B5BF7,#0E0F13)",
+            "linear-gradient(135deg,#22D3EE,#0E0F13)",
+            "linear-gradient(135deg,#F472B6,#5B5BF7)",
+            "linear-gradient(135deg,#10B981,#0E0F13)",
+            "linear-gradient(135deg,#F59E0B,#EF4444)",
+            "linear-gradient(135deg,#A78BFA,#22D3EE)",
+            "linear-gradient(135deg,#0EA5E9,#0E0F13)",
+            "linear-gradient(135deg,#EF4444,#0E0F13)",
+          ].map((bg, i) => (
+            <div key={i} style={{ aspectRatio: "9/16", borderRadius: 6, background: bg, position: "relative", overflow: "hidden", border: "1px solid #232631" }}>
+              <div style={{ position: "absolute", bottom: 4, left: 5, right: 5, fontSize: 8.5, color: "white", fontWeight: 600 }}>Reel {String(i + 1).padStart(2, "0")}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {tasks && (
+        <div style={{ marginTop: 6 }}>
+          {["Reel 01 — Educación", "Reel 02 — Caso real", "Reel 03 — Mito", "Reel 04 — BTS"].map((t, i) => (
+            <div key={i} className="row" style={{ gap: 8, padding: "5px 0", fontSize: 12, color: "#B7BCC6", borderBottom: i === 3 ? "none" : "1px solid #232631" }}>
+              <span style={{ width: 14, height: 14, border: "1.5px solid #2A2E3A", borderRadius: 4 }}/>
+              <span style={{ flex: 1 }}>{t}</span>
+              <span style={{ fontSize: 10.5, color: "#5C626F" }}>CV</span>
+            </div>
+          ))}
+          <div style={{ fontSize: 11, color: "#5C626F", paddingTop: 6 }}>+4 más</div>
+        </div>
+      )}
+      <div className="lo-foot">
+        <button className="chip" style={{ cursor: "pointer", background: "#1A1D26", border: "1px solid #2A2E3A", color: "#B7BCC6", padding: "1px 7px" }}><Icon.copy size={10}/> Copiar</button>
+        <button className="chip" style={{ cursor: "pointer", background: "#1A1D26", border: "1px solid #2A2E3A", color: "#B7BCC6", padding: "1px 7px" }}><Icon.pin size={10}/> Guardar</button>
+        <span style={{ marginLeft: "auto" }}>hace 1 min</span>
+      </div>
+    </div>
+  );
+}
+
+
+const useStateSt = useState;
+
+const SETTINGS_NAV = [
+  { group: "Workspace", items: [
+    { id: "general", label: "General", icon: "cog" },
+    { id: "branding", label: "Branding", icon: "sparkles" },
+    { id: "members", label: "Usuarios", icon: "users" },
+    { id: "roles", label: "Roles & permisos", icon: "shield" },
+  ]},
+  { group: "Operaciones", items: [
+    { id: "integrations", label: "Integraciones", icon: "link" },
+    { id: "api", label: "API Keys", icon: "command" },
+    { id: "webhooks", label: "Webhooks", icon: "bolt" },
+    { id: "billing", label: "Facturación interna", icon: "card" },
+  ]},
+  { group: "Avanzado", items: [
+    { id: "audit", label: "Audit logs", icon: "history" },
+    { id: "danger", label: "Zona peligrosa", icon: "shield" },
+  ]},
+];
+
+const MEMBERS = [
+  { name: "Mateo López", email: "mateo@inspyra.studio", role: "Owner", status: "Activo", last: "Ahora", mfa: true },
+  { name: "Lucía Romero", email: "lucia@inspyra.studio", role: "Admin", status: "Activo", last: "hace 12m", mfa: true },
+  { name: "Pablo Ferré", email: "pablo@inspyra.studio", role: "Member · Delivery", status: "Activo", last: "hace 1h", mfa: true },
+  { name: "Camila Vega", email: "camila@inspyra.studio", role: "Member · Studio", status: "Activo", last: "hace 2h", mfa: false },
+  { name: "Diego Salas", email: "diego@inspyra.studio", role: "Member · DevOps", status: "Activo", last: "hace 4h", mfa: true },
+  { name: "Sofía Vidal", email: "sofia@inspyra.studio", role: "Member · Growth", status: "Activo", last: "ayer", mfa: true },
+  { name: "Bruno Téllez", email: "bruno@inspyra.studio", role: "Guest · Cliente", status: "Pendiente", last: "—", mfa: false },
+];
+
+const INTEGRATIONS = [
+  { name: "Stripe", desc: "Cobros y suscripciones", color: "#635BFF", on: true, ic: "card", id: "stripe" },
+  { name: "Slack", desc: "Notificaciones del equipo", color: "#4A154B", on: true, ic: "message", id: "slack" },
+  { name: "Linear", desc: "Sync de tareas técnicas", color: "#5E6AD2", on: true, ic: "flow", id: "linear" },
+  { name: "GitHub", desc: "Deploys & PRs", color: "#0B0D12", on: true, ic: "cube", id: "gh" },
+  { name: "AWS", desc: "Infraestructura cloud", color: "#FF9900", on: true, ic: "server", id: "aws" },
+  { name: "HubSpot", desc: "CRM legacy import", color: "#FF7A59", on: false, ic: "building", id: "hs" },
+  { name: "Google Analytics 4", desc: "Métricas de clientes", color: "#F9AB00", on: true, ic: "chart", id: "ga4" },
+  { name: "Meta Business", desc: "Ads & páginas", color: "#1877F2", on: false, ic: "rocket", id: "meta" },
+  { name: "Notion", desc: "Documentación de proyectos", color: "#0B0D12", on: true, ic: "doc", id: "notion" },
+  { name: "Cloudflare", desc: "DNS, CDN, R2", color: "#F38020", on: true, ic: "shield", id: "cf" },
+  { name: "Shopify", desc: "Tiendas de clientes", color: "#95BF47", on: true, ic: "globe", id: "shopify" },
+  { name: "Resend", desc: "Email transaccional", color: "#0B0D12", on: false, ic: "inbox", id: "resend" },
+];
+
+function Settings() {
+  const [section, setSection] = useStateSt("members");
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Configuración</h1>
+          <p>Workspace Studio Inspyra · Plan Pro · Renovación 4 Feb 2027</p>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 24 }}>
+        <nav style={{ position: "sticky", top: 0, alignSelf: "start" }}>
+          {SETTINGS_NAV.map((g) => (
+            <div key={g.group} style={{ marginBottom: 18 }}>
+              <div className="section-title">{g.group}</div>
+              {g.items.map((it) => {
+                const IconC = Icon[it.icon];
+                return (
+                  <button key={it.id}
+                    onClick={() => setSection(it.id)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 9,
+                      width: "100%", padding: "7px 10px",
+                      border: 0, background: section === it.id ? "var(--surface)" : "transparent",
+                      color: section === it.id ? "var(--ink-900)" : "var(--ink-700)",
+                      fontSize: 13, fontWeight: section === it.id ? 600 : 500,
+                      borderRadius: 6, cursor: "pointer",
+                      boxShadow: section === it.id ? "var(--sh-xs)" : "none",
+                    }}>
+                    {IconC && <IconC size={14}/>} {it.label}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+
+        <div>
+          {section === "members" && <MembersPanel/>}
+          {section === "integrations" && <IntegrationsPanel/>}
+          {section === "general" && <GeneralPanel/>}
+          {section !== "members" && section !== "integrations" && section !== "general" && <PlaceholderPanel section={section}/>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MembersPanel() {
+  return (
+    <div>
+      <div className="row between" style={{ marginBottom: 16 }}>
+        <div>
+          <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 600, letterSpacing: "-0.02em" }}>Usuarios & permisos</h2>
+          <p style={{ margin: "4px 0 0", color: "var(--ink-500)", fontSize: 13 }}>12 miembros activos · 1 invitación pendiente</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.download size={14}/> Exportar</button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Invitar miembro</button>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Miembro</th>
+              <th>Rol</th>
+              <th>2FA</th>
+              <th>Última actividad</th>
+              <th>Estado</th>
+              <th style={{ width: 40 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {MEMBERS.map((m) => (
+              <tr key={m.email}>
+                <td>
+                  <div className="row gap-sm">
+                    <Avatar name={m.name} size="md"/>
+                    <div>
+                      <div className="cell-strong">{m.name}</div>
+                      <div className="cell-muted cell-mono" style={{ fontSize: 11 }}>{m.email}</div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <Badge tone={m.role === "Owner" ? "brand" : m.role === "Admin" ? "info" : m.role.includes("Guest") ? "warning" : "outline"}>
+                    {m.role}
+                  </Badge>
+                </td>
+                <td>
+                  {m.mfa ?
+                    <span className="row gap-sm" style={{ fontSize: 12, color: "var(--success-ink)" }}><Icon.shield size={13}/> Activo</span> :
+                    <span style={{ fontSize: 12, color: "var(--warning-ink)" }}>Sin configurar</span>}
+                </td>
+                <td className="cell-muted">{m.last}</td>
+                <td>
+                  {m.status === "Activo" ? <Badge tone="success" dot>Activo</Badge> : <Badge tone="warning" dot>Pendiente</Badge>}
+                </td>
+                <td><button className="icon-btn" style={{ width: 26, height: 26, background: "transparent", border: 0 }}><Icon.more size={14}/></button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">Roles</div>
+          <button className="btn btn-sm"><Icon.plus size={13}/> Nuevo rol</button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0 }}>
+          {[
+            { name: "Owner", color: "var(--primary)", count: 1, can: "Todos los permisos" },
+            { name: "Admin", color: "var(--info)", count: 2, can: "Gestionar usuarios y facturación" },
+            { name: "Member", color: "var(--success)", count: 8, can: "Acceso por área (Growth, Delivery, Studio, DevOps)" },
+            { name: "Guest", color: "var(--warning)", count: 1, can: "Solo lectura de su cliente" },
+          ].map((r, i) => (
+            <div key={r.name} style={{ padding: 18, borderRight: i < 3 ? "1px solid var(--border-soft)" : "none" }}>
+              <div className="row between" style={{ marginBottom: 6 }}>
+                <span className="row gap-sm">
+                  <span style={{ width: 8, height: 8, borderRadius: 50, background: r.color }}/>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>{r.name}</span>
+                </span>
+                <span className="badge outline">{r.count}</span>
+              </div>
+              <div style={{ fontSize: 12, color: "var(--ink-500)" }}>{r.can}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IntegrationsPanel() {
+  return (
+    <div>
+      <div className="row between" style={{ marginBottom: 16 }}>
+        <div>
+          <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 600, letterSpacing: "-0.02em" }}>Integraciones</h2>
+          <p style={{ margin: "4px 0 0", color: "var(--ink-500)", fontSize: 13 }}>8 conectadas · 4 disponibles · sync OK hace 2 min</p>
+        </div>
+        <div className="row gap-sm">
+          <div className="topbar-search" style={{ width: 240, height: 30, padding: "4px 10px" }}>
+            <Icon.search size={13}/>
+            <input placeholder="Buscar integración..."/>
+          </div>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Nueva integración</button>
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+        {INTEGRATIONS.map((it) => {
+          const Ico = Icon[it.ic];
+          return (
+            <div key={it.id} className="card" style={{ padding: 16 }}>
+              <div className="row between" style={{ marginBottom: 10 }}>
+                <span style={{ width: 36, height: 36, borderRadius: 10, background: it.color, color: "white", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                  <Ico size={18}/>
+                </span>
+                <Toggle on={it.on}/>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{it.name}</div>
+              <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 2 }}>{it.desc}</div>
+              <div className="row between" style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border-soft)", fontSize: 11.5, color: "var(--ink-500)" }}>
+                {it.on ? <span style={{ color: "var(--success-ink)" }}>● Conectado</span> : <span>Sin conectar</span>}
+                <button className="btn btn-sm btn-ghost">{it.on ? "Configurar" : "Conectar"}</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function GeneralPanel() {
+  return (
+    <div>
+      <div className="row between" style={{ marginBottom: 16 }}>
+        <div>
+          <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 600, letterSpacing: "-0.02em" }}>General</h2>
+          <p style={{ margin: "4px 0 0", color: "var(--ink-500)", fontSize: 13 }}>Información del workspace</p>
+        </div>
+      </div>
+      <div className="card">
+        <div style={{ padding: 18, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+          <Setting label="Nombre del workspace" value="Studio Inspyra"/>
+          <Setting label="Subdominio" value="inspyra.app" mono/>
+          <Setting label="Zona horaria" value="(UTC−03:00) Buenos Aires"/>
+          <Setting label="Moneda primaria" value="USD"/>
+          <Setting label="Idioma del sistema" value="Español (LATAM)"/>
+          <Setting label="Formato de fecha" value="DD MMM YYYY"/>
+        </div>
+        <div style={{ padding: "14px 18px", borderTop: "1px solid var(--border-soft)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <button className="btn">Cancelar</button>
+          <button className="btn btn-primary">Guardar cambios</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlaceholderPanel({ section }) {
+  return (
+    <div className="card" style={{ padding: 40, textAlign: "center" }}>
+      <div style={{ width: 48, height: 48, margin: "0 auto 14px", borderRadius: 12, background: "var(--bg-2)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+        <Icon.cog size={20}/>
+      </div>
+      <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 600 }}>Sección: {section}</h3>
+      <p style={{ color: "var(--ink-500)", fontSize: 13, marginTop: 4 }}>Configuración avanzada — disponible en este panel.</p>
+    </div>
+  );
+}
+
+function Setting({ label, value, mono }) {
+  return (
+    <div className="field">
+      <label>{label}</label>
+      <input className="input" defaultValue={value} style={{ fontFamily: mono ? "var(--font-mono)" : undefined }}/>
+    </div>
+  );
+}
+
+function Toggle({ on }) {
+  return (
+    <span style={{
+      width: 32, height: 18, borderRadius: 999,
+      background: on ? "var(--ink-900)" : "var(--ink-200)",
+      display: "inline-flex", alignItems: "center",
+      padding: 2, transition: "background .2s",
+    }}>
+      <span style={{
+        width: 14, height: 14, borderRadius: 50, background: "white",
+        transform: on ? "translateX(14px)" : "translateX(0)",
+        transition: "transform .2s",
+        boxShadow: "0 1px 2px rgba(0,0,0,.2)",
+      }}/>
+    </span>
+  );
+}
+
+
+
+// (old Campaigns + CAMPAIGNS removed — now in screens/com-campaigns.jsx)
+
+const TICKETS = [
+  { id: "#291", title: "Email transaccional no llega", client: "Helia Energy", svc: "Software", pri: "urg", assn: "Mateo López", created: "hace 22m", status: "Abierto", sla: "3h restantes" },
+  { id: "#290", title: "Pedido perdido en checkout", client: "Tessera Joyas", svc: "E-commerce", pri: "urg", assn: "Pablo Ferré", created: "hace 1h", status: "En curso", sla: "4h restantes" },
+  { id: "#289", title: "Cambiar tipografía en home", client: "Klein Studio", svc: "Web", pri: "low", assn: "Camila Vega", created: "hace 3h", status: "En curso", sla: "2d restantes" },
+  { id: "#288", title: "Lentitud al subir imágenes", client: "Mira Cosmetics", svc: "E-commerce", pri: "high", assn: "Pablo Ferré", created: "hace 5h", status: "Abierto", sla: "8h restantes" },
+  { id: "#287", title: "SSL en lumen-salud.com expira pronto", client: "Lumen Salud", svc: "Hosting", pri: "high", assn: "Diego Salas", created: "hace 8h", status: "En curso", sla: "12h restantes" },
+  { id: "#286", title: "No recibo notificaciones de leads", client: "Calá Inmobiliaria", svc: "Software", pri: "med", assn: "Mateo López", created: "ayer", status: "Esperando cliente", sla: "—" },
+  { id: "#285", title: "Pedido de cambio de plan", client: "Borealis Tours", svc: "Hosting", pri: "low", assn: "Diego Salas", created: "hace 2d", status: "Esperando cliente", sla: "—" },
+];
+
+function Tickets() {
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Tickets</h1>
+          <p>Cola de soporte · 7 abiertos · SLA 96% · MTTR 4.2h</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.filter size={14}/> Filtros</button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Nuevo ticket</button>
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
+        <SmallStat label="Abiertos" value="7" delta="2 urgentes" tone="warning"/>
+        <SmallStat label="SLA cumplido (30d)" value="96%" delta="+1.2pp" tone="success"/>
+        <SmallStat label="MTTR" value="4.2h" delta="−0.4h" tone="success"/>
+        <SmallStat label="CSAT" value="4.8 / 5" delta="42 respuestas" tone="brand"/>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <div className="tabs" style={{ border: 0, padding: 0, margin: "-4px 0" }}>
+            <div className="tab active">Todos <span className="badge outline">7</span></div>
+            <div className="tab">Urgentes <span className="badge danger">2</span></div>
+            <div className="tab">Mis tickets <span className="badge outline">3</span></div>
+            <div className="tab">Esperando cliente <span className="badge outline">2</span></div>
+            <div className="tab">Cerrados</div>
+          </div>
+        </div>
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th style={{ width: 60 }}>ID</th>
+              <th>Asunto</th>
+              <th>Cliente</th>
+              <th>Servicio</th>
+              <th>Prioridad</th>
+              <th>Asignado</th>
+              <th>Creado</th>
+              <th>SLA</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {TICKETS.map((t) => (
+              <tr key={t.id}>
+                <td className="cell-mono cell-muted">{t.id}</td>
+                <td className="cell-strong">{t.title}</td>
+                <td>{t.client}</td>
+                <td><Badge tone="outline">{t.svc}</Badge></td>
+                <td>
+                  {t.pri === "urg" && <Badge tone="danger" dot>Urgente</Badge>}
+                  {t.pri === "high" && <Badge tone="warning" dot>Alta</Badge>}
+                  {t.pri === "med" && <Badge tone="info" dot>Media</Badge>}
+                  {t.pri === "low" && <Badge tone="outline" dot>Baja</Badge>}
+                </td>
+                <td>
+                  <div className="row gap-sm"><Avatar name={t.assn} size="sm"/>{t.assn.split(" ")[0]}</div>
+                </td>
+                <td className="cell-muted">{t.created}</td>
+                <td className={t.sla.includes("h") && parseInt(t.sla) < 5 ? "" : "cell-muted"} style={{ color: t.sla.includes("h") && parseInt(t.sla) < 5 ? "var(--danger-ink)" : undefined, fontWeight: t.sla.includes("h") && parseInt(t.sla) < 5 ? 600 : undefined }}>{t.sla}</td>
+                <td>
+                  {t.status === "Abierto" && <Badge tone="danger" dot>Abierto</Badge>}
+                  {t.status === "En curso" && <Badge tone="info" dot>En curso</Badge>}
+                  {t.status === "Esperando cliente" && <Badge tone="warning" dot>Esperando cliente</Badge>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function Reports() {
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Reportes</h1>
+          <p>14 reportes guardados · auto-refresh diario · exportable a PDF y CSV</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.calendar size={14}/> Mayo 2026 <Icon.chevronDown size={12}/></button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Nuevo reporte</button>
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+        {[
+          { t: "Resumen ejecutivo · Mayo", desc: "MRR, ingresos, churn, pipeline", icon: "chart", color: "#5B5BF7" },
+          { t: "Pipeline & forecast Q2", desc: "Deals por etapa, probabilidad", icon: "trend", color: "#22D3EE" },
+          { t: "Health de clientes", desc: "Score, NPS, riesgo de churn", icon: "users", color: "#10B981" },
+          { t: "Velocidad de proyectos", desc: "Cycle time, throughput, on-time", icon: "flow", color: "#A78BFA" },
+          { t: "Performance de servicios", desc: "MRR por servicio, churn, LTV", icon: "layers", color: "#F59E0B" },
+          { t: "Infraestructura · uptime", desc: "Por cliente y por dominio", icon: "shield", color: "#0EA5E9" },
+          { t: "Soporte & SLA", desc: "Tickets, MTTR, CSAT por equipo", icon: "life", color: "#EF4444" },
+          { t: "Eficacia outbound", desc: "Open/Reply/Meeting por campaña", icon: "rocket", color: "#F472B6" },
+          { t: "Cashflow & cobros", desc: "Facturado, cobrado, atrasados", icon: "card", color: "#0B0D12" },
+        ].map((r, i) => {
+          const Ico = Icon[r.icon];
+          return (
+            <div key={i} className="card" style={{ padding: 18 }}>
+              <div className="row between" style={{ marginBottom: 12 }}>
+                <span style={{ width: 36, height: 36, borderRadius: 10, background: r.color + "22", color: r.color, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                  <Ico size={17}/>
+                </span>
+                <Badge tone="outline">Diario</Badge>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{r.t}</div>
+              <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 2 }}>{r.desc}</div>
+              <div style={{ height: 36, marginTop: 14 }}>
+                <Spark data={[20, 28, 24, 32, 38, 36, 44, 52, 48, 58, 64, 70].map(v => v * (Math.random() + .5))} color={r.color} fill={r.color + "22"} w={280} h={36}/>
+              </div>
+              <div className="row between" style={{ fontSize: 11.5, color: "var(--ink-500)", marginTop: 8 }}>
+                <span>Actualizado hace 2h</span>
+                <button className="btn btn-sm btn-ghost">Abrir <Icon.arrowRight size={11}/></button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SmallStat({ label, value, delta, tone }) {
+  const tones = { brand: "var(--primary)", success: "var(--success)", warning: "var(--warning)", info: "var(--info)" };
+  return (
+    <div className="card" style={{ padding: "14px 16px" }}>
+      <div className="row" style={{ gap: 8, marginBottom: 4 }}>
+        <span style={{ width: 7, height: 7, borderRadius: 999, background: tones[tone] }}/>
+        <span style={{ fontSize: 12, color: "var(--ink-500)", fontWeight: 500 }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 24, fontWeight: 600, fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>{value}</div>
+      <div style={{ fontSize: 11.5, color: "var(--ink-500)", marginTop: 2 }}>{delta}</div>
+    </div>
+  );
+}
+
+// (Campaigns moved to screens/com-campaigns.jsx — Inbound Lead Engine)
+
+const ROUTE_BY_SCREEN = {
+  dashboard: "/erp/dashboard",
+  prospects: "/erp/comercial/prospectos",
+  growth: "/erp/comercial/pipeline",
+  campaigns: "/erp/comercial/campanas",
+  followup: "/erp/comercial/seguimiento",
+  pipeline: "/erp/comercial/pipeline",
+  meetings: "/erp/comercial/reuniones",
+  clients: "/erp/clientes",
+  services: "/erp/delivery/servicios",
+  projects: "/erp/proyectos",
+  tasks: "/erp/tareas",
+  lab: "/erp/laboratorio",
+  hosting: "/erp/hostingguard",
+  billing: "/erp/facturacion",
+  tickets: "/erp/tickets",
+  reports: "/erp/reportes",
+  settings: "/erp/configuracion",
+};
+
+const SCREEN_BY_ROUTE = Object.fromEntries(
+  Object.entries(ROUTE_BY_SCREEN).map(([screen, route]) => [route, screen])
+);
+
+function getScreenFromPath(pathname) {
+  return SCREEN_BY_ROUTE[pathname] || "dashboard";
+}
+
+
+function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [authed, setAuthed] = useState(true); // default to logged in so reviewers land on the ERP
+  const [screen, setScreen] = useState(() => getScreenFromPath(location.pathname));
+  const [clientDrawer, setClientDrawer] = useState(null);
+
+  const handleNav = (nextScreen) => {
+    setScreen(nextScreen);
+    navigate(ROUTE_BY_SCREEN[nextScreen] || "/erp/dashboard");
+  };
+
+  // Persist screen across reload
+  useEffect(() => {
+    const auth = localStorage.getItem("inspyra-auth");
+    if (auth === "out") setAuthed(false);
+  }, []);
+
+  useEffect(() => {
+    setScreen(getScreenFromPath(location.pathname));
+  }, [location.pathname]);
+
+  useEffect(() => { localStorage.setItem("inspyra-screen", screen); }, [screen]);
+  useEffect(() => { localStorage.setItem("inspyra-auth", authed ? "in" : "out"); }, [authed]);
+
+  if (!authed) {
+    return <Login onEnter={() => { setAuthed(true); handleNav("dashboard"); }}/>;
+  }
+
+  // Lab is full-bleed (its own layout)
+  if (screen === "lab") {
+    return (
+      <div className="app" data-screen-label={`Lab IA`}>
+        <Sidebar active={screen} onNav={handleNav}/>
+        <Lab/>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app" data-screen-label={screen}>
+      <Sidebar active={screen} onNav={handleNav}/>
+      <main className="main">
+        <Topbar screen={screen}/>
+        {screen === "dashboard" && <Dashboard/>}
+        {screen === "prospects" && <Prospects onNav={handleNav}/>}
+        {screen === "growth" && <Pipeline onNav={handleNav}/>}
+        {screen === "campaigns" && <Campaigns onNav={handleNav}/>}
+        {screen === "followup" && <Followup onNav={handleNav}/>}
+        {screen === "pipeline" && <Pipeline onNav={handleNav}/>}
+        {screen === "meetings" && <Meetings onNav={handleNav}/>}
+        {screen === "clients" && <Clients onOpen={setClientDrawer}/>}
+        {screen === "services" && <Services/>}
+        {screen === "projects" && <Projects/>}
+        {screen === "tasks" && <Tasks/>}
+        {screen === "hosting" && <HostingGuard/>}
+        {screen === "billing" && <Billing/>}
+        {screen === "tickets" && <Tickets/>}
+        {screen === "reports" && <Reports/>}
+        {screen === "settings" && <Settings/>}
+        <button
+          onClick={() => { setAuthed(false); }}
+          style={{
+            position: "fixed", bottom: 16, right: 16, zIndex: 20,
+            padding: "6px 12px", borderRadius: 999, fontSize: 11.5,
+            background: "rgba(11,13,18,.85)", color: "white", border: "1px solid rgba(255,255,255,.08)",
+            backdropFilter: "blur(8px)", display: "inline-flex", alignItems: "center", gap: 6,
+          }}
+          title="View login screen"
+        >
+          ↩ Ver Login
+        </button>
+      </main>
+      {clientDrawer && <ClientDrawer client={clientDrawer} onClose={() => setClientDrawer(null)}/>}
+    </div>
+  );
+}
+
+export default App;
