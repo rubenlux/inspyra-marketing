@@ -31,6 +31,7 @@ Toda nueva feature, módulo o decisión arquitectónica debe tener una spec ante
 | 16 | ERP-015 | [16-erp-015-hostingguard.md](./16-erp-015-hostingguard.md) | HostingGuard — Integración ERP + deployments + subdominios + SSL + billing | 🟡 DRAFT v1 |
 | 17 | ERP-016 | [17-erp-016-inspyra-cloud.md](./17-erp-016-inspyra-cloud.md) | Inspyra Cloud — Integración ERP + workloads AWS + Cost Explorer + monitoring | 🟡 DRAFT v1 |
 | 18 | ERP-017 | [18-erp-017-inspyra-mail.md](./18-erp-017-inspyra-mail.md) | Inspyra Mail — Inbox unificado + clasificación IA + secuencias + formularios web | 🟡 DRAFT v1 |
+| 19 | ERP-018 | [19-erp-018-equipo-colaboradores.md](./19-erp-018-equipo-colaboradores.md) | Equipo & Colaboradores — RBAC + presencia + productividad + performance scores | 🟡 DRAFT v1 |
 
 ## Convención de nombres
 
