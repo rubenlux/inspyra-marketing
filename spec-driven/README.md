@@ -24,6 +24,7 @@ Toda nueva feature, módulo o decisión arquitectónica debe tener una spec ante
 | 09 | ERP-008 | [09-erp-008-delivery-proyectos.md](./09-erp-008-delivery-proyectos.md) | Módulo Delivery — Proyectos + Hitos + Time Tracking + Riesgo IA | 🟡 DRAFT v1 |
 | 10 | ERP-009 | [10-erp-009-delivery-tareas.md](./10-erp-009-delivery-tareas.md) | Módulo Delivery — Tareas + Kanban + Activity Log + Recurrencia | 🟡 DRAFT v1 |
 | 11 | ERP-010 | [11-erp-010-studio-laboratorio-ia.md](./11-erp-010-studio-laboratorio-ia.md) | Módulo Studio — Laboratorio IA + Orquestador + Cost Governance | 🟡 DRAFT v1 |
+| 12 | ERP-011 | [12-erp-011-operations-finanzas.md](./12-erp-011-operations-finanzas.md) | Módulo Operations — Finanzas + Facturación + Rentabilidad + Multi-BU | 🟡 DRAFT v1 |
 
 ## Convención de nombres
 
