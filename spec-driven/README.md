@@ -26,6 +26,7 @@ Toda nueva feature, módulo o decisión arquitectónica debe tener una spec ante
 | 11 | ERP-010 | [11-erp-010-studio-laboratorio-ia.md](./11-erp-010-studio-laboratorio-ia.md) | Módulo Studio — Laboratorio IA + Orquestador + Cost Governance | 🟡 DRAFT v1 |
 | 12 | ERP-011 | [12-erp-011-operations-finanzas.md](./12-erp-011-operations-finanzas.md) | Módulo Operations — Finanzas + Facturación + Rentabilidad + Multi-BU | 🟡 DRAFT v1 |
 | 13 | ERP-012 | [13-erp-012-operations-facturacion-cobranza.md](./13-erp-012-operations-facturacion-cobranza.md) | Módulo Operations — Facturación & Cobranza + Recurrentes + Morosidad | 🟡 DRAFT v1 |
+| 14 | ERP-013 | [14-erp-013-operations-tickets-soporte.md](./14-erp-013-operations-tickets-soporte.md) | Módulo Operations — Tickets & Soporte + SLA + Escalación + CSAT | 🟡 DRAFT v1 |
 
 ## Convención de nombres
 
