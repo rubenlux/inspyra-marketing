@@ -20,6 +20,7 @@ Toda nueva feature, módulo o decisión arquitectónica debe tener una spec ante
 | 05 | ERP-004 | [05-erp-004-comercial-pipeline.md](./05-erp-004-comercial-pipeline.md) | Módulo Comercial — Pipeline + Kanban + Forecast + Auto-onboarding | 🟡 DRAFT v1 |
 | 06 | ERP-005 | [06-erp-005-comercial-reuniones.md](./06-erp-005-comercial-reuniones.md) | Módulo Comercial — Reuniones + Briefing IA + Outcomes + CRM Update | 🟡 DRAFT v1 |
 | 07 | ERP-006 | [07-erp-006-delivery-clientes.md](./07-erp-006-delivery-clientes.md) | Módulo Delivery — Clientes + Ficha 360° + Health Score + Upsell IA | 🟡 DRAFT v1 |
+| 08 | ERP-007 | [08-erp-007-delivery-servicios.md](./08-erp-007-delivery-servicios.md) | Módulo Delivery — Servicios + Catálogo + Entregables + Margen | 🟡 DRAFT v1 |
 
 ## Convención de nombres
 
