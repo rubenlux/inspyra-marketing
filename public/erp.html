@@ -1068,8 +1068,9 @@ input, textarea, select { font-family: inherit; }
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
+
+  <!-- components.jsx -->
   <script type="text/babel">
-/* === components.jsx === */
 /* global React */
 // Shared icons + small UI atoms used across the ERP.
 // Icons are inline strokes — tabler-style. 16px default.
@@ -1247,8 +1248,10 @@ Object.assign(window, {
   Icon, Ic, Badge, Spark, Avatar, AvatarGroup, Priority, Progress, InspyraLogo,
 });
 
+  </script>
 
-/* === sidebar.jsx === */
+  <!-- sidebar.jsx -->
+  <script type="text/babel">
 /* global React, Icon, InspyraLogo, Avatar */
 const { useState } = React;
 
@@ -1507,8 +1510,10 @@ if (!document.getElementById("sb-styles")) {
 window.Sidebar = Sidebar;
 window.NAV = NAV;
 
+  </script>
 
-/* === topbar.jsx === */
+  <!-- topbar.jsx -->
+  <script type="text/babel">
 /* global React, Icon, Avatar */
 const { useState: useStateTB } = React;
 
@@ -1566,8 +1571,10 @@ function Topbar({ screen }) {
 window.Topbar = Topbar;
 window.SCREEN_META = SCREEN_META;
 
+  </script>
 
-/* === screens\login.jsx === */
+  <!-- screens\login.jsx -->
+  <script type="text/babel">
 /* global React, Icon, InspyraLogo */
 const { useState: useStateLogin } = React;
 
@@ -1701,8 +1708,10 @@ function FloatingCard({ title, subtitle, footer, accent, stat, agent }) {
 
 window.Login = Login;
 
+  </script>
 
-/* === screens\dashboard.jsx === */
+  <!-- screens\dashboard.jsx -->
+  <script type="text/babel">
 /* global React, Icon, Badge, Spark, Avatar, AvatarGroup, Progress */
 
 const KPI = ({ icon, label, value, unit, delta, trend, chartColor = "#0B0D12", chartFill }) => {
@@ -2056,8 +2065,10 @@ function RevenueChart() {
 
 window.Dashboard = Dashboard;
 
+  </script>
 
-/* === screens\com-shared.jsx === */
+  <!-- screens\com-shared.jsx -->
+  <script type="text/babel">
 /* global React, Icon, Badge */
 const { useState: useStateCom } = React;
 
@@ -2392,8 +2403,10 @@ if (!document.getElementById("com-styles")) {
 
 Object.assign(window, { ComercialTabs, ChannelTag, Score, Temp, QuickActions, AutomationFlow, BotsStrip, CHANNELS, COM_TABS });
 
+  </script>
 
-/* === screens\com-prospects.jsx === */
+  <!-- screens\com-prospects.jsx -->
+  <script type="text/babel">
 /* global React, Icon, Badge, Avatar, ComercialTabs, ChannelTag, Score */
 const { useState: useStateProsp } = React;
 
@@ -2609,8 +2622,10 @@ if (!document.getElementById("seg-styles")) {
 
 window.Prospects = Prospects;
 
+  </script>
 
-/* === screens\com-campaigns.jsx === */
+  <!-- screens\com-campaigns.jsx -->
+  <script type="text/babel">
 /* global React, Icon, Badge, Avatar, ComercialTabs, ChannelTag, BotsStrip */
 
 const CAMP_DATA = [
@@ -2778,8 +2793,10 @@ if (!document.getElementById("info-banner-styles")) {
 
 window.Campaigns = Campaigns;
 
+  </script>
 
-/* === screens\com-followup.jsx === */
+  <!-- screens\com-followup.jsx -->
+  <script type="text/babel">
 /* global React, Icon, Badge, Avatar, ComercialTabs, ChannelTag, Temp, QuickActions, AutomationFlow */
 const { useState: useStateFu } = React;
 
@@ -2973,8 +2990,10 @@ if (!document.getElementById("fu-styles")) {
 
 window.Followup = Followup;
 
+  </script>
 
-/* === screens\com-pipeline.jsx === */
+  <!-- screens\com-pipeline.jsx -->
+  <script type="text/babel">
 /* global React, Icon, Badge, Avatar, ComercialTabs, ChannelTag */
 
 const PIPE_COLS = [
@@ -3109,8 +3128,10 @@ function PipeStat({ label, value, sub, c }) {
 
 window.Pipeline = Pipeline;
 
+  </script>
 
-/* === screens\com-meetings.jsx === */
+  <!-- screens\com-meetings.jsx -->
+  <script type="text/babel">
 /* global React, Icon, Badge, Avatar, ComercialTabs, ChannelTag */
 const { useState: useStateMt } = React;
 
@@ -3297,8 +3318,10 @@ if (!document.getElementById("mt-styles")) {
 
 window.Meetings = Meetings;
 
+  </script>
 
-/* === screens\clients.jsx === */
+  <!-- screens\clients.jsx -->
+  <script type="text/babel">
 /* global React, Icon, Badge, Avatar, AvatarGroup, Progress, Spark */
 const { useState: useStateCL } = React;
 
@@ -3589,8 +3612,10 @@ function TLI({ tone, who, what, obj, time }) {
 window.Clients = Clients;
 window.ClientDrawer = ClientDrawer;
 
+  </script>
 
-/* === screens\projects.jsx === */
+  <!-- screens\projects.jsx -->
+  <script type="text/babel">
 /* global React, Icon, Badge, Avatar, AvatarGroup, Priority, Progress */
 
 const PROJ_KANBAN = {
@@ -3784,8 +3809,10 @@ function Tasks() {
 window.Projects = Projects;
 window.Tasks = Tasks;
 
+  </script>
 
-/* === screens\services.jsx === */
+  <!-- screens\services.jsx -->
+  <script type="text/babel">
 /* global React, Icon, Badge, Avatar, Spark, Progress */
 
 const SERVICES = [
@@ -3946,8 +3973,10 @@ function SvcStat({ label, value, unit, delta, tone }) {
 
 window.Services = Services;
 
+  </script>
 
-/* === screens\billing.jsx === */
+  <!-- screens\billing.jsx -->
+  <script type="text/babel">
 /* global React, Icon, Badge, Avatar, Spark */
 
 const INVOICES = [
@@ -4162,8 +4191,10 @@ function DonutMix() {
 
 window.Billing = Billing;
 
+  </script>
 
-/* === screens\hosting.jsx === */
+  <!-- screens\hosting.jsx -->
+  <script type="text/babel">
 /* global React, Icon, Badge */
 
 const DEPLOYS = [
@@ -4426,8 +4457,10 @@ function TrafficChart() {
 
 window.HostingGuard = HostingGuard;
 
+  </script>
 
-/* === screens\lab.jsx === */
+  <!-- screens\lab.jsx -->
+  <script type="text/babel">
 /* global React, Icon, Badge, Avatar */
 const { useState: useStateLab } = React;
 
@@ -4723,8 +4756,10 @@ function Output({ type, title, body, thumbs, tasks }) {
 
 window.Lab = Lab;
 
+  </script>
 
-/* === screens\settings.jsx === */
+  <!-- screens\settings.jsx -->
+  <script type="text/babel">
 /* global React, Icon, Badge, Avatar, AvatarGroup */
 const { useState: useStateSt } = React;
 
@@ -5019,8 +5054,10 @@ function Toggle({ on }) {
 
 window.Settings = Settings;
 
+  </script>
 
-/* === screens\misc.jsx === */
+  <!-- screens\misc.jsx -->
+  <script type="text/babel">
 /* global React, Icon, Badge, Avatar, AvatarGroup, Spark, Progress */
 
 // (old Campaigns + CAMPAIGNS removed — now in screens/com-campaigns.jsx)
@@ -5182,8 +5219,10 @@ function SmallStat({ label, value, delta, tone }) {
 window.Tickets = Tickets;
 window.Reports = Reports;
 
+  </script>
 
-/* === app.jsx === */
+  <!-- app.jsx -->
+  <script type="text/babel">
 /* global React, ReactDOM,
    Sidebar, Topbar, Login, Dashboard, Prospects, Campaigns, Followup, Pipeline, Meetings,
    Clients, ClientDrawer, Projects, Tasks, Services, Billing, HostingGuard, Lab, Settings,
