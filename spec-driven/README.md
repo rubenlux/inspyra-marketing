@@ -22,6 +22,7 @@ Toda nueva feature, módulo o decisión arquitectónica debe tener una spec ante
 | 07 | ERP-006 | [07-erp-006-delivery-clientes.md](./07-erp-006-delivery-clientes.md) | Módulo Delivery — Clientes + Ficha 360° + Health Score + Upsell IA | 🟡 DRAFT v1 |
 | 08 | ERP-007 | [08-erp-007-delivery-servicios.md](./08-erp-007-delivery-servicios.md) | Módulo Delivery — Servicios + Catálogo + Entregables + Margen | 🟡 DRAFT v1 |
 | 09 | ERP-008 | [09-erp-008-delivery-proyectos.md](./09-erp-008-delivery-proyectos.md) | Módulo Delivery — Proyectos + Hitos + Time Tracking + Riesgo IA | 🟡 DRAFT v1 |
+| 10 | ERP-009 | [10-erp-009-delivery-tareas.md](./10-erp-009-delivery-tareas.md) | Módulo Delivery — Tareas + Kanban + Activity Log + Recurrencia | 🟡 DRAFT v1 |
 
 ## Convención de nombres
 
