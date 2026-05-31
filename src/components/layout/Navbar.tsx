@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X, Zap, Globe } from 'lucide-react'
+import { Menu, X, Zap, Globe, LogIn } from 'lucide-react'
 import { SITE } from '../../config/site'
 import { useLang, type Lang } from '../../i18n'
 
@@ -71,7 +71,7 @@ export function Navbar() {
             ))}
           </nav>
 
-          {/* CTA + Lang + Hamburger */}
+          {/* CTA + Lang + Login + Hamburger */}
           <div className="flex items-center gap-2">
             {/* Lang toggle */}
             <button
@@ -82,6 +82,15 @@ export function Navbar() {
               <Globe className="w-3.5 h-3.5" />
               {lang === 'es' ? 'EN' : 'ES'}
             </button>
+
+            {/* Login button */}
+            <a
+              href="/erp.html"
+              className="hidden sm:flex items-center gap-1.5 px-4 py-2.5 glass rounded-xl text-sm font-semibold text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200 border border-white/10 hover:border-white/20"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              {t.nav.login}
+            </a>
 
             <button
               onClick={() => handleNav('#contacto')}
@@ -121,9 +130,16 @@ export function Navbar() {
                   {link.label}
                 </button>
               ))}
+              <a
+                href="/erp.html"
+                className="flex items-center justify-center gap-2 mt-2 px-4 py-3 glass rounded-xl text-sm font-semibold text-white/80 hover:text-white hover:bg-white/10 transition-all border border-white/10"
+              >
+                <LogIn className="w-4 h-4" />
+                {t.nav.login}
+              </a>
               <button
                 onClick={() => handleNav('#contacto')}
-                className="mt-3 btn-primary justify-center"
+                className="mt-2 btn-primary justify-center"
               >
                 {t.nav.cta}
               </button>

@@ -8,6 +8,7 @@ export const es = {
     faq: 'FAQ',
     contact: 'Contacto',
     cta: 'Solicitar diagnóstico',
+    login: 'Iniciar sesión',
   },
   hero: {
     badge: 'Soluciones digitales integrales para empresas',

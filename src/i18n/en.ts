@@ -10,6 +10,7 @@ export const en: Translations = {
     faq: 'FAQ',
     contact: 'Contact',
     cta: 'Request diagnosis',
+    login: 'Log in',
   },
   hero: {
     badge: 'End-to-end digital solutions for businesses',
