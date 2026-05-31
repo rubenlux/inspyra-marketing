@@ -33,6 +33,7 @@ Toda nueva feature, módulo o decisión arquitectónica debe tener una spec ante
 | 18 | ERP-017 | [18-erp-017-inspyra-mail.md](./18-erp-017-inspyra-mail.md) | Inspyra Mail — Inbox unificado + clasificación IA + secuencias + formularios web | 🟡 DRAFT v1 |
 | 19 | ERP-018 | [19-erp-018-equipo-colaboradores.md](./19-erp-018-equipo-colaboradores.md) | Equipo & Colaboradores — RBAC + presencia + productividad + performance scores | 🟡 DRAFT v1 |
 | 20 | ERP-019 | [20-erp-019-account-configuracion.md](./20-erp-019-account-configuracion.md) | Account / Configuración — Panel maestro del ERP + integraciones + seguridad + auditoría | 🟡 DRAFT v1 |
+| 21 | ERP-020 | [21-erp-020-social-publishing-hub.md](./21-erp-020-social-publishing-hub.md) | Social & Publishing Hub — Redes sociales + calendario editorial + publicación automática + métricas | 🟡 DRAFT v1 |
 
 ## Convención de nombres
 
