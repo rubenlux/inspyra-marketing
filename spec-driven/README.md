@@ -35,6 +35,7 @@ Toda nueva feature, módulo o decisión arquitectónica debe tener una spec ante
 | 20 | ERP-019 | [20-erp-019-account-configuracion.md](./20-erp-019-account-configuracion.md) | Account / Configuración — Panel maestro del ERP + integraciones + seguridad + auditoría | 🟡 DRAFT v1 |
 | 21 | ERP-020 | [21-erp-020-social-publishing-hub.md](./21-erp-020-social-publishing-hub.md) | Social & Publishing Hub — Redes sociales + calendario editorial + publicación automática + métricas | 🟡 DRAFT v1 |
 | 22 | ERP-021 | [22-erp-021-email-marketing.md](./22-erp-021-email-marketing.md) | Email Marketing — Campañas masivas + automatizaciones + deliverability + A/B testing | 🟡 DRAFT v1 |
+| 23 | ERP-022 | [23-erp-022-mcp-ai-tool-gateway.md](./23-erp-022-mcp-ai-tool-gateway.md) | MCP & AI Tool Gateway — Orquestación agentes + tool registry + permisos + vault credenciales | 🟡 DRAFT v1 |
 
 ## Convención de nombres
 
