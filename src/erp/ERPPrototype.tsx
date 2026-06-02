@@ -2,6 +2,7 @@
 import * as React from 'react'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import DashboardV2 from './DashboardV2'
 import './erp.css'
 
 // Shared icons + small UI atoms used across the ERP.
@@ -4111,7 +4112,7 @@ function App() {
       <Sidebar active={screen} onNav={handleNav}/>
       <main className="main">
         <Topbar screen={screen}/>
-        {screen === "dashboard" && <Dashboard/>}
+        {screen === "dashboard" && <DashboardV2/>}
         {screen === "prospects" && <Prospects onNav={handleNav}/>}
         {screen === "growth" && <Pipeline onNav={handleNav}/>}
         {screen === "campaigns" && <Campaigns onNav={handleNav}/>}

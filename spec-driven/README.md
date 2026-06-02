@@ -37,6 +37,8 @@ Toda nueva feature, módulo o decisión arquitectónica debe tener una spec ante
 | 22 | ERP-021 | [22-erp-021-email-marketing.md](./22-erp-021-email-marketing.md) | Email Marketing — Campañas masivas + automatizaciones + deliverability + A/B testing | 🟡 DRAFT v1 |
 | 23 | ERP-022 | [23-erp-022-mcp-ai-tool-gateway.md](./23-erp-022-mcp-ai-tool-gateway.md) | MCP & AI Tool Gateway — Orquestación agentes + tool registry + permisos + vault credenciales | 🟡 DRAFT v1 |
 | 24 | ERP-023 | [24-erp-023-backend-core-foundation.md](./24-erp-023-backend-core-foundation.md) | Backend Core Foundation — NestJS, PostgreSQL, Redis, Auth, RBAC, tenancy y APIs base | 🟡 DRAFT v1 |
+| 25 | ERP-024 | [25-erp-024-politica-intelligence.md](./25-erp-024-politica-intelligence.md) | Política Intelligence Hub — Campañas políticas, candidatos, encuestas, territorio, social listening, War Room e IA política | 🟡 DRAFT v1 |
+| 26 | ERP-025 | [26-erp-025-metrics-intelligence-hub.md](./26-erp-025-metrics-intelligence-hub.md) | Metrics Intelligence Hub — Métricas unificadas, rentabilidad, costos IA, productividad, scores, predicciones y Executive Dashboard | 🟡 DRAFT v1 |
 
 ## Convención de nombres
 
