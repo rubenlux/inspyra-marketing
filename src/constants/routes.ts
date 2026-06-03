@@ -21,4 +21,6 @@ export const ERP_ROUTES = {
   settings: '/erp/configuracion',
   socialIntegrations: '/erp/integraciones-sociales',
   mcp: '/erp/mcp',
+  politica: '/erp/politica-intelligence',
+  metrics: '/erp/metrics-hub',
 } as const

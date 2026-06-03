@@ -201,14 +201,24 @@ const NAV = [
   ]},
   { group: "Studio", items: [
     { id: "lab", label: "Laboratorio IA", icon: "beaker", pin: true },
+    { id: "politica", label: "Política Intelligence", icon: "flag" },
+    { id: "metrics", label: "Metrics Hub", icon: "trend" },
   ]},
   { group: "Operations", items: [
     { id: "hosting", label: "HostingGuard", icon: "shield" },
+    { id: "cloudInspyra", label: "Inspyra Cloud", icon: "server" },
     { id: "billing", label: "Facturación", icon: "card" },
     { id: "tickets", label: "Tickets", icon: "life", badge: "7" },
     { id: "reports", label: "Reportes", icon: "chart" },
   ]},
+  { group: "Comunicación", items: [
+    { id: "mailInspyra", label: "Inspyra Mail", icon: "inbox", badge: "12" },
+    { id: "emailMarketing", label: "Email Marketing", icon: "mail" },
+    { id: "social", label: "Social Hub", icon: "globe" },
+  ]},
   { group: "Account", items: [
+    { id: "team", label: "Equipo", icon: "users" },
+    { id: "mcp", label: "MCP Gateway", icon: "command" },
     { id: "settings", label: "Configuración", icon: "cog" },
   ]},
 ];
@@ -4037,6 +4047,1420 @@ function SmallStat({ label, value, delta, tone }) {
   );
 }
 
+// ─── INSPYRA CLOUD (ERP-016) ──────────────────────────────────────────────
+
+const useStateCloud = useState;
+
+const CLOUD_WORKLOADS = [
+  { id: "wk-01", name: "helia-energy-api", client: "Helia Energy", type: "Lambda", env: "production", cpu: 24, ram: 48, lat: 98, status: "running" },
+  { id: "wk-02", name: "tessera-checkout", client: "Tessera Joyas", type: "Container", env: "production", cpu: 62, ram: 71, lat: 142, status: "running" },
+  { id: "wk-03", name: "mira-cms-api", client: "Mira Cosmetics", type: "API GW", env: "production", cpu: 18, ram: 32, lat: 87, status: "running" },
+  { id: "wk-04", name: "cala-crm-backend", client: "Calá Inmobiliaria", type: "ECS", env: "staging", cpu: 45, ram: 55, lat: 220, status: "running" },
+  { id: "wk-05", name: "norte-films-cdn", client: "Norte Films", type: "CloudFront", env: "production", cpu: 8, ram: 12, lat: 34, status: "running" },
+  { id: "wk-06", name: "inspyra-auth-svc", client: "Inspyra (interno)", type: "Lambda", env: "production", cpu: 88, ram: 76, lat: 67, status: "running" },
+  { id: "wk-07", name: "veleta-wines-shop", client: "Veleta Wines", type: "Container", env: "production", cpu: 34, ram: 41, lat: 189, status: "error" },
+  { id: "wk-08", name: "borealis-booking", client: "Borealis Tours", type: "Lambda", env: "dev", cpu: 12, ram: 20, lat: 310, status: "running" },
+];
+
+const CLOUD_COSTS = [
+  { service: "Lambda", cost: "324", delta: 5.2, desc: "2.4M invocaciones · 128MB avg", sparkData: [80,100,110,95,120,130,115,140,155,145,160,170] },
+  { service: "RDS (PostgreSQL)", cost: "481", delta: 2.1, desc: "db.t3.medium × 3 instancias", sparkData: [120,125,130,128,135,140,138,142,148,145,155,160] },
+  { service: "ECS / Fargate", cost: "298", delta: 12.4, desc: "8 tasks corriendo en producción", sparkData: [60,70,80,90,100,110,130,145,160,175,190,200] },
+  { service: "CloudFront", cost: "187", delta: -3.2, desc: "CDN + S3 · 4.2TB transferidos", sparkData: [200,190,180,175,170,168,165,162,160,158,155,152] },
+  { service: "API Gateway", cost: "142", delta: 8.7, desc: "12.3M requests este mes", sparkData: [60,75,82,90,100,108,115,122,130,135,138,142] },
+  { service: "S3 + transfers", cost: "210", delta: 1.5, desc: "890 GB almacenados · 1.8TB out", sparkData: [100,105,108,112,118,125,130,135,140,148,155,162] },
+];
+
+const CLOUD_DEPLOYS = [
+  { sha: "a3f8c2d", workload: "helia-energy-api", by: "Diego Salas", time: "hace 12m", status: "success" },
+  { sha: "b91e4a7", workload: "tessera-checkout", by: "Pablo Ferré", time: "hace 45m", status: "success" },
+  { sha: "c22d9f1", workload: "veleta-wines-shop", by: "Diego Salas", time: "hace 2h", status: "failed" },
+  { sha: "d54a8b3", workload: "inspyra-auth-svc", by: "Mateo López", time: "hace 4h", status: "success" },
+  { sha: "e77c5d9", workload: "mira-cms-api", by: "Pablo Ferré", time: "hace 6h", status: "success" },
+  { sha: "f19b3e6", workload: "cala-crm-backend", by: "Diego Salas", time: "ayer", status: "success" },
+];
+
+const CLOUD_ALERTS = [
+  { title: "Lambda inspyra-auth-svc CPU > 85%", desc: "Umbral de CPU superado durante 15 min consecutivos. Considerar scaling.", severity: "warning", time: "hace 8m" },
+  { title: "Container veleta-wines-shop crash loop", desc: "El servicio reinició 3 veces en los últimos 20 minutos. Último error: ENOMEM.", severity: "critical", time: "hace 2h" },
+  { title: "RDS backup completado", desc: "Snapshot diario completado correctamente en todas las instancias.", severity: "info", time: "hace 3h" },
+  { title: "CloudFront cache hit rate < 70%", desc: "El ratio de aciertos de caché bajó de 92% a 67%. Revisar reglas de caché.", severity: "warning", time: "hace 5h" },
+];
+
+function InspyraCloud() {
+  const [tab, setTab] = useStateCloud("workloads");
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Inspyra Cloud</h1>
+          <p>8 workloads activos · AWS us-east-1 · sync hace 30s</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.refresh size={14}/> Sync ahora</button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Nuevo workload</button>
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
+        <SmallStat label="Workloads activos" value="8" delta="1 con error" tone="warning"/>
+        <SmallStat label="Costo AWS (mes)" value="$1,842" delta="+8.3% vs may" tone="warning"/>
+        <SmallStat label="Uptime promedio" value="99.97%" delta="SLA OK" tone="brand"/>
+        <SmallStat label="Lambdas invocadas" value="2.4M" delta="últimos 7 días" tone="info"/>
+      </div>
+
+      <div className="tabs">
+        {[["workloads","Workloads"],["costos","Cost Explorer"],["deployments","Deployments"],["alertas","Alertas"]].map(([id,label]) => (
+          <div key={id} className={`tab${tab === id ? " active" : ""}`} onClick={() => setTab(id)}>{label}</div>
+        ))}
+      </div>
+
+      {tab === "workloads" && (
+        <div className="card">
+          <table className="tbl">
+            <thead><tr>
+              <th>Workload</th><th>Cliente</th><th>Tipo</th><th>Entorno</th>
+              <th style={{width:110}}>CPU</th><th style={{width:110}}>RAM</th><th>Latencia</th><th>Estado</th>
+            </tr></thead>
+            <tbody>
+              {CLOUD_WORKLOADS.map(w => (
+                <tr key={w.id}>
+                  <td className="cell-strong cell-mono" style={{fontSize:12}}>{w.name}</td>
+                  <td>{w.client}</td>
+                  <td><Badge tone="outline">{w.type}</Badge></td>
+                  <td><Badge tone={w.env === "production" ? "brand" : w.env === "staging" ? "warning" : "info"}>{w.env}</Badge></td>
+                  <td>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <Progress value={w.cpu} tone={w.cpu > 80 ? "danger" : "success"}/>
+                      <span style={{fontSize:10,color:"var(--ink-500)",minWidth:28}}>{w.cpu}%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <Progress value={w.ram} tone={w.ram > 80 ? "danger" : "info"}/>
+                      <span style={{fontSize:10,color:"var(--ink-500)",minWidth:28}}>{w.ram}%</span>
+                    </div>
+                  </td>
+                  <td className="cell-mono" style={{color: w.lat > 300 ? "var(--warning-ink)" : "inherit"}}>{w.lat}ms</td>
+                  <td>{w.status === "running" ? <Badge tone="success" dot>Running</Badge> : <Badge tone="danger" dot>Error</Badge>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === "costos" && (
+        <div>
+          <div className="card" style={{padding:18, marginBottom:16, display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div>
+              <span style={{fontSize:13,color:"var(--ink-500)"}}>Total AWS junio 2026</span>
+              <div style={{fontSize:32,fontWeight:700,fontFamily:"var(--font-display)",letterSpacing:"-0.03em"}}>$1,842 <span style={{fontSize:16,color:"var(--warning-ink)",fontWeight:600}}>+8.3%</span></div>
+            </div>
+            <div className="row gap-sm">
+              <button className="btn"><Icon.download size={14}/> Exportar</button>
+              <button className="btn btn-ghost btn-sm">Por cliente</button>
+            </div>
+          </div>
+          <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+            {CLOUD_COSTS.map((c, i) => (
+              <div key={i} className="card" style={{ padding: 18 }}>
+                <div className="row between" style={{ marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>{c.service}</span>
+                  <Badge tone={c.delta > 5 ? "warning" : c.delta < 0 ? "success" : "outline"}>{c.delta > 0 ? "+" : ""}{c.delta}%</Badge>
+                </div>
+                <div style={{ fontSize: 26, fontWeight: 700, fontFamily: "var(--font-display)" }}>${c.cost}<span style={{fontSize:12,color:"var(--ink-500)",fontWeight:400}}>/mes</span></div>
+                <div style={{ fontSize: 11.5, color: "var(--ink-500)", marginTop: 4 }}>{c.desc}</div>
+                <div style={{ height: 36, marginTop: 12 }}>
+                  <Spark data={c.sparkData} color="#5B5BF7" fill="#5B5BF722" w={240} h={36}/>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === "deployments" && (
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Historial de deployments</div>
+            <Badge tone="outline">Últimos 30</Badge>
+          </div>
+          <table className="tbl">
+            <thead><tr>
+              <th style={{width:100}}>Commit</th><th>Workload</th><th>Deploy por</th><th>Fecha</th><th>Estado</th>
+            </tr></thead>
+            <tbody>
+              {CLOUD_DEPLOYS.map((d, i) => (
+                <tr key={i}>
+                  <td className="cell-mono" style={{fontSize:12,color:"var(--ink-500)"}}>{d.sha}</td>
+                  <td className="cell-strong" style={{fontFamily:"var(--font-mono)",fontSize:12}}>{d.workload}</td>
+                  <td><div className="row gap-sm"><Avatar name={d.by} size="sm"/>{d.by.split(" ")[0]}</div></td>
+                  <td className="cell-muted">{d.time}</td>
+                  <td>{d.status === "success" ? <Badge tone="success" dot>Success</Badge> : <Badge tone="danger" dot>Failed</Badge>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === "alertas" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {CLOUD_ALERTS.map((a, i) => (
+            <div key={i} className="card" style={{ padding: "14px 18px", display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <span style={{ color: a.severity === "critical" ? "var(--danger-ink)" : a.severity === "warning" ? "var(--warning-ink)" : "var(--info)", marginTop: 2, flexShrink:0 }}>
+                <Icon.pulse size={16}/>
+              </span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>{a.title}</div>
+                <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 3 }}>{a.desc}</div>
+              </div>
+              <div className="row gap-sm" style={{flexShrink:0}}>
+                <Badge tone={a.severity === "critical" ? "danger" : a.severity === "warning" ? "warning" : "info"}>{a.severity}</Badge>
+                <span style={{ fontSize: 11.5, color: "var(--ink-500)" }}>{a.time}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── INSPYRA MAIL (ERP-017) ───────────────────────────────────────────────
+
+const useStateMail = useState;
+
+const MAIL_THREADS = [
+  { id: "m-01", from: "contacto@heliaenergy.com", name: "Fernando Roca", subject: "Revisión del dashboard junio", preview: "Mateo, te envío los datos del mes...", time: "hace 8m", unread: true, tag: "Clientes" },
+  { id: "m-02", from: "dra.roca@lumen-salud.com", name: "Dra. M. Roca", subject: "Propuesta contenidos Q3", preview: "Gracias por la reunión. Adjunto la...", time: "hace 35m", unread: true, tag: "Comercial" },
+  { id: "m-03", from: "jbauer@bauernco.com", name: "J. Bauer", subject: "Re: Onboarding hosting", preview: "Ya completé el formulario. ¿Cuándo...", time: "hace 1h", unread: false, tag: "Soporte" },
+  { id: "m-04", from: "tessera@joyastessera.com", name: "A. Tessera", subject: "Error en checkout — urgente", preview: "Los clientes reportan que no pueden...", time: "hace 2h", unread: true, tag: "Soporte" },
+  { id: "m-05", from: "sofia.vidal@aurora-cafe.com", name: "Sofía Vidal", subject: "Nuevo diseño home aprobado", preview: "Todo perfecto! Pueden proceder con...", time: "hace 3h", unread: false, tag: "Proyectos" },
+  { id: "m-06", from: "mcalderon@borealistours.com", name: "M. Calderón", subject: "Factura julio pendiente", preview: "Hola, me llega un recordatorio de...", time: "ayer", unread: false, tag: "Facturación" },
+  { id: "m-07", from: "klein@kleinstudio.io", name: "D. Klein", subject: "Presupuesto branding 2027", preview: "Quedamos en que nos mandaban el...", time: "ayer", unread: false, tag: "Comercial" },
+  { id: "m-08", from: "mira@miracosmetics.ar", name: "C. Bregman", subject: "Nuevas fotos para galería", preview: "Adjunto 48 fotos del shoot de ayer...", time: "hace 2d", unread: false, tag: "Proyectos" },
+];
+
+const MAIL_TAG_COLORS = { Clientes: "#10B981", Comercial: "#5B5BF7", Soporte: "#EF4444", Proyectos: "#A78BFA", Facturación: "#F59E0B" };
+
+function InspyraMail() {
+  const [active, setActive] = useStateMail("m-01");
+  const [folder, setFolder] = useStateMail("inbox");
+  const thread = MAIL_THREADS.find(t => t.id === active);
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "220px 300px 1fr", height: "100%", overflow: "hidden" }}>
+      <div style={{ borderRight: "1px solid var(--border-soft)", padding: "16px 12px", display:"flex", flexDirection:"column", gap:2, overflowY:"auto" }}>
+        <button className="btn btn-brand" style={{marginBottom:12, justifyContent:"center"}}><Icon.plus size={14}/> Redactar</button>
+        {[
+          { id:"inbox", label:"Bandeja de entrada", icon:"inbox", count:3 },
+          { id:"sent", label:"Enviados", icon:"send" },
+          { id:"drafts", label:"Borradores", icon:"doc", count:2 },
+          { id:"starred", label:"Destacados", icon:"pin" },
+          { id:"spam", label:"Spam", icon:"shield" },
+          { id:"trash", label:"Papelera", icon:"x" },
+        ].map(f => {
+          const Ico2 = Icon[f.icon];
+          return (
+            <button key={f.id} onClick={() => setFolder(f.id)}
+              style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",border:0,background:folder===f.id?"var(--surface)":"transparent",
+                color:folder===f.id?"var(--ink-900)":"var(--ink-600)",fontSize:13,fontWeight:folder===f.id?600:500,borderRadius:6,cursor:"pointer",width:"100%"}}>
+              {Ico2 && <Ico2 size={14}/>} {f.label}
+              {f.count && <span className="badge danger" style={{marginLeft:"auto"}}>{f.count}</span>}
+            </button>
+          );
+        })}
+        <div style={{borderTop:"1px solid var(--border-soft)",marginTop:12,paddingTop:12}}>
+          <div className="section-title" style={{marginBottom:6}}>Etiquetas</div>
+          {Object.entries(MAIL_TAG_COLORS).map(([tag, color]) => (
+            <button key={tag} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 10px",border:0,background:"transparent",
+              color:"var(--ink-600)",fontSize:12,borderRadius:6,cursor:"pointer",width:"100%"}}>
+              <span style={{width:8,height:8,borderRadius:50,background:color,flexShrink:0}}/>
+              {tag}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ borderRight: "1px solid var(--border-soft)", overflowY:"auto" }}>
+        <div style={{ padding:"12px", borderBottom:"1px solid var(--border-soft)", position:"sticky",top:0,background:"var(--bg)",zIndex:1 }}>
+          <div className="topbar-search" style={{width:"100%", padding:"6px 10px"}}>
+            <Icon.search size={13}/><input placeholder="Buscar emails..."/>
+          </div>
+        </div>
+        {MAIL_THREADS.map(t => (
+          <div key={t.id} onClick={() => setActive(t.id)}
+            style={{padding:"12px 14px", cursor:"pointer", borderBottom:"1px solid var(--border-soft)",
+              background: active===t.id ? "var(--surface)" : "transparent",
+              borderLeft: active===t.id ? "3px solid var(--primary)" : "3px solid transparent"}}>
+            <div className="row between" style={{marginBottom:3}}>
+              <span style={{fontWeight: t.unread?700:500,fontSize:13}}>{t.name}</span>
+              <span style={{fontSize:11,color:"var(--ink-400)"}}>{t.time}</span>
+            </div>
+            <div style={{fontWeight:t.unread?600:500,fontSize:12.5,marginBottom:3,color:"var(--ink-800)"}}>{t.subject}</div>
+            <div style={{fontSize:12,color:"var(--ink-500)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.preview}</div>
+            <div style={{marginTop:5}}>
+              <span style={{fontSize:10.5,padding:"1px 7px",borderRadius:999,background:MAIL_TAG_COLORS[t.tag]+"22",color:MAIL_TAG_COLORS[t.tag],fontWeight:600}}>{t.tag}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {thread && (
+        <div style={{ padding:28, overflowY:"auto" }}>
+          <div className="row between" style={{marginBottom:20}}>
+            <div>
+              <h2 style={{margin:0,fontFamily:"var(--font-display)",fontWeight:700,fontSize:20,letterSpacing:"-0.02em"}}>{thread.subject}</h2>
+              <div style={{fontSize:13,color:"var(--ink-500)",marginTop:4}}>De: {thread.from} · {thread.time}</div>
+            </div>
+            <div className="row gap-sm">
+              <button className="btn btn-sm"><Icon.arrowRight size={13}/> Asignar</button>
+              <button className="btn btn-sm btn-ghost"><Icon.more size={14}/></button>
+            </div>
+          </div>
+          <div className="card" style={{padding:24,marginBottom:20,fontSize:14,lineHeight:1.7,color:"var(--ink-700)"}}>
+            <p>Hola Mateo,</p>
+            <p>Espero que estés bien. Te escribo para dar seguimiento a lo que estuvimos conversando la semana pasada.</p>
+            <p>Adjunto los datos actualizados del mes. Nos gustaría poder revisar el dashboard juntos antes del cierre del trimestre.</p>
+            <p>¿Tienes disponibilidad esta semana?</p>
+            <p>Saludos,<br/><strong>{thread.name}</strong></p>
+          </div>
+          <div className="card" style={{padding:16}}>
+            <div style={{fontSize:12,color:"var(--ink-500)",marginBottom:8}}>Responder a {thread.name}</div>
+            <textarea rows={4} style={{width:"100%",background:"transparent",border:0,resize:"none",fontSize:13,color:"var(--ink-800)",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}} placeholder="Escribe tu respuesta..."/>
+            <div className="row between" style={{marginTop:8,borderTop:"1px solid var(--border-soft)",paddingTop:8}}>
+              <div className="row gap-sm">
+                <button className="btn btn-sm btn-ghost"><Icon.paperclip size={13}/></button>
+                <button className="btn btn-sm btn-ghost"><Icon.sparkles size={13}/> IA</button>
+              </div>
+              <button className="btn btn-brand btn-sm"><Icon.send size={13}/> Enviar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── EQUIPO & COLABORADORES (ERP-018) ─────────────────────────────────────
+
+const useStateTeam = useState;
+
+const TEAM_DATA = [
+  { name: "Mateo López", role: "Founder · Admin", area: "Management", avatar: "ML", status: "online", tasks: 8, projects: 5, score: 94, hours: 38, load: 85 },
+  { name: "Lucía Romero", role: "Account Manager", area: "Growth", avatar: "LR", status: "online", tasks: 12, projects: 6, score: 91, hours: 40, load: 92 },
+  { name: "Pablo Ferré", role: "Dev Lead", area: "Delivery", avatar: "PF", status: "online", tasks: 15, projects: 4, score: 88, hours: 42, load: 96 },
+  { name: "Camila Vega", role: "Motion Designer", area: "Studio", avatar: "CV", status: "away", tasks: 9, projects: 3, score: 87, hours: 35, load: 78 },
+  { name: "Diego Salas", role: "DevOps", area: "Delivery", avatar: "DS", status: "online", tasks: 6, projects: 7, score: 90, hours: 40, load: 88 },
+  { name: "Sofía Vidal", role: "Growth Manager", area: "Growth", avatar: "SV", status: "offline", tasks: 11, projects: 4, score: 86, hours: 32, load: 70 },
+];
+
+function Team() {
+  const [view, setView] = useStateTeam("members");
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Equipo</h1>
+          <p>6 miembros activos · carga promedio 85% · 1 saturado</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.download size={14}/> Exportar</button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Invitar</button>
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
+        <SmallStat label="Miembros activos" value="6" delta="+1 invitación pendiente" tone="success"/>
+        <SmallStat label="Carga promedio" value="85%" delta="1 saturado >95%" tone="warning"/>
+        <SmallStat label="Tareas asignadas" value="61" delta="esta semana" tone="info"/>
+        <SmallStat label="Score promedio" value="89.3" delta="+2.1 vs mes ant." tone="brand"/>
+      </div>
+
+      <div className="tabs">
+        {[["members","Miembros"],["workload","Carga operativa"],["performance","Performance"]].map(([id,label]) => (
+          <div key={id} className={`tab${view === id ? " active" : ""}`} onClick={() => setView(id)}>{label}</div>
+        ))}
+      </div>
+
+      {view === "members" && (
+        <div className="card">
+          <table className="tbl">
+            <thead><tr>
+              <th>Miembro</th><th>Área</th><th>Estado</th><th>Tareas</th><th>Proyectos</th><th>Score</th><th style={{width:40}}></th>
+            </tr></thead>
+            <tbody>
+              {TEAM_DATA.map(m => (
+                <tr key={m.name}>
+                  <td>
+                    <div className="row gap-sm">
+                      <div style={{position:"relative"}}>
+                        <Avatar name={m.avatar} size="md"/>
+                        <span style={{position:"absolute",bottom:0,right:0,width:9,height:9,borderRadius:50,border:"2px solid var(--bg)",
+                          background: m.status==="online"?"var(--success)":m.status==="away"?"var(--warning)":"var(--ink-300)"}}/>
+                      </div>
+                      <div>
+                        <div className="cell-strong">{m.name}</div>
+                        <div className="cell-muted" style={{fontSize:11}}>{m.role}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td><Badge tone="outline">{m.area}</Badge></td>
+                  <td>
+                    {m.status === "online" ? <Badge tone="success" dot>Online</Badge> :
+                     m.status === "away" ? <Badge tone="warning" dot>Away</Badge> :
+                     <Badge dot>Offline</Badge>}
+                  </td>
+                  <td style={{fontWeight:600}}>{m.tasks}</td>
+                  <td style={{fontWeight:600}}>{m.projects}</td>
+                  <td>
+                    <span style={{fontWeight:700,color: m.score>=90?"var(--success-ink)":m.score>=80?"var(--primary)":"var(--warning-ink)"}}>{m.score}</span>
+                    <span style={{fontSize:11,color:"var(--ink-400)"}}>/100</span>
+                  </td>
+                  <td><button className="icon-btn" style={{width:26,height:26,background:"transparent",border:0}}><Icon.more size={14}/></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {view === "workload" && (
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {TEAM_DATA.map(m => (
+            <div key={m.name} className="card" style={{padding:"14px 18px"}}>
+              <div className="row between" style={{marginBottom:10}}>
+                <div className="row gap-sm">
+                  <Avatar name={m.avatar} size="md"/>
+                  <div>
+                    <div style={{fontWeight:600,fontSize:13}}>{m.name}</div>
+                    <div style={{fontSize:12,color:"var(--ink-500)"}}>{m.area} · {m.tasks} tareas · {m.hours}h esta semana</div>
+                  </div>
+                </div>
+                <Badge tone={m.load>90?"danger":m.load>80?"warning":"success"}>{m.load}% carga</Badge>
+              </div>
+              <Progress value={m.load} tone={m.load>90?"danger":m.load>80?"warning":"success"}/>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {view === "performance" && (
+        <div className="grid" style={{gridTemplateColumns:"repeat(3, 1fr)"}}>
+          {TEAM_DATA.map(m => (
+            <div key={m.name} className="card" style={{padding:20}}>
+              <div className="row gap-sm" style={{marginBottom:16}}>
+                <Avatar name={m.avatar} size="lg"/>
+                <div>
+                  <div style={{fontWeight:700,fontSize:14}}>{m.name}</div>
+                  <div style={{fontSize:12,color:"var(--ink-500)"}}>{m.role}</div>
+                </div>
+              </div>
+              <div style={{textAlign:"center",marginBottom:16}}>
+                <div style={{fontSize:40,fontWeight:800,fontFamily:"var(--font-display)",
+                  color: m.score>=90?"var(--success-ink)":m.score>=80?"var(--primary)":"var(--warning-ink)"}}>{m.score}</div>
+                <div style={{fontSize:12,color:"var(--ink-500)"}}>Score de rendimiento</div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {[["Tareas completadas",m.tasks*6,100],["Proyectos activos",m.projects*14,100],["Horas registradas",m.hours,48]].map(([label,val,max]) => (
+                  <div key={label}>
+                    <div className="row between" style={{fontSize:12,marginBottom:3}}>
+                      <span style={{color:"var(--ink-500)"}}>{label}</span>
+                      <span style={{fontWeight:600}}>{val}{label.includes("Horas")?"h":""}</span>
+                    </div>
+                    <Progress value={Math.min(100,(val/max)*100)} tone="brand"/>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── SOCIAL & PUBLISHING HUB (ERP-020) ───────────────────────────────────
+
+const useStateSocial = useState;
+
+const SOCIAL_POSTS = [
+  { id:"sp-01", client:"Mira Cosmetics", platform:"instagram", content:"Nueva colección primavera ✨ Descubrí los nuevos tonos...", media:"imagen", scheduled:"Lunes 3 Jun · 10:00", status:"scheduled", author:"Camila Vega" },
+  { id:"sp-02", client:"Helia Energy", platform:"linkedin", content:"¿Cómo elegir el proveedor de energía adecuado para tu empresa?", media:"artículo", scheduled:"Lunes 3 Jun · 14:00", status:"scheduled", author:"Lucía Romero" },
+  { id:"sp-03", client:"Tessera Joyas", platform:"instagram", content:"Reel: Historia de cada pieza artesanal 🎨", media:"reel", scheduled:"Martes 4 Jun · 18:00", status:"draft", author:"Camila Vega" },
+  { id:"sp-04", client:"Borealis Tours", platform:"facebook", content:"Oferta especial — Patagonia antes del invierno!", media:"imagen", scheduled:"Miércoles 5 Jun · 09:30", status:"approved", author:"Sofía Vidal" },
+  { id:"sp-05", client:"Klein Studio", platform:"linkedin", content:"Caso de estudio: rediseño identidad visual completa", media:"documento", scheduled:"Jueves 6 Jun · 11:00", status:"scheduled", author:"Camila Vega" },
+  { id:"sp-06", client:"Aurora Café", platform:"instagram", content:"Buenos días ☀️ ¿Cuál es tu café favorito?", media:"imagen", scheduled:"Vie 7 Jun · 08:00", status:"published", author:"Sofía Vidal" },
+];
+
+const SOCIAL_NET_ICONS = { instagram: "📷", linkedin: "💼", facebook: "👥", tiktok: "🎵", youtube: "📺", twitter: "🐦" };
+const SOCIAL_METRICS_DATA = [
+  { platform: "Instagram", followers: "14.2K", posts: 48, reach: "82K", engagement: "4.8%", color: "#E1306C" },
+  { platform: "LinkedIn", followers: "3.1K", posts: 22, reach: "28K", engagement: "3.2%", color: "#0A66C2" },
+  { platform: "Facebook", followers: "8.4K", posts: 31, reach: "45K", engagement: "2.1%", color: "#1877F2" },
+  { platform: "TikTok", followers: "2.6K", posts: 14, reach: "65K", engagement: "6.3%", color: "#010101" },
+];
+
+function Social() {
+  const [view, setView] = useStateSocial("calendario");
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Social & Publishing Hub</h1>
+          <p>12 cuentas conectadas · 6 publicaciones esta semana · calendario editorial activo</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.calendar size={14}/> Junio 2026</button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Nuevo post</button>
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
+        <SmallStat label="Posts pendientes" value="8" delta="próximos 7 días" tone="info"/>
+        <SmallStat label="Alcance total (30d)" value="220K" delta="+14% vs mayo" tone="success"/>
+        <SmallStat label="Engagement promedio" value="4.1%" delta="+0.3pp" tone="brand"/>
+        <SmallStat label="Posts publicados (mes)" value="115" delta="12 clientes" tone="outline"/>
+      </div>
+
+      <div className="tabs">
+        {[["calendario","Calendario"],["posts","Cola de publicaciones"],["metricas","Métricas"],["cuentas","Cuentas"]].map(([id,label]) => (
+          <div key={id} className={`tab${view === id ? " active" : ""}`} onClick={() => setView(id)}>{label}</div>
+        ))}
+      </div>
+
+      {view === "calendario" && (
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Semana 2–8 junio 2026</div>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(7, 1fr)", gap:1, background:"var(--border-soft)" }}>
+            {["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].map(d => (
+              <div key={d} style={{ padding:"8px 12px", background:"var(--bg)", textAlign:"center", fontSize:12, fontWeight:600, color:"var(--ink-500)" }}>{d}</div>
+            ))}
+            {Array.from({length:7}).map((_,di) => {
+              const days = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
+              const dayPosts = SOCIAL_POSTS.filter(p => p.scheduled.startsWith(days[di]));
+              return (
+                <div key={di} style={{ minHeight:120, padding:8, background:"var(--bg)", display:"flex", flexDirection:"column", gap:4 }}>
+                  <span style={{fontSize:12,color:"var(--ink-400)",marginBottom:4}}>{di+2}</span>
+                  {dayPosts.map(p => (
+                    <div key={p.id} style={{ fontSize:11,padding:"4px 7px",borderRadius:6,cursor:"pointer",
+                      background: p.status==="published"?"var(--success-bg)":p.status==="approved"?"var(--primary-10)":p.status==="scheduled"?"#22D3EE22":"var(--bg-2)",
+                      color: p.status==="published"?"var(--success-ink)":p.status==="approved"?"var(--primary)":"var(--ink-700)",
+                      fontWeight:500 }}>
+                      <span style={{marginRight:4}}>{SOCIAL_NET_ICONS[p.platform]}</span>
+                      {p.client} · {p.scheduled.split("·")[1]?.trim()}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {view === "posts" && (
+        <div className="card">
+          <table className="tbl">
+            <thead><tr>
+              <th>Cliente</th><th>Red</th><th>Contenido</th><th>Media</th><th>Programado</th><th>Por</th><th>Estado</th><th></th>
+            </tr></thead>
+            <tbody>
+              {SOCIAL_POSTS.map(p => (
+                <tr key={p.id}>
+                  <td className="cell-strong">{p.client}</td>
+                  <td><span style={{fontSize:16}}>{SOCIAL_NET_ICONS[p.platform]}</span></td>
+                  <td style={{maxWidth:220,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:12,color:"var(--ink-600)"}}>{p.content}</td>
+                  <td><Badge tone="outline">{p.media}</Badge></td>
+                  <td style={{fontSize:12,color:"var(--ink-500)"}}>{p.scheduled}</td>
+                  <td><div className="row gap-sm"><Avatar name={p.author} size="sm"/>{p.author.split(" ")[0]}</div></td>
+                  <td>
+                    {p.status==="published"&&<Badge tone="success" dot>Publicado</Badge>}
+                    {p.status==="scheduled"&&<Badge tone="info" dot>Programado</Badge>}
+                    {p.status==="approved"&&<Badge tone="brand" dot>Aprobado</Badge>}
+                    {p.status==="draft"&&<Badge tone="outline" dot>Borrador</Badge>}
+                  </td>
+                  <td><button className="icon-btn" style={{width:26,height:26,background:"transparent",border:0}}><Icon.more size={14}/></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {view === "metricas" && (
+        <div className="grid" style={{gridTemplateColumns:"repeat(2, 1fr)"}}>
+          {SOCIAL_METRICS_DATA.map((m,i) => (
+            <div key={i} className="card" style={{padding:20}}>
+              <div className="row between" style={{marginBottom:16}}>
+                <div className="row gap-sm">
+                  <span style={{fontSize:22}}>{SOCIAL_NET_ICONS[m.platform.toLowerCase()]||"🌐"}</span>
+                  <span style={{fontWeight:700,fontSize:16}}>{m.platform}</span>
+                </div>
+                <Badge tone="success">Conectado</Badge>
+              </div>
+              <div className="grid" style={{gridTemplateColumns:"repeat(2,1fr)",gap:12}}>
+                {[["Seguidores",m.followers],["Posts este mes",m.posts],["Alcance orgánico",m.reach],["Engagement",m.engagement]].map(([label,val]) => (
+                  <div key={label} style={{background:"var(--bg-2)",borderRadius:8,padding:12}}>
+                    <div style={{fontSize:11,color:"var(--ink-500)",marginBottom:2}}>{label}</div>
+                    <div style={{fontSize:20,fontWeight:700,fontFamily:"var(--font-display)"}}>{val}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{height:48,marginTop:14}}>
+                <Spark data={[40,55,48,62,70,58,75,68,82,90,85,95].map(v => v * (Math.random()+0.5))} color={m.color} fill={m.color+"22"} w={400} h={48}/>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {view === "cuentas" && (
+        <div className="grid" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
+          {[
+            { client:"Mira Cosmetics", nets:["instagram","facebook","tiktok"], status:"ok" },
+            { client:"Helia Energy", nets:["linkedin","twitter"], status:"ok" },
+            { client:"Tessera Joyas", nets:["instagram","facebook"], status:"ok" },
+            { client:"Borealis Tours", nets:["instagram","facebook","youtube"], status:"ok" },
+            { client:"Klein Studio", nets:["linkedin","instagram"], status:"expiring" },
+            { client:"Aurora Café", nets:["instagram","facebook"], status:"ok" },
+          ].map((c,i) => (
+            <div key={i} className="card" style={{padding:18}}>
+              <div className="row between" style={{marginBottom:10}}>
+                <span style={{fontWeight:600,fontSize:14}}>{c.client}</span>
+                <Badge tone={c.status==="ok"?"success":"warning"}>{c.status==="ok"?"Token OK":"Token expira"}</Badge>
+              </div>
+              <div className="row gap-sm" style={{flexWrap:"wrap",gap:8}}>
+                {c.nets.map(n => <span key={n} style={{fontSize:20}} title={n}>{SOCIAL_NET_ICONS[n]}</span>)}
+              </div>
+              <button className="btn btn-sm" style={{marginTop:12,width:"100%"}}>Gestionar cuentas</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── EMAIL MARKETING (ERP-021) ────────────────────────────────────────────
+
+const useStateEM = useState;
+
+const EMAIL_CAMPAIGNS = [
+  { id:"ec-01", name:"Newsletter Junio — Mira Cosmetics", client:"Mira Cosmetics", type:"newsletter", status:"sent", sent:4820, openRate:38.4, ctr:6.2, unsub:0.3, date:"1 Jun 2026" },
+  { id:"ec-02", name:"Lanzamiento Colección Verano", client:"Tessera Joyas", type:"lanzamiento", status:"scheduled", sent:0, openRate:0, ctr:0, unsub:0, date:"5 Jun 2026" },
+  { id:"ec-03", name:"Recuperación leads fríos — B2B", client:"Helia Energy", type:"secuencia", status:"active", sent:1240, openRate:22.1, ctr:4.8, unsub:0.8, date:"Activo" },
+  { id:"ec-04", name:"Onboarding nuevos suscriptores", client:"Borealis Tours", type:"automatización", status:"active", sent:380, openRate:51.3, ctr:12.4, unsub:0.1, date:"Activo" },
+  { id:"ec-05", name:"Remarketing abandono carrito", client:"Mira Cosmetics", type:"remarketing", status:"draft", sent:0, openRate:0, ctr:0, unsub:0, date:"—" },
+  { id:"ec-06", name:"Post-venta fidelización", client:"Klein Studio", type:"automatización", status:"paused", sent:216, openRate:29.7, ctr:3.1, unsub:0.5, date:"Pausada" },
+];
+
+function EmailMarketing() {
+  const [view, setView] = useStateEM("campanas");
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Email Marketing</h1>
+          <p>6 campañas · 3 activas · SES bulk pool · 12K contactos totales</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.filter size={14}/> Filtros</button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Nueva campaña</button>
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
+        <SmallStat label="Emails enviados (mes)" value="6.7K" delta="+22% vs mayo" tone="success"/>
+        <SmallStat label="Open rate promedio" value="35.2%" delta="+3pp vs industria" tone="brand"/>
+        <SmallStat label="CTR promedio" value="6.8%" delta="benchmark: 2.6%" tone="info"/>
+        <SmallStat label="Unsubscribe rate" value="0.4%" delta="< 0.5% OK" tone="success"/>
+      </div>
+
+      <div className="tabs">
+        {[["campanas","Campañas"],["listas","Listas & Segmentos"],["automatizaciones","Automatizaciones"],["templates","Templates"]].map(([id,label]) => (
+          <div key={id} className={`tab${view === id ? " active" : ""}`} onClick={() => setView(id)}>{label}</div>
+        ))}
+      </div>
+
+      {view === "campanas" && (
+        <div className="card">
+          <table className="tbl">
+            <thead><tr>
+              <th>Campaña</th><th>Cliente</th><th>Tipo</th><th>Enviados</th><th>Open rate</th><th>CTR</th><th>Unsub</th><th>Fecha</th><th>Estado</th>
+            </tr></thead>
+            <tbody>
+              {EMAIL_CAMPAIGNS.map(c => (
+                <tr key={c.id}>
+                  <td className="cell-strong">{c.name}</td>
+                  <td>{c.client}</td>
+                  <td><Badge tone="outline">{c.type}</Badge></td>
+                  <td>{c.sent > 0 ? c.sent.toLocaleString() : "—"}</td>
+                  <td style={{fontWeight:c.openRate>30?600:400,color:c.openRate>30?"var(--success-ink)":undefined}}>{c.openRate>0?c.openRate+"%":"—"}</td>
+                  <td style={{fontWeight:c.ctr>5?600:400,color:c.ctr>5?"var(--primary)":undefined}}>{c.ctr>0?c.ctr+"%":"—"}</td>
+                  <td style={{color:c.unsub>0.5?"var(--warning-ink)":undefined}}>{c.unsub>0?c.unsub+"%":"—"}</td>
+                  <td className="cell-muted">{c.date}</td>
+                  <td>
+                    {c.status==="sent"&&<Badge tone="success" dot>Enviada</Badge>}
+                    {c.status==="scheduled"&&<Badge tone="info" dot>Programada</Badge>}
+                    {c.status==="active"&&<Badge tone="brand" dot>Activa</Badge>}
+                    {c.status==="draft"&&<Badge tone="outline" dot>Borrador</Badge>}
+                    {c.status==="paused"&&<Badge tone="warning" dot>Pausada</Badge>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {view === "listas" && (
+        <div className="grid" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
+          {[
+            { name:"Clientes activos", count:1240, tag:"CRM", growth:"+48 este mes", health:94 },
+            { name:"Leads newsletter", count:3820, tag:"Orgánico", growth:"+120 este mes", health:88 },
+            { name:"Suscriptores Mira", count:4820, tag:"Ecommerce", growth:"+240 este mes", health:92 },
+            { name:"Prospectos B2B", count:890, tag:"Outbound", growth:"+35 este mes", health:76 },
+            { name:"Abandono carrito", count:652, tag:"Remarketing", growth:"variable", health:82 },
+            { name:"Reactivación cold", count:1180, tag:"Re-engage", growth:"+0 (cerrada)", health:65 },
+          ].map((l,i) => (
+            <div key={i} className="card" style={{padding:18}}>
+              <div className="row between" style={{marginBottom:8}}>
+                <span style={{fontWeight:700,fontSize:14}}>{l.name}</span>
+                <Badge tone="outline">{l.tag}</Badge>
+              </div>
+              <div style={{fontSize:28,fontWeight:800,fontFamily:"var(--font-display)"}}>{l.count.toLocaleString()}</div>
+              <div style={{fontSize:12,color:"var(--ink-500)",marginTop:2}}>{l.growth}</div>
+              <div style={{marginTop:12}}>
+                <div className="row between" style={{fontSize:11,marginBottom:4}}>
+                  <span style={{color:"var(--ink-500)"}}>Health score</span>
+                  <span style={{fontWeight:600,color:l.health>85?"var(--success-ink)":l.health>70?"var(--warning-ink)":"var(--danger-ink)"}}>{l.health}%</span>
+                </div>
+                <Progress value={l.health} tone={l.health>85?"success":l.health>70?"warning":"danger"}/>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {view === "automatizaciones" && (
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {[
+            { name:"Onboarding bienvenida", trigger:"Nuevo suscriptor", steps:4, active:true, sent:380, rate:"51.3%" },
+            { name:"Recuperación carrito", trigger:"Carrito abandonado > 24h", steps:3, active:true, sent:265, rate:"18.2%" },
+            { name:"Re-engagement cold", trigger:"Sin apertura > 60 días", steps:5, active:false, sent:0, rate:"—" },
+            { name:"Post compra fidelización", trigger:"Compra confirmada", steps:3, active:true, sent:148, rate:"44.1%" },
+            { name:"Lead nurturing B2B", trigger:"Form contacto descargado", steps:7, active:false, sent:0, rate:"—" },
+          ].map((a,i) => (
+            <div key={i} className="card" style={{padding:"16px 18px",display:"flex",alignItems:"center",gap:16}}>
+              <span style={{width:36,height:36,borderRadius:10,background:"var(--primary-10)",color:"var(--primary)",display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <Icon.flow2 size={17}/>
+              </span>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:600,fontSize:13}}>{a.name}</div>
+                <div style={{fontSize:12,color:"var(--ink-500)",marginTop:2}}>Disparador: {a.trigger} · {a.steps} pasos</div>
+              </div>
+              <div className="row gap-sm" style={{flexShrink:0}}>
+                {a.active&&<><span style={{fontSize:13,fontWeight:600}}>{a.sent} enviados</span><span style={{fontSize:12,color:"var(--ink-500)"}}>· open {a.rate}</span></>}
+                <Badge tone={a.active?"success":"outline"}>{a.active?"Activa":"Inactiva"}</Badge>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {view === "templates" && (
+        <div className="grid" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
+          {[
+            { name:"Newsletter mensual", type:"newsletter", uses:24, updated:"hace 3d" },
+            { name:"Bienvenida onboarding", type:"transaccional", uses:380, updated:"hace 1 sem" },
+            { name:"Oferta especial", type:"comercial", uses:8, updated:"hace 2 sem" },
+            { name:"Re-engagement", type:"retención", uses:12, updated:"hace 1 mes" },
+            { name:"Factura adjunta", type:"administrativo", uses:142, updated:"hace 2d" },
+            { name:"Confirmación cita", type:"operativo", uses:64, updated:"hace 5d" },
+          ].map((t,i) => (
+            <div key={i} className="card" style={{padding:18}}>
+              <div className="row between" style={{marginBottom:8}}>
+                <span style={{fontWeight:600,fontSize:14}}>{t.name}</span>
+                <Badge tone="outline">{t.type}</Badge>
+              </div>
+              <div style={{height:80,background:"var(--bg-2)",borderRadius:8,marginBottom:10,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <Icon.doc size={24} stroke={1.2}/>
+              </div>
+              <div className="row between" style={{fontSize:12,color:"var(--ink-500)"}}>
+                <span>Usado {t.uses}x</span><span>{t.updated}</span>
+              </div>
+              <div className="row gap-sm" style={{marginTop:10}}>
+                <button className="btn btn-sm" style={{flex:1}}>Editar</button>
+                <button className="btn btn-sm btn-ghost"><Icon.copy size={13}/></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MCP & AI TOOL GATEWAY (ERP-022) ─────────────────────────────────────
+
+const useStateMCP = useState;
+
+const MCP_TOOLS_DATA = [
+  { id:"mcp-01", name:"Google Maps MCP", category:"Prospección", status:"connected", calls_today:142, cost_today:"$0.28", agent:"Sales Agent", latency:230 },
+  { id:"mcp-02", name:"Apollo Lead API", category:"Enrichment", status:"connected", calls_today:87, cost_today:"$1.74", agent:"Sales Agent", latency:410 },
+  { id:"mcp-03", name:"Website Scraper", category:"Research", status:"connected", calls_today:215, cost_today:"$0.43", agent:"Research Agent", latency:1840 },
+  { id:"mcp-04", name:"LinkedIn Enrichment", category:"Enrichment", status:"error", calls_today:0, cost_today:"$0.00", agent:"Sales Agent", latency:0 },
+  { id:"mcp-05", name:"Notion Write API", category:"Operaciones", status:"connected", calls_today:34, cost_today:"$0.00", agent:"Ops Agent", latency:180 },
+  { id:"mcp-06", name:"GitHub Actions", category:"DevOps", status:"connected", calls_today:12, cost_today:"$0.00", agent:"DevOps Agent", latency:320 },
+  { id:"mcp-07", name:"Stripe MCP", category:"Facturación", status:"connected", calls_today:28, cost_today:"$0.00", agent:"Billing Agent", latency:145 },
+  { id:"mcp-08", name:"Google Calendar", category:"Reuniones", status:"connected", calls_today:22, cost_today:"$0.00", agent:"Assistant Agent", latency:120 },
+  { id:"mcp-09", name:"Email Finder (Hunter)", category:"Prospección", status:"limit", calls_today:0, cost_today:"$0.00", agent:"Sales Agent", latency:0 },
+  { id:"mcp-10", name:"AWS Lambda Invoker", category:"Infraestructura", status:"connected", calls_today:8, cost_today:"$0.02", agent:"DevOps Agent", latency:290 },
+];
+
+function MCPGateway() {
+  const [view, setView] = useStateMCP("tools");
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>MCP & AI Tool Gateway</h1>
+          <p>10 tools registradas · 8 conectadas · 548 llamadas hoy · $2.47 costo IA hoy</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.download size={14}/> Exportar logs</button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Registrar tool</button>
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
+        <SmallStat label="Tools activas" value="8/10" delta="1 error · 1 sin quota" tone="warning"/>
+        <SmallStat label="Llamadas hoy" value="548" delta="avg 420" tone="info"/>
+        <SmallStat label="Costo IA (mes)" value="$47.2" delta="budget $200" tone="success"/>
+        <SmallStat label="Agentes corriendo" value="5" delta="2 en espera" tone="brand"/>
+      </div>
+
+      <div className="tabs">
+        {[["tools","Tool Registry"],["agentes","Agentes activos"],["logs","Audit logs"],["costos","Costos IA"]].map(([id,label]) => (
+          <div key={id} className={`tab${view === id ? " active" : ""}`} onClick={() => setView(id)}>{label}</div>
+        ))}
+      </div>
+
+      {view === "tools" && (
+        <div className="card">
+          <table className="tbl">
+            <thead><tr>
+              <th>Tool</th><th>Categoría</th><th>Agente</th><th>Llamadas hoy</th><th>Costo hoy</th><th>Latencia</th><th>Estado</th><th></th>
+            </tr></thead>
+            <tbody>
+              {MCP_TOOLS_DATA.map(t => (
+                <tr key={t.id}>
+                  <td className="cell-strong">{t.name}</td>
+                  <td><Badge tone="outline">{t.category}</Badge></td>
+                  <td style={{fontSize:12,color:"var(--ink-600)"}}>{t.agent}</td>
+                  <td style={{fontWeight:600}}>{t.calls_today}</td>
+                  <td className="cell-mono">{t.cost_today}</td>
+                  <td className="cell-mono" style={{color:t.latency>1000?"var(--warning-ink)":undefined}}>{t.latency>0?t.latency+"ms":"—"}</td>
+                  <td>
+                    {t.status==="connected"&&<Badge tone="success" dot>Connected</Badge>}
+                    {t.status==="error"&&<Badge tone="danger" dot>Error</Badge>}
+                    {t.status==="limit"&&<Badge tone="warning" dot>Sin quota</Badge>}
+                  </td>
+                  <td><button className="icon-btn" style={{width:26,height:26,background:"transparent",border:0}}><Icon.cog size={14}/></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {view === "agentes" && (
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {[
+            { name:"Sales Agent", desc:"Prospección, lead gen, calificación y creación de prospectos en ERP", tools:["Google Maps MCP","Apollo Lead API","LinkedIn Enrichment","Email Finder"], runs:28, last:"hace 12m", status:"running" },
+            { name:"Research Agent", desc:"Análisis de sitios web, scraping de datos públicos e investigación de mercado", tools:["Website Scraper","Google Maps MCP"], runs:14, last:"hace 45m", status:"idle" },
+            { name:"Ops Agent", desc:"Sincronización de notas, documentos y tareas entre herramientas internas", tools:["Notion Write API","Google Calendar"], runs:8, last:"hace 2h", status:"idle" },
+            { name:"DevOps Agent", desc:"Deploys, monitoreo de infraestructura y gestión de workloads cloud", tools:["GitHub Actions","AWS Lambda Invoker"], runs:4, last:"hace 4h", status:"idle" },
+            { name:"Billing Agent", desc:"Creación de facturas, sync de pagos y verificación de cobros en Stripe", tools:["Stripe MCP"], runs:6, last:"hace 1h", status:"running" },
+          ].map((a,i) => (
+            <div key={i} className="card" style={{padding:20}}>
+              <div className="row between" style={{marginBottom:10}}>
+                <div className="row gap-sm">
+                  <span style={{width:40,height:40,borderRadius:12,background:"var(--primary-10)",color:"var(--primary)",display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <Icon.robot size={20}/>
+                  </span>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:15}}>{a.name}</div>
+                    <div style={{fontSize:12,color:"var(--ink-500)",marginTop:1}}>{a.desc}</div>
+                  </div>
+                </div>
+                <div className="row gap-sm">
+                  <Badge tone={a.status==="running"?"success":"outline"}>{a.status==="running"?"Corriendo":"Idle"}</Badge>
+                  <button className="btn btn-sm"><Icon.play size={13}/> Ejecutar</button>
+                </div>
+              </div>
+              <div className="row between" style={{paddingTop:12,borderTop:"1px solid var(--border-soft)"}}>
+                <div className="row gap-sm" style={{flexWrap:"wrap",gap:6}}>
+                  {a.tools.map(t => <Badge key={t} tone="outline">{t}</Badge>)}
+                </div>
+                <span style={{fontSize:11.5,color:"var(--ink-500)"}}>{a.runs} ejecuciones · último {a.last}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {view === "logs" && (
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Audit log — últimas acciones</div>
+            <button className="btn btn-sm"><Icon.filter size={13}/> Filtrar</button>
+          </div>
+          <table className="tbl">
+            <thead><tr>
+              <th>Timestamp</th><th>Agente</th><th>Tool</th><th>Acción</th><th>Resultado</th><th>Costo</th>
+            </tr></thead>
+            <tbody>
+              {[
+                { ts:"14:32:08", agent:"Sales Agent", tool:"Google Maps MCP", action:"search_businesses", result:"12 resultados", cost:"$0.002" },
+                { ts:"14:31:55", agent:"Billing Agent", tool:"Stripe MCP", action:"create_invoice", result:"inv_9x2k4", cost:"$0.000" },
+                { ts:"14:30:22", agent:"Sales Agent", tool:"Apollo Lead API", action:"enrich_contact", result:"ok · 8 fields", cost:"$0.020" },
+                { ts:"14:28:14", agent:"Research Agent", tool:"Website Scraper", action:"scrape_url", result:"1,240 chars", cost:"$0.002" },
+                { ts:"14:25:03", agent:"DevOps Agent", tool:"GitHub Actions", action:"trigger_workflow", result:"run #1482", cost:"$0.000" },
+                { ts:"14:20:41", agent:"Ops Agent", tool:"Notion Write API", action:"create_page", result:"page_id: 4ac3", cost:"$0.000" },
+                { ts:"14:18:09", agent:"Sales Agent", tool:"LinkedIn Enrichment", action:"lookup_profile", result:"ERROR 429", cost:"$0.000" },
+              ].map((l,i) => (
+                <tr key={i}>
+                  <td className="cell-mono" style={{fontSize:11.5,color:"var(--ink-400)"}}>{l.ts}</td>
+                  <td><Badge tone="outline">{l.agent}</Badge></td>
+                  <td style={{fontSize:12,color:"var(--ink-600)"}}>{l.tool}</td>
+                  <td className="cell-mono" style={{fontSize:12}}>{l.action}</td>
+                  <td style={{fontSize:12,color:l.result.includes("ERROR")?"var(--danger-ink)":"var(--success-ink)"}}>{l.result}</td>
+                  <td className="cell-mono" style={{fontSize:12}}>{l.cost}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {view === "costos" && (
+        <div>
+          <div className="grid" style={{gridTemplateColumns:"repeat(3,1fr)",marginBottom:16}}>
+            {[
+              { label:"Anthropic Claude", cost:"$28.40", pct:60, desc:"Labs IA + Agentes" },
+              { label:"OpenAI (fallback)", cost:"$9.20", pct:20, desc:"GPT-4o · imágenes" },
+              { label:"APIs externas", cost:"$9.60", pct:20, desc:"Apollo, Maps, Hunter" },
+            ].map((c,i) => (
+              <div key={i} className="card" style={{padding:18}}>
+                <div className="row between" style={{marginBottom:6}}>
+                  <span style={{fontWeight:600,fontSize:14}}>{c.label}</span>
+                  <Badge tone="outline">{c.pct}%</Badge>
+                </div>
+                <div style={{fontSize:28,fontWeight:700,fontFamily:"var(--font-display)"}}>{c.cost}<span style={{fontSize:12,fontWeight:400,color:"var(--ink-500)"}}>/mes</span></div>
+                <div style={{fontSize:12,color:"var(--ink-500)",marginTop:4,marginBottom:12}}>{c.desc}</div>
+                <Progress value={c.pct*2} tone="brand"/>
+              </div>
+            ))}
+          </div>
+          <div className="card">
+            <div className="card-header"><div className="card-title">Costo IA por cliente</div></div>
+            <table className="tbl">
+              <thead><tr><th>Cliente</th><th>Tokens entrada</th><th>Tokens salida</th><th>Imágenes</th><th>Costo total</th></tr></thead>
+              <tbody>
+                {[
+                  { client:"Helia Energy", in:"420K", out:"185K", img:"—", cost:"$4.80" },
+                  { client:"Mira Cosmetics", in:"380K", out:"210K", img:"48", cost:"$8.20" },
+                  { client:"Tessera Joyas", in:"210K", out:"88K", img:"22", cost:"$3.60" },
+                  { client:"Borealis Tours", in:"180K", out:"72K", img:"—", cost:"$2.10" },
+                  { client:"Inspyra (interno)", in:"640K", out:"320K", img:"84", cost:"$14.80" },
+                ].map((r,i) => (
+                  <tr key={i}>
+                    <td className="cell-strong">{r.client}</td>
+                    <td className="cell-mono">{r.in}</td>
+                    <td className="cell-mono">{r.out}</td>
+                    <td className="cell-muted">{r.img}</td>
+                    <td style={{fontWeight:700}}>{r.cost}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── POLÍTICA INTELLIGENCE HUB (ERP-024) ─────────────────────────────────
+
+const useStatePol = useState;
+
+const POL_CANDIDATES = [
+  { name:"Laura Méndez", partido:"Frente Renovador", cargo:"Candidata Intendente", intencion:38.4, delta:2.1, imagen:72, menciones:1240 },
+  { name:"Carlos Ibarra", partido:"Unión Ciudadana", cargo:"Candidato Gobernador", intencion:31.2, delta:-0.8, imagen:64, menciones:880 },
+  { name:"Patricia Suárez", partido:"Alianza Progresista", cargo:"Candidata Senadora", intencion:22.6, delta:1.4, imagen:68, menciones:620 },
+];
+
+function PoliticaHub() {
+  const [view, setView] = useStatePol("overview");
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Política Intelligence Hub</h1>
+          <p>3 campañas activas · monitoreo en tiempo real · elecciones 22 Oct 2026</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.download size={14}/> Exportar reporte</button>
+          <button className="btn btn-brand"><Icon.plus size={14}/> Nueva campaña</button>
+        </div>
+      </div>
+
+      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
+        <SmallStat label="Días para elecciones" value="142" delta="22 Oct 2026" tone="brand"/>
+        <SmallStat label="Intención voto — top" value="38.4%" delta="+2.1pp vs sem ant" tone="success"/>
+        <SmallStat label="Menciones sociales (24h)" value="2,740" delta="+12% vs ayer" tone="info"/>
+        <SmallStat label="Alertas reputacionales" value="2" delta="1 crítica" tone="warning"/>
+      </div>
+
+      <div className="tabs">
+        {[["overview","Overview"],["encuestas","Encuestas"],["territorio","Territorio"],["warroom","War Room"],["social","Social listening"]].map(([id,label]) => (
+          <div key={id} className={`tab${view === id ? " active" : ""}`} onClick={() => setView(id)}>{label}</div>
+        ))}
+      </div>
+
+      {view === "overview" && (
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          {POL_CANDIDATES.map((c,i) => (
+            <div key={i} className="card" style={{padding:20}}>
+              <div className="row between" style={{marginBottom:14}}>
+                <div className="row gap-sm">
+                  <Avatar name={c.name} size="lg"/>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:16}}>{c.name}</div>
+                    <div style={{fontSize:12,color:"var(--ink-500)",marginTop:2}}>{c.cargo} · {c.partido}</div>
+                  </div>
+                </div>
+                <Badge tone="brand">Campaña activa</Badge>
+              </div>
+              <div className="grid" style={{gridTemplateColumns:"repeat(4,1fr)",gap:16}}>
+                <div style={{background:"var(--bg-2)",borderRadius:10,padding:14,textAlign:"center"}}>
+                  <div style={{fontSize:11,color:"var(--ink-500)",marginBottom:4}}>Intención de voto</div>
+                  <div style={{fontSize:28,fontWeight:800,fontFamily:"var(--font-display)",color:"var(--primary)"}}>{c.intencion}%</div>
+                  <Badge tone={c.delta>0?"success":"danger"}>{c.delta>0?"+":""}{c.delta}pp</Badge>
+                </div>
+                <div style={{background:"var(--bg-2)",borderRadius:10,padding:14,textAlign:"center"}}>
+                  <div style={{fontSize:11,color:"var(--ink-500)",marginBottom:4}}>Imagen positiva</div>
+                  <div style={{fontSize:28,fontWeight:800,fontFamily:"var(--font-display)"}}>{c.imagen}%</div>
+                  <Progress value={c.imagen} tone="brand"/>
+                </div>
+                <div style={{background:"var(--bg-2)",borderRadius:10,padding:14,textAlign:"center"}}>
+                  <div style={{fontSize:11,color:"var(--ink-500)",marginBottom:4}}>Menciones (24h)</div>
+                  <div style={{fontSize:28,fontWeight:800,fontFamily:"var(--font-display)"}}>{c.menciones.toLocaleString()}</div>
+                  <div style={{fontSize:11,color:"var(--ink-400)"}}>redes sociales</div>
+                </div>
+                <div style={{background:"var(--bg-2)",borderRadius:10,padding:14}}>
+                  <div style={{fontSize:11,color:"var(--ink-500)",marginBottom:6}}>Evolución intención</div>
+                  <Spark data={[32,33,34,33,35,36,36,37,37,38,38,c.intencion].map(v=>v+(Math.random()-0.5)*0.5)} color="var(--primary)" fill="var(--primary-10)" w={140} h={40}/>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {view === "encuestas" && (
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {[
+            { title:"Encuesta nacional — Intención de voto Q2", date:"28 May 2026", size:"n=1,200", method:"Telefónica", status:"published" },
+            { title:"Encuesta territorial — Zona norte urbana", date:"25 May 2026", size:"n=600", method:"Presencial", status:"published" },
+            { title:"Sondeo urgente — Crisis reputacional", date:"20 May 2026", size:"n=400", method:"Online panel", status:"published" },
+            { title:"Encuesta imagen candidatos", date:"15 May 2026", size:"n=800", method:"Mixta", status:"published" },
+            { title:"Encuesta Q3 — julio 2026", date:"1 Jul 2026", size:"n=1,500 plan", method:"Telefónica", status:"planned" },
+          ].map((e,i) => (
+            <div key={i} className="card" style={{padding:"14px 18px",display:"flex",alignItems:"center",gap:16}}>
+              <span style={{width:36,height:36,borderRadius:10,background:"var(--info-bg)",color:"var(--info)",display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <Icon.chart size={17}/>
+              </span>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:600,fontSize:13}}>{e.title}</div>
+                <div style={{fontSize:12,color:"var(--ink-500)",marginTop:2}}>{e.date} · {e.size} · {e.method}</div>
+              </div>
+              <Badge tone={e.status==="published"?"success":"info"}>{e.status==="published"?"Publicada":"Planificada"}</Badge>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {view === "warroom" && (
+        <div>
+          <div className="grid" style={{gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+            <div className="card" style={{padding:18,borderLeft:"3px solid var(--danger)"}}>
+              <div className="row between" style={{marginBottom:10}}>
+                <span style={{fontWeight:700,fontSize:14,color:"var(--danger-ink)"}}>Alerta crítica activa</span>
+                <Badge tone="danger">Crítica</Badge>
+              </div>
+              <div style={{fontWeight:600,marginBottom:6}}>Nota de prensa adversaria — declaraciones fuera de contexto</div>
+              <div style={{fontSize:12,color:"var(--ink-500)",marginBottom:12}}>Canal: Medios digitales · Alcance estimado: 42K · hace 3h 20m</div>
+              <div className="row gap-sm">
+                <button className="btn btn-sm btn-brand"><Icon.sparkles size={13}/> Respuesta IA</button>
+                <button className="btn btn-sm">Monitorear</button>
+              </div>
+            </div>
+            <div className="card" style={{padding:18,borderLeft:"3px solid var(--warning)"}}>
+              <div className="row between" style={{marginBottom:10}}>
+                <span style={{fontWeight:700,fontSize:14,color:"var(--warning-ink)"}}>Alerta media</span>
+                <Badge tone="warning">Media</Badge>
+              </div>
+              <div style={{fontWeight:600,marginBottom:6}}>Hashtag adversario trending — zona oeste</div>
+              <div style={{fontSize:12,color:"var(--ink-500)",marginBottom:12}}>Canal: Twitter/X · 480 menciones en 2h · hace 1h 10m</div>
+              <div className="row gap-sm">
+                <button className="btn btn-sm btn-brand"><Icon.sparkles size={13}/> Respuesta IA</button>
+                <button className="btn btn-sm">Monitorear</button>
+              </div>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">Feed en tiempo real</div>
+              <Badge tone="danger" dot>Live</Badge>
+            </div>
+            {[
+              { platform:"Instagram", text:"Gran discurso de Laura Méndez hoy en la plaza!", sentiment:"positivo", time:"hace 2m" },
+              { platform:"Twitter/X", text:"#IBarra2026 trending — zona norte · 340 tweets/h", sentiment:"neutral", time:"hace 8m" },
+              { platform:"Facebook", text:"Me preocupa la postura de Suárez sobre educación...", sentiment:"negativo", time:"hace 14m" },
+              { platform:"Noticias online", text:"Encuesta revela empate técnico entre Méndez e Ibarra", sentiment:"neutral", time:"hace 22m" },
+            ].map((f,i) => (
+              <div key={i} style={{padding:"12px 18px",borderTop:"1px solid var(--border-soft)",display:"flex",gap:12,alignItems:"center"}}>
+                <span style={{color:f.sentiment==="positivo"?"var(--success-ink)":f.sentiment==="negativo"?"var(--danger-ink)":"var(--ink-400)",flexShrink:0,fontSize:14}}>
+                  {f.sentiment==="positivo"?"▲":f.sentiment==="negativo"?"▼":"●"}
+                </span>
+                <div style={{flex:1}}>
+                  <span style={{fontSize:12,fontWeight:600,color:"var(--ink-600)"}}>[{f.platform}]</span>
+                  <span style={{fontSize:12,marginLeft:6}}>{f.text}</span>
+                </div>
+                <span style={{fontSize:11,color:"var(--ink-400)",flexShrink:0}}>{f.time}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {view === "territorio" && (
+        <div className="card" style={{padding:40,textAlign:"center"}}>
+          <div style={{width:48,height:48,margin:"0 auto 14px",borderRadius:12,background:"var(--primary-10)",display:"inline-flex",alignItems:"center",justifyContent:"center"}}>
+            <Icon.globe size={22} stroke={1.4}/>
+          </div>
+          <h3 style={{margin:0,fontFamily:"var(--font-display)",fontSize:16,fontWeight:600}}>Mapa territorial interactivo</h3>
+          <p style={{color:"var(--ink-500)",fontSize:13,marginTop:4}}>Intención de voto por distrito · KPIs electorales por circuito · 48 distritos cargados</p>
+          <button className="btn btn-brand" style={{margin:"16px auto 0"}}>Abrir mapa completo</button>
+        </div>
+      )}
+
+      {view === "social" && (
+        <div>
+          <div className="grid" style={{gridTemplateColumns:"repeat(3,1fr)",marginBottom:16}}>
+            <SmallStat label="Menciones totales (24h)" value="2,740" delta="+12% vs ayer" tone="info"/>
+            <SmallStat label="Sentimiento positivo" value="58%" delta="+4pp" tone="success"/>
+            <SmallStat label="Temas emergentes" value="5" delta="2 requieren acción" tone="warning"/>
+          </div>
+          <div className="card">
+            <div className="card-header"><div className="card-title">Temas más mencionados (últimas 24h)</div></div>
+            {[
+              { topic:"Educación pública", mentions:840, sentiment:72, trend:"up" },
+              { topic:"Seguridad urbana", mentions:620, sentiment:45, trend:"up" },
+              { topic:"Infraestructura vial", mentions:480, sentiment:58, trend:"flat" },
+              { topic:"Propuesta económica", mentions:410, sentiment:63, trend:"up" },
+              { topic:"Declaraciones controversiales", mentions:390, sentiment:28, trend:"down" },
+            ].map((t,i) => (
+              <div key={i} style={{padding:"12px 18px",borderTop:"1px solid var(--border-soft)",display:"flex",gap:16,alignItems:"center"}}>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:600,fontSize:13}}>{t.topic}</div>
+                  <div style={{fontSize:12,color:"var(--ink-500)",marginTop:2}}>{t.mentions.toLocaleString()} menciones</div>
+                </div>
+                <div style={{width:140}}>
+                  <div className="row between" style={{fontSize:11,marginBottom:3}}>
+                    <span style={{color:"var(--ink-500)"}}>Sentimiento</span>
+                    <span style={{fontWeight:600,color:t.sentiment>60?"var(--success-ink)":t.sentiment>40?"var(--warning-ink)":"var(--danger-ink)"}}>{t.sentiment}%</span>
+                  </div>
+                  <Progress value={t.sentiment} tone={t.sentiment>60?"success":t.sentiment>40?"warning":"danger"}/>
+                </div>
+                <Badge tone={t.trend==="up"?"success":t.trend==="down"?"danger":"outline"}>{t.trend==="up"?"↑":t.trend==="down"?"↓":"→"}</Badge>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── METRICS INTELLIGENCE HUB (ERP-025) ──────────────────────────────────
+
+const useStateMetrics = useState;
+
+function MetricsHub() {
+  const [view, setView] = useStateMetrics("executive");
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Metrics Intelligence Hub</h1>
+          <p>Inteligencia de negocio · datos en tiempo real · Studio Inspyra</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon.calendar size={14}/> Junio 2026 <Icon.chevronDown size={12}/></button>
+          <button className="btn btn-brand"><Icon.download size={14}/> Exportar</button>
+        </div>
+      </div>
+
+      <div className="tabs">
+        {[["executive","Ejecutivo"],["rentabilidad","Rentabilidad"],["clientes","Clientes"],["ia","Costos IA"],["equipo","Productividad"]].map(([id,label]) => (
+          <div key={id} className={`tab${view === id ? " active" : ""}`} onClick={() => setView(id)}>{label}</div>
+        ))}
+      </div>
+
+      {view === "executive" && (
+        <div>
+          <div className="grid" style={{gridTemplateColumns:"repeat(4,1fr)",marginBottom:16}}>
+            <SmallStat label="MRR" value="$32,180" delta="+8.2% vs mayo" tone="success"/>
+            <SmallStat label="Ingresos junio" value="$86,420" delta="+24% vs 2025" tone="brand"/>
+            <SmallStat label="Margen bruto" value="64.2%" delta="+1.8pp" tone="success"/>
+            <SmallStat label="Churn rate" value="1.4%" delta="-0.3pp" tone="success"/>
+          </div>
+          <div className="grid" style={{gridTemplateColumns:"2fr 1fr",gap:16,marginBottom:16}}>
+            <div className="card" style={{padding:18}}>
+              <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>MRR · últimos 12 meses</div>
+              <Spark data={[18200,19400,20800,22100,23500,25200,26400,27800,29100,30200,31400,32180]} color="var(--primary)" fill="var(--primary-10)" w={560} h={80}/>
+              <div className="row between" style={{marginTop:8,fontSize:12,color:"var(--ink-500)"}}>
+                <span>Jul 2025</span><span>Jun 2026</span>
+              </div>
+            </div>
+            <div className="card" style={{padding:18}}>
+              <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>Pipeline value</div>
+              {[
+                { stage:"Lead", value:991000, pct:52 },
+                { stage:"Propuesta", value:255000, pct:13 },
+                { stage:"Reunión", value:118000, pct:6 },
+                { stage:"Ganado", value:145000, pct:8 },
+              ].map((s,i) => (
+                <div key={i} style={{marginBottom:10}}>
+                  <div className="row between" style={{fontSize:12,marginBottom:4}}>
+                    <span style={{color:"var(--ink-500)"}}>{s.stage}</span>
+                    <span style={{fontWeight:600}}>${(s.value/1000).toFixed(0)}K</span>
+                  </div>
+                  <Progress value={s.pct} tone="brand"/>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="grid" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
+            {[
+              { label:"LTV promedio", value:"$8,240", delta:"+12%", tone:"brand" },
+              { label:"CAC (costo adq.)", value:"$380", delta:"-5%", tone:"success" },
+              { label:"LTV:CAC ratio", value:"21.7x", delta:"objetivo 3x OK", tone:"success" },
+              { label:"NRR (net revenue)", value:"112%", delta:"+4pp", tone:"brand" },
+              { label:"Proyectos on-time", value:"87%", delta:"+3pp", tone:"success" },
+              { label:"Proyección MRR Q3", value:"$38,500", delta:"+19.6%", tone:"info" },
+            ].map((m,i) => (
+              <SmallStat key={i} label={m.label} value={m.value} delta={m.delta} tone={m.tone}/>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {view === "rentabilidad" && (
+        <div>
+          <div className="card" style={{marginBottom:16}}>
+            <div className="card-header">
+              <div className="card-title">Rentabilidad por cliente</div>
+              <Badge tone="success">Junio 2026</Badge>
+            </div>
+            <table className="tbl">
+              <thead><tr>
+                <th>Cliente</th><th>Ingresos</th><th>Costo directo</th><th>Costo IA</th><th>Margen</th><th>Margen %</th>
+              </tr></thead>
+              <tbody>
+                {[
+                  { client:"Helia Energy", rev:12400, cost:4200, ai:480, margin:7720, pct:62.3 },
+                  { client:"Tessera Joyas", rev:9800, cost:3800, ai:360, margin:5640, pct:57.6 },
+                  { client:"Mira Cosmetics", rev:8200, cost:2900, ai:820, margin:4480, pct:54.6 },
+                  { client:"Borealis Tours", rev:6400, cost:2100, ai:210, margin:4090, pct:63.9 },
+                  { client:"Klein Studio", rev:5800, cost:2400, ai:180, margin:3220, pct:55.5 },
+                  { client:"Norte Films", rev:4200, cost:1800, ai:120, margin:2280, pct:54.3 },
+                ].map((r,i) => (
+                  <tr key={i}>
+                    <td className="cell-strong">{r.client}</td>
+                    <td style={{fontWeight:600}}>${r.rev.toLocaleString()}</td>
+                    <td className="cell-muted">${r.cost.toLocaleString()}</td>
+                    <td style={{color:"var(--warning-ink)"}}>${r.ai}</td>
+                    <td style={{fontWeight:700,color:"var(--success-ink)"}}>${r.margin.toLocaleString()}</td>
+                    <td>
+                      <div className="row gap-sm">
+                        <Progress value={r.pct} tone={r.pct>60?"success":"brand"}/>
+                        <span style={{fontSize:12,fontWeight:600}}>{r.pct}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="card">
+            <div className="card-header"><div className="card-title">Rentabilidad por servicio</div></div>
+            <table className="tbl">
+              <thead><tr>
+                <th>Servicio</th><th>Clientes</th><th>MRR</th><th>Margen bruto</th><th>Churn</th>
+              </tr></thead>
+              <tbody>
+                {[
+                  { svc:"Web + SEO", clients:12, mrr:8400, margin:68, churn:"0.8%" },
+                  { svc:"Hosting (HostingGuard)", clients:38, mrr:9800, margin:82, churn:"1.2%" },
+                  { svc:"Software / SaaS", clients:6, mrr:7200, margin:74, churn:"0%" },
+                  { svc:"Social Media", clients:9, mrr:3600, margin:61, churn:"2.1%" },
+                  { svc:"Branding", clients:4, mrr:2200, margin:72, churn:"0%" },
+                  { svc:"Consultoría", clients:3, mrr:980, margin:88, churn:"0%" },
+                ].map((s,i) => (
+                  <tr key={i}>
+                    <td className="cell-strong">{s.svc}</td>
+                    <td>{s.clients}</td>
+                    <td style={{fontWeight:600}}>${s.mrr.toLocaleString()}</td>
+                    <td>
+                      <div className="row gap-sm">
+                        <Progress value={s.margin} tone={s.margin>70?"success":"brand"}/>
+                        <span style={{fontSize:12,fontWeight:600,color:s.margin>70?"var(--success-ink)":undefined}}>{s.margin}%</span>
+                      </div>
+                    </td>
+                    <td style={{color:parseFloat(s.churn)>1.5?"var(--danger-ink)":undefined}}>{s.churn}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {view === "clientes" && (
+        <div className="grid" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
+          {[
+            { client:"Helia Energy", health:88, ltv:14200, mrr:1240, risk:"bajo" },
+            { client:"Tessera Joyas", health:92, ltv:9800, mrr:820, risk:"bajo" },
+            { client:"Mira Cosmetics", health:76, ltv:8200, mrr:680, risk:"medio" },
+            { client:"Borealis Tours", health:94, ltv:6400, mrr:540, risk:"bajo" },
+            { client:"Klein Studio", health:71, ltv:5800, mrr:480, risk:"medio" },
+            { client:"Norte Films", health:85, ltv:4200, mrr:360, risk:"bajo" },
+          ].map((c,i) => (
+            <div key={i} className="card" style={{padding:18}}>
+              <div className="row between" style={{marginBottom:12}}>
+                <div className="row gap-sm">
+                  <Avatar name={c.client} size="md"/>
+                  <span style={{fontWeight:600,fontSize:14}}>{c.client}</span>
+                </div>
+                <Badge tone={c.risk==="bajo"?"success":c.risk==="medio"?"warning":"danger"}>Riesgo {c.risk}</Badge>
+              </div>
+              <div className="grid" style={{gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div style={{background:"var(--bg-2)",borderRadius:8,padding:10,textAlign:"center"}}>
+                  <div style={{fontSize:10,color:"var(--ink-500)",marginBottom:2}}>Health Score</div>
+                  <div style={{fontSize:22,fontWeight:800,fontFamily:"var(--font-display)",color:c.health>85?"var(--success-ink)":c.health>70?"var(--warning-ink)":"var(--danger-ink)"}}>{c.health}</div>
+                </div>
+                <div style={{background:"var(--bg-2)",borderRadius:8,padding:10,textAlign:"center"}}>
+                  <div style={{fontSize:10,color:"var(--ink-500)",marginBottom:2}}>MRR</div>
+                  <div style={{fontSize:22,fontWeight:800,fontFamily:"var(--font-display)"}}>${c.mrr}</div>
+                </div>
+              </div>
+              <div style={{marginTop:10,fontSize:12,color:"var(--ink-500)"}}>LTV: <strong style={{color:"var(--ink-700)"}}>${c.ltv.toLocaleString()}</strong></div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {view === "ia" && (
+        <div>
+          <div className="grid" style={{gridTemplateColumns:"repeat(4,1fr)",marginBottom:16}}>
+            <SmallStat label="Costo IA total (mes)" value="$47.2" delta="budget $200" tone="success"/>
+            <SmallStat label="Tokens procesados" value="4.8M" delta="claude-sonnet-4-6" tone="info"/>
+            <SmallStat label="Costo por cliente" value="$0.94" delta="avg por cliente" tone="brand"/>
+            <SmallStat label="ROI sobre IA" value="18.4x" delta="vs revenue generado" tone="success"/>
+          </div>
+          <div className="card">
+            <div className="card-header"><div className="card-title">Consumo IA por agente y módulo</div></div>
+            <table className="tbl">
+              <thead><tr>
+                <th>Agente / Módulo</th><th>Modelo</th><th>Tokens entrada</th><th>Tokens salida</th><th>Costo</th><th>% del total</th>
+              </tr></thead>
+              <tbody>
+                {[
+                  { name:"Laboratorio IA (ERP-010)", model:"claude-sonnet-4-6", in:"1.8M", out:"640K", cost:"$21.40", pct:45 },
+                  { name:"Sales Agent (MCP)", model:"claude-opus-4-8", in:"420K", out:"185K", cost:"$8.80", pct:19 },
+                  { name:"Research Agent (MCP)", model:"claude-sonnet-4-6", in:"380K", out:"120K", cost:"$4.20", pct:9 },
+                  { name:"Email Marketing IA", model:"claude-haiku-4-5", in:"640K", out:"280K", cost:"$3.60", pct:8 },
+                  { name:"Política Intelligence", model:"claude-sonnet-4-6", in:"310K", out:"140K", cost:"$4.80", pct:10 },
+                  { name:"Otros módulos", model:"varios", in:"240K", out:"95K", cost:"$4.40", pct:9 },
+                ].map((r,i) => (
+                  <tr key={i}>
+                    <td className="cell-strong">{r.name}</td>
+                    <td><Badge tone="outline">{r.model}</Badge></td>
+                    <td className="cell-mono">{r.in}</td>
+                    <td className="cell-mono">{r.out}</td>
+                    <td style={{fontWeight:700}}>{r.cost}</td>
+                    <td>
+                      <div className="row gap-sm">
+                        <Progress value={r.pct*2} tone="brand"/>
+                        <span style={{fontSize:12}}>{r.pct}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {view === "equipo" && (
+        <div>
+          <div className="grid" style={{gridTemplateColumns:"repeat(4,1fr)",marginBottom:16}}>
+            <SmallStat label="Horas totales (semana)" value="227h" delta="6 personas" tone="info"/>
+            <SmallStat label="Tareas completadas" value="48" delta="de 61 asignadas" tone="success"/>
+            <SmallStat label="Proyectos on-time" value="87%" delta="+3pp vs mayo" tone="brand"/>
+            <SmallStat label="Carga máxima" value="Pablo 96%" delta="1 saturado" tone="warning"/>
+          </div>
+          <div className="card">
+            <div className="card-header"><div className="card-title">Productividad individual</div></div>
+            <table className="tbl">
+              <thead><tr>
+                <th>Colaborador</th><th>Área</th><th>Horas</th><th>Tareas</th><th>Proyectos</th><th>Score</th><th>Carga</th>
+              </tr></thead>
+              <tbody>
+                {TEAM_DATA.map((r,i) => (
+                  <tr key={i}>
+                    <td><div className="row gap-sm"><Avatar name={r.avatar} size="sm"/>{r.name}</div></td>
+                    <td><Badge tone="outline">{r.area}</Badge></td>
+                    <td style={{fontWeight:600}}>{r.hours}h</td>
+                    <td>{r.tasks}</td>
+                    <td>{r.projects}</td>
+                    <td style={{fontWeight:700,color:r.score>=90?"var(--success-ink)":r.score>=85?"var(--primary)":"var(--warning-ink)"}}>{r.score}</td>
+                    <td>
+                      <div className="row gap-sm">
+                        <Progress value={r.load} tone={r.load>90?"danger":r.load>85?"warning":"success"}/>
+                        <span style={{fontSize:12,fontWeight:600}}>{r.load}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // (Campaigns moved to screens/com-campaigns.jsx — Inbound Lead Engine)
 
 const ROUTE_BY_SCREEN = {
@@ -4053,9 +5477,17 @@ const ROUTE_BY_SCREEN = {
   tasks: "/erp/tareas",
   lab: "/erp/laboratorio",
   hosting: "/erp/hostingguard",
+  cloudInspyra: "/erp/inspyra-cloud",
   billing: "/erp/facturacion",
   tickets: "/erp/tickets",
   reports: "/erp/reportes",
+  mailInspyra: "/erp/inspyra-mail",
+  emailMarketing: "/erp/email-marketing",
+  social: "/erp/integraciones-sociales",
+  team: "/erp/equipo",
+  mcp: "/erp/mcp",
+  politica: "/erp/politica-intelligence",
+  metrics: "/erp/metrics-hub",
   settings: "/erp/configuracion",
 };
 
@@ -4097,12 +5529,21 @@ function App() {
     return <Login onEnter={() => { setAuthed(true); handleNav("dashboard"); }}/>;
   }
 
-  // Lab is full-bleed (its own layout)
+  // Full-bleed screens (own layout without .main wrapper)
   if (screen === "lab") {
     return (
-      <div className="app" data-screen-label={`Lab IA`}>
+      <div className="app" data-screen-label="Lab IA">
         <Sidebar active={screen} onNav={handleNav}/>
         <Lab/>
+      </div>
+    );
+  }
+
+  if (screen === "mailInspyra") {
+    return (
+      <div className="app" data-screen-label="Inspyra Mail">
+        <Sidebar active={screen} onNav={handleNav}/>
+        <InspyraMail/>
       </div>
     );
   }
@@ -4124,9 +5565,16 @@ function App() {
         {screen === "projects" && <Projects/>}
         {screen === "tasks" && <Tasks/>}
         {screen === "hosting" && <HostingGuard/>}
+        {screen === "cloudInspyra" && <InspyraCloud/>}
         {screen === "billing" && <Billing/>}
         {screen === "tickets" && <Tickets/>}
         {screen === "reports" && <Reports/>}
+        {screen === "emailMarketing" && <EmailMarketing/>}
+        {screen === "social" && <Social/>}
+        {screen === "team" && <Team/>}
+        {screen === "mcp" && <MCPGateway/>}
+        {screen === "politica" && <PoliticaHub/>}
+        {screen === "metrics" && <MetricsHub/>}
         {screen === "settings" && <Settings/>}
         <button
           onClick={() => { setAuthed(false); }}
