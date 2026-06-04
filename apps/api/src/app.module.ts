@@ -1,5 +1,4 @@
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
-import { AgentAuditMiddleware } from './common/middleware/agent-audit.middleware';
+import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -38,8 +37,4 @@ import configuration from './config/configuration';
     HealthModule,
   ],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer.apply(AgentAuditMiddleware).forRoutes('*');
-  }
-}
+export class AppModule {}
