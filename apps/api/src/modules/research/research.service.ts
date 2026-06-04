@@ -9,7 +9,7 @@ export class ResearchService {
   private readonly logger = new Logger(ResearchService.name);
 
   // Resolved at construction time — 4 levels up from dist/modules/research/ → project root
-  private readonly projectRoot = path.resolve(__dirname, '../../../../');
+  private readonly projectRoot = path.resolve(__dirname, '../../../../../');
 
   constructor(private readonly prisma: PrismaService) {}
 
