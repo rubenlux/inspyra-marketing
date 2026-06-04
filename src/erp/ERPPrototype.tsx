@@ -1383,234 +1383,580 @@ function fmtDate(iso) {
   return `Hace ${diff}d`;
 }
 
-// ── AI Assessment Panel ───────────────────────────────────────────────────────
-function ProspectAssessmentPanel({ prospectId, validationById, onClose }) {
+// ── Prospect Drawer — 4 tabs: General · AI Assessment · Validación · Historial
+function ProspectDrawer({ prospectId, validationById, onClose }) {
+  const [tab, setTab] = useState("assessment");
   const qc = useQueryClient();
+
   const { data: prospect } = useQuery({
     queryKey: ["prospects", prospectId],
     queryFn: () => prospectsApi.get(prospectId),
     enabled: Boolean(prospectId),
   });
-  const validation = validationById?.[prospectId];
 
-  const [humanScore, setHumanScore] = useState("");
-  const [reviewStatus, setReviewStatus] = useState("VALIDATED");
+  const validation = validationById?.[prospectId];
+  const df = validation?.decisionFactors;
+
+  // Review form state
+  const [humanScore, setHumanScore] = useState(() => validation ? String(validation.agentScore) : "");
+  const [isRejecting, setIsRejecting] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("SIN_PRESUPUESTO");
   const [notes, setNotes] = useState("");
   const [reviewing, setReviewing] = useState(false);
+  const [reviewError, setReviewError] = useState("");
 
-  const doReview = async () => {
-    if (!validation?.id || !humanScore) return;
+  // Update humanScore default when validation loads
+  React.useEffect(() => {
+    if (validation && !humanScore) setHumanScore(String(validation.agentScore));
+  }, [validation?.id]);
+
+  const doReview = async (status) => {
+    if (!validation?.id) return;
+    const score = parseInt(humanScore);
+    if (isNaN(score) || score < 0 || score > 100) { setReviewError("Score debe ser entre 0 y 100"); return; }
+    if (status === "REJECTED" && !rejectionReason) { setReviewError("Seleccioná un motivo de rechazo"); return; }
+    setReviewError("");
     setReviewing(true);
     try {
       await validationsApi.review(validation.id, {
-        humanScore: parseInt(humanScore),
-        status: reviewStatus,
+        humanScore: score,
+        status,
         notes: notes || undefined,
-        rejectionReason: reviewStatus === "REJECTED" ? rejectionReason : undefined,
+        rejectionReason: status === "REJECTED" ? rejectionReason : undefined,
       });
       qc.invalidateQueries({ queryKey: ["validations"] });
       qc.invalidateQueries({ queryKey: ["prospects"] });
-      onClose();
     } catch (e) {
-      alert(e.message);
+      setReviewError(e.message);
     } finally {
       setReviewing(false);
     }
   };
 
-  const df = validation?.decisionFactors;
-  const dfTotal = df ? Object.values(df).reduce((a, b) => a + b, 0) : 0;
+  const TABS = [
+    { id: "general",    label: "General" },
+    { id: "assessment", label: "AI Assessment" },
+    { id: "validacion", label: "Validación" },
+    { id: "historial",  label: "Historial" },
+  ];
+
+  const scoreColor = (s) => s >= 70 ? "var(--success)" : s >= 50 ? "var(--warning)" : "var(--danger)";
+  const SLabel = ({ children }) => (
+    <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--ink-400)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>{children}</div>
+  );
+  const Field = ({ label, value }) => value ? (
+    <div style={{ marginBottom: 12 }}>
+      <SLabel>{label}</SLabel>
+      <div style={{ fontSize: 13, color: "var(--ink-800)" }}>{value}</div>
+    </div>
+  ) : null;
 
   return (
     <div style={{
-      position: "fixed", top: 0, right: 0, bottom: 0, width: 380,
+      position: "fixed", top: 0, right: 0, bottom: 0, width: 520,
       background: "var(--bg-1)", borderLeft: "1px solid var(--border-soft)",
       zIndex: 100, display: "flex", flexDirection: "column",
-      boxShadow: "-4px 0 24px rgba(0,0,0,0.12)", overflowY: "auto",
+      boxShadow: "-6px 0 32px rgba(0,0,0,0.14)",
     }}>
-      {/* Header */}
-      <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-soft)", display: "flex", alignItems: "center", gap: 10 }}>
-        <Icon.robot size={16} color="var(--primary-700)"/>
-        <span style={{ fontWeight: 600, fontSize: 14, flex: 1 }}>AI Assessment</span>
-        <button onClick={onClose} style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ink-500)", padding: 4 }}>
+      {/* ── Header ── */}
+      <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border-soft)", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: "var(--ink-900)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {prospect?.nombreEmpresa ?? "Cargando…"}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 2 }}>
+            {[prospect?.rubro, prospect?.ciudad].filter(Boolean).join(" · ")}
+          </div>
+        </div>
+        {prospect && <Badge tone={ESTADO_TONE[prospect.estado] ?? "default"} dot>{ESTADO_LABEL[prospect.estado] ?? prospect.estado}</Badge>}
+        <button onClick={onClose} style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ink-400)", padding: 6, borderRadius: 6, display: "flex" }}>
           <Icon.x size={16}/>
         </button>
       </div>
 
-      {/* Prospect info */}
-      {prospect && (
-        <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-soft)" }}>
-          <div style={{ fontWeight: 600, fontSize: 15, color: "var(--ink-900)", marginBottom: 4 }}>{prospect.nombreEmpresa}</div>
-          <div style={{ fontSize: 12, color: "var(--ink-500)", marginBottom: 8 }}>
-            {[prospect.ciudad, prospect.pais].filter(Boolean).join(", ")} · {prospect.rubro ?? "—"}
-          </div>
-          {prospect.problemasEncontrados?.length > 0 && (
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-500)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Problemas detectados</div>
-              {prospect.problemasEncontrados.map((p, i) => (
-                <div key={i} style={{ fontSize: 12, color: "var(--ink-700)", padding: "3px 0", display: "flex", gap: 6, alignItems: "flex-start" }}>
-                  <span style={{ color: "var(--warning)", marginTop: 1 }}>•</span> {p}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {/* ── Tab bar ── */}
+      <div style={{ display: "flex", borderBottom: "1px solid var(--border-soft)", flexShrink: 0, padding: "0 6px" }}>
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{
+            padding: "10px 14px", fontSize: 12.5, fontWeight: tab === t.id ? 600 : 400,
+            color: tab === t.id ? "var(--primary-700)" : "var(--ink-500)",
+            background: "none", border: "none", borderBottom: tab === t.id ? "2px solid var(--primary)" : "2px solid transparent",
+            cursor: "pointer", transition: "all 120ms",
+          }}>{t.label}</button>
+        ))}
+      </div>
 
-      {/* Validation */}
-      {validation ? (
-        <div style={{ padding: "14px 16px", flex: 1 }}>
-          {/* Score comparison */}
-          <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-            <div style={{ flex: 1, background: "var(--bg-2)", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
-              <div style={{ fontSize: 11, color: "var(--ink-500)", marginBottom: 4 }}>Score IA</div>
-              <div style={{ fontSize: 28, fontWeight: 700, color: validation.agentScore >= 70 ? "var(--success)" : validation.agentScore >= 50 ? "var(--warning)" : "var(--danger)" }}>
-                {validation.agentScore}
+      {/* ── Scrollable content ── */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "18px" }}>
+
+        {/* ═══════════════════════════════════════════════
+            TAB: GENERAL
+        ═══════════════════════════════════════════════ */}
+        {tab === "general" && prospect && (
+          <div>
+            {/* Identity */}
+            <div style={{ display: "flex", gap: 14, marginBottom: 20, alignItems: "flex-start" }}>
+              <span style={{ width: 48, height: 48, borderRadius: 12, background: "var(--primary-soft)", color: "var(--primary-700)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, flexShrink: 0 }}>
+                {prospect.nombreEmpresa.split(" ").slice(0, 2).map(s => s[0]).join("").toUpperCase()}
+              </span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 16, color: "var(--ink-900)" }}>{prospect.nombreEmpresa}</div>
+                <div style={{ fontSize: 13, color: "var(--ink-500)", marginTop: 2 }}>{prospect.rubro ?? "—"}</div>
+                <div style={{ fontSize: 12, color: "var(--ink-400)", marginTop: 2 }}>{[prospect.ciudad, prospect.pais].filter(Boolean).join(", ")}</div>
               </div>
             </div>
-            {validation.humanScore !== null && (
-              <div style={{ flex: 1, background: "var(--bg-2)", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
-                <div style={{ fontSize: 11, color: "var(--ink-500)", marginBottom: 4 }}>Score humano</div>
-                <div style={{ fontSize: 28, fontWeight: 700, color: "var(--ink-900)" }}>{validation.humanScore}</div>
-                <div style={{ fontSize: 11, color: validation.agentScore - validation.humanScore > 0 ? "var(--warning)" : "var(--success)" }}>
-                  drift {validation.agentScore - validation.humanScore > 0 ? "+" : ""}{validation.agentScore - validation.humanScore}
+
+            {/* Digital presence */}
+            <SLabel>Presencia digital</SLabel>
+            <div style={{ background: "var(--bg-2)", borderRadius: 10, padding: "12px 14px", marginBottom: 16 }}>
+              {prospect.website
+                ? <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}><Icon.globe size={13} color="var(--ink-400)"/><span style={{ fontSize: 12.5, color: "var(--primary-700)" }}>{prospect.website}</span></div>
+                : <div style={{ fontSize: 12, color: "var(--ink-400)", marginBottom: 8 }}>Sin sitio web</div>}
+              {prospect.instagram
+                ? <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}><Icon.link size={13} color="var(--ink-400)"/><span style={{ fontSize: 12.5, color: "var(--ink-700)" }}>{prospect.instagram}</span></div>
+                : null}
+              {prospect.linkedin
+                ? <div style={{ display: "flex", gap: 8, alignItems: "center" }}><Icon.link size={13} color="var(--ink-400)"/><span style={{ fontSize: 12.5, color: "var(--ink-700)" }}>{prospect.linkedin}</span></div>
+                : null}
+            </div>
+
+            {/* Contact */}
+            {(prospect.nombreContacto || prospect.email || prospect.telefono) && (
+              <>
+                <SLabel>Contacto</SLabel>
+                <div style={{ background: "var(--bg-2)", borderRadius: 10, padding: "12px 14px", marginBottom: 16 }}>
+                  {prospect.nombreContacto && <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-900)", marginBottom: 4 }}>{prospect.nombreContacto}</div>}
+                  {prospect.email && <div style={{ fontSize: 12.5, color: "var(--ink-600)" }}>{prospect.email}</div>}
+                  {prospect.telefono && <div style={{ fontSize: 12.5, color: "var(--ink-600)" }}>{prospect.telefono}</div>}
+                </div>
+              </>
+            )}
+
+            {/* Meta */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ background: "var(--bg-2)", borderRadius: 8, padding: "10px 12px" }}>
+                <SLabel>Score inicial</SLabel>
+                <div style={{ fontSize: 24, fontWeight: 700, color: scoreColor(prospect.score) }}>{prospect.score}</div>
+              </div>
+              <div style={{ background: "var(--bg-2)", borderRadius: 8, padding: "10px 12px" }}>
+                <SLabel>Nivel oportunidad</SLabel>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink-800)" }}>{prospect.nivelOportunidad ?? "—"}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════
+            TAB: AI ASSESSMENT
+        ═══════════════════════════════════════════════ */}
+        {tab === "assessment" && (
+          <div>
+            {/* ── Research Agent ── */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, padding: "8px 12px", background: "var(--bg-2)", borderRadius: 8 }}>
+              <Icon.search size={13} color="var(--ink-500)"/>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-600)" }}>Research Agent</span>
+              <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--ink-400)" }}>{prospect?.detectadoPor ?? "IA"}</span>
+            </div>
+
+            {/* Score chip */}
+            {prospect && (
+              <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+                <div style={{ flex: 1, background: "var(--bg-2)", borderRadius: 10, padding: "14px", textAlign: "center" }}>
+                  <SLabel>Score research</SLabel>
+                  <div style={{ fontSize: 32, fontWeight: 700, color: scoreColor(prospect.score) }}>{prospect.score}</div>
+                </div>
+                {prospect.nivelOportunidad && (
+                  <div style={{ flex: 1, background: "var(--bg-2)", borderRadius: 10, padding: "14px", textAlign: "center" }}>
+                    <SLabel>Nivel</SLabel>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: "var(--ink-800)", marginTop: 6 }}>{prospect.nivelOportunidad}</div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Problems */}
+            {prospect?.problemasEncontrados?.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <SLabel>Problemas detectados ({prospect.problemasEncontrados.length})</SLabel>
+                {prospect.problemasEncontrados.map((p, i) => (
+                  <div key={i} style={{ display: "flex", gap: 10, padding: "8px 12px", background: "var(--bg-2)", borderRadius: 8, marginBottom: 6, alignItems: "flex-start" }}>
+                    <span style={{ width: 18, height: 18, borderRadius: 999, background: "var(--warning-soft, #fef9c3)", color: "var(--warning-ink, #854d0e)", fontSize: 11, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>!</span>
+                    <span style={{ fontSize: 13, color: "var(--ink-800)", lineHeight: 1.5 }}>{p}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Opportunity detected */}
+            {prospect?.oportunidadDetectada && (
+              <div style={{ marginBottom: 16 }}>
+                <SLabel>Oportunidad detectada</SLabel>
+                <div style={{ fontSize: 13, color: "var(--ink-700)", lineHeight: 1.6, padding: "12px 14px", background: "var(--bg-2)", borderRadius: 8, borderLeft: "3px solid var(--primary)" }}>
+                  {prospect.oportunidadDetectada}
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Status */}
-          <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
-            <Badge tone={VAL_TONE[validation.status] ?? "default"} dot>{VAL_LABEL[validation.status]}</Badge>
-            <span style={{ fontSize: 11.5, color: "var(--ink-500)" }}>{validation.prioridad}</span>
-          </div>
-
-          {/* Services */}
-          {validation.servicesRecommended?.length > 0 && (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-500)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Servicios recomendados</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {validation.servicesRecommended.map((s, i) => <Badge key={i} tone="brand">{s}</Badge>)}
+            {/* Suggested service from research */}
+            {prospect?.servicioSugerido && (
+              <div style={{ marginBottom: 20 }}>
+                <SLabel>Servicio sugerido (Research)</SLabel>
+                <Badge tone="brand">{prospect.servicioSugerido}</Badge>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Ticket */}
-          {validation.estimatedTicketUsd && (
-            <div style={{ marginBottom: 14, padding: "10px 12px", background: "var(--bg-2)", borderRadius: 8 }}>
-              <div style={{ fontSize: 11, color: "var(--ink-500)" }}>Ticket estimado</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--ink-900)" }}>USD {Number(validation.estimatedTicketUsd).toLocaleString()}</div>
-            </div>
-          )}
+            {/* ── Opportunity Agent section ── */}
+            {validation ? (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, padding: "8px 12px", background: "var(--bg-2)", borderRadius: 8 }}>
+                  <Icon.robot size={13} color="var(--primary-700)"/>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--primary-700)" }}>Opportunity Agent</span>
+                  <Badge tone={VAL_TONE[validation.status]} dot style={{ marginLeft: "auto" }}>{VAL_LABEL[validation.status]}</Badge>
+                </div>
 
-          {/* Decision factors breakdown */}
-          {df && (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-500)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Score breakdown ({dfTotal}/100)</div>
-              {[
-                { k: "problemScore", l: "Problemas" },
-                { k: "priorityScore", l: "Severidad" },
-                { k: "fitScore", l: "Service fit" },
-                { k: "ticketScore", l: "Ticket" },
-              ].map(({ k, l }) => (
-                <div key={k} style={{ marginBottom: 6 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
-                    <span style={{ color: "var(--ink-600)" }}>{l}</span>
-                    <span style={{ fontWeight: 600 }}>{df[k] ?? 0}/25</span>
+                {/* Score IA */}
+                <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+                  <div style={{ flex: 1, background: "var(--bg-2)", borderRadius: 10, padding: "14px", textAlign: "center" }}>
+                    <SLabel>Score IA</SLabel>
+                    <div style={{ fontSize: 32, fontWeight: 700, color: scoreColor(validation.agentScore) }}>{validation.agentScore}</div>
                   </div>
-                  <div style={{ height: 4, background: "var(--border-soft)", borderRadius: 2 }}>
-                    <div style={{ width: `${((df[k] ?? 0) / 25) * 100}%`, height: "100%", background: "var(--primary)", borderRadius: 2 }}/>
+                  {validation.humanScore !== null && (
+                    <div style={{ flex: 1, background: "var(--bg-2)", borderRadius: 10, padding: "14px", textAlign: "center" }}>
+                      <SLabel>Score humano</SLabel>
+                      <div style={{ fontSize: 32, fontWeight: 700, color: "var(--ink-900)" }}>{validation.humanScore}</div>
+                      <div style={{ fontSize: 11, color: "var(--ink-500)", marginTop: 4 }}>
+                        drift {validation.agentScore - validation.humanScore > 0 ? "+" : ""}{validation.agentScore - validation.humanScore}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Score breakdown */}
+                {df && (
+                  <div style={{ marginBottom: 16 }}>
+                    <SLabel>Score breakdown</SLabel>
+                    {[
+                      { k: "problemScore",  l: "Problemas detectados" },
+                      { k: "priorityScore", l: "Severidad de problemas" },
+                      { k: "fitScore",      l: "Service fit" },
+                      { k: "ticketScore",   l: "Tamaño de ticket" },
+                    ].map(({ k, l }) => (
+                      <div key={k} style={{ marginBottom: 8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                          <span style={{ color: "var(--ink-600)" }}>{l}</span>
+                          <span style={{ fontWeight: 700, color: "var(--ink-900)" }}>{df[k] ?? 0}/25</span>
+                        </div>
+                        <div style={{ height: 5, background: "var(--border-soft)", borderRadius: 3 }}>
+                          <div style={{ width: `${((df[k] ?? 0) / 25) * 100}%`, height: "100%", background: "var(--primary)", borderRadius: 3, transition: "width 400ms ease" }}/>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Services & ticket */}
+                {validation.servicesRecommended?.length > 0 && (
+                  <div style={{ marginBottom: 14 }}>
+                    <SLabel>Servicios recomendados</SLabel>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {validation.servicesRecommended.map((s, i) => <Badge key={i} tone="brand">{s}</Badge>)}
+                    </div>
+                  </div>
+                )}
+
+                {validation.estimatedTicketUsd && (
+                  <div style={{ marginBottom: 16, padding: "12px 14px", background: "var(--bg-2)", borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <SLabel>Ticket estimado</SLabel>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: "var(--ink-900)" }}>USD {Number(validation.estimatedTicketUsd).toLocaleString()}</div>
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--ink-400)", textAlign: "right" }}>{validation.prioridad}</div>
+                  </div>
+                )}
+
+                {/* Reasoning */}
+                {validation.reasoning && (
+                  <div>
+                    <SLabel>Justificación del agente</SLabel>
+                    <div style={{ fontSize: 13, color: "var(--ink-700)", lineHeight: 1.7, padding: "12px 14px", background: "var(--bg-2)", borderRadius: 8, borderLeft: "3px solid var(--primary)" }}>
+                      {validation.reasoning}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{ marginTop: 8, padding: "20px 16px", background: "var(--bg-2)", borderRadius: 10, textAlign: "center" }}>
+                <Icon.robot size={28} style={{ opacity: 0.25, marginBottom: 10 }}/>
+                <div style={{ fontSize: 13, color: "var(--ink-500)", fontWeight: 600 }}>Opportunity Agent no procesó este prospecto</div>
+                <div style={{ fontSize: 12, color: "var(--ink-400)", marginTop: 4 }}>Pasá el prospecto a estado INVESTIGADO y corré el agente</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════
+            TAB: VALIDACIÓN
+        ═══════════════════════════════════════════════ */}
+        {tab === "validacion" && (
+          <div>
+            {!validation ? (
+              <div style={{ padding: "32px 0", textAlign: "center" }}>
+                <Icon.robot size={36} style={{ opacity: 0.2, marginBottom: 12 }}/>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink-500)" }}>Sin análisis del Opportunity Agent</div>
+                <div style={{ fontSize: 12.5, color: "var(--ink-400)", marginTop: 6, lineHeight: 1.6 }}>
+                  El Opportunity Agent debe analizar este prospecto antes de poder validarlo.<br/>
+                  El prospecto debe estar en estado INVESTIGADO.
+                </div>
+              </div>
+            ) : validation.status !== "PENDING" ? (
+              /* ── Already reviewed ── */
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", background: validation.status === "VALIDATED" ? "var(--success-soft, #ecfdf5)" : "var(--danger-soft, #fff5f5)", borderRadius: 12, marginBottom: 20, border: `1px solid ${validation.status === "VALIDATED" ? "var(--success)" : "var(--danger)"}` }}>
+                  <span style={{ fontSize: 20 }}>{validation.status === "VALIDATED" ? "✓" : "✗"}</span>
+                  <div>
+                    <div style={{ fontWeight: 700, color: validation.status === "VALIDATED" ? "var(--success)" : "var(--danger)", fontSize: 14 }}>
+                      {validation.status === "VALIDATED" ? "Análisis aprobado" : "Análisis rechazado"}
+                    </div>
+                    {validation.validatedAt && (
+                      <div style={{ fontSize: 11.5, color: "var(--ink-500)", marginTop: 2 }}>
+                        {new Date(validation.validatedAt).toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" })}
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
 
-          {/* Reasoning */}
-          {validation.reasoning && (
-            <div style={{ marginBottom: 16, fontSize: 12.5, color: "var(--ink-700)", lineHeight: 1.6, padding: "10px 12px", background: "var(--bg-2)", borderRadius: 8, borderLeft: "3px solid var(--primary)" }}>
-              {validation.reasoning}
-            </div>
-          )}
+                <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+                  <div style={{ flex: 1, background: "var(--bg-2)", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
+                    <SLabel>Score IA</SLabel>
+                    <div style={{ fontSize: 26, fontWeight: 700, color: scoreColor(validation.agentScore) }}>{validation.agentScore}</div>
+                  </div>
+                  <div style={{ flex: 1, background: "var(--bg-2)", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
+                    <SLabel>Tu score</SLabel>
+                    <div style={{ fontSize: 26, fontWeight: 700, color: "var(--ink-900)" }}>{validation.humanScore}</div>
+                  </div>
+                  <div style={{ flex: 1, background: "var(--bg-2)", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
+                    <SLabel>Drift</SLabel>
+                    <div style={{ fontSize: 26, fontWeight: 700, color: Math.abs(validation.agentScore - validation.humanScore) <= 10 ? "var(--success)" : "var(--warning)" }}>
+                      {validation.agentScore - validation.humanScore > 0 ? "+" : ""}{validation.agentScore - validation.humanScore}
+                    </div>
+                  </div>
+                </div>
 
-          {/* Review form — only when PENDING */}
-          {validation.status === "PENDING" && (
-            <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-700)", marginBottom: 12 }}>Tu revisión</div>
+                {validation.feedback?.rejectionReason && (
+                  <div style={{ marginBottom: 14 }}>
+                    <SLabel>Motivo de rechazo</SLabel>
+                    <div style={{ fontSize: 13, color: "var(--ink-800)", padding: "10px 12px", background: "var(--bg-2)", borderRadius: 8 }}>
+                      {validation.feedback.rejectionReason.replace(/_/g, " ")}
+                    </div>
+                  </div>
+                )}
 
-              <div style={{ marginBottom: 10 }}>
-                <label style={{ fontSize: 11, color: "var(--ink-500)", display: "block", marginBottom: 4 }}>Tu score (0–100)</label>
-                <input
-                  type="number" min="0" max="100"
-                  value={humanScore} onChange={e => setHumanScore(e.target.value)}
-                  placeholder="Ej: 45"
-                  style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid var(--border-soft)", background: "var(--bg-2)", color: "var(--ink-900)", fontSize: 14, boxSizing: "border-box" }}
-                />
+                {validation.notes && (
+                  <div style={{ marginBottom: 20 }}>
+                    <SLabel>Notas</SLabel>
+                    <div style={{ fontSize: 13, color: "var(--ink-700)", padding: "10px 12px", background: "var(--bg-2)", borderRadius: 8 }}>
+                      {validation.notes}
+                    </div>
+                  </div>
+                )}
+
+                {/* Next step: Generar propuesta */}
+                {validation.status === "VALIDATED" && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ height: 1, background: "var(--border-soft)", marginBottom: 20 }}/>
+                    <SLabel>Siguiente paso</SLabel>
+                    <button style={{
+                      width: "100%", padding: "14px 0", borderRadius: 10, border: "1px dashed var(--border-soft)",
+                      background: "var(--bg-2)", color: "var(--ink-400)", fontSize: 13.5, fontWeight: 600,
+                      cursor: "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    }} disabled title="Próximamente">
+                      <Icon.doc size={15}/>
+                      Generar propuesta
+                      <span style={{ fontSize: 10.5, background: "var(--border-soft)", borderRadius: 4, padding: "2px 6px" }}>Próximamente</span>
+                    </button>
+                    <div style={{ fontSize: 11.5, color: "var(--ink-400)", textAlign: "center", marginTop: 8 }}>
+                      El Proposal Agent generará una propuesta preliminar para revisión
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* ── Pending review form ── */
+              <div>
+                {/* Summary of what you're approving */}
+                <div style={{ background: "var(--bg-2)", borderRadius: 12, padding: "14px 16px", marginBottom: 20 }}>
+                  <SLabel>Análisis del Opportunity Agent</SLabel>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: scoreColor(validation.agentScore) }}>{validation.agentScore}</div>
+                    <div>
+                      <div style={{ fontSize: 12.5, color: "var(--ink-700)", fontWeight: 600 }}>{validation.prioridad}</div>
+                      <div style={{ fontSize: 11.5, color: "var(--ink-500)" }}>
+                        {validation.servicesRecommended?.join(", ") ?? "—"}
+                      </div>
+                    </div>
+                    {validation.estimatedTicketUsd && (
+                      <div style={{ marginLeft: "auto", textAlign: "right" }}>
+                        <div style={{ fontSize: 11, color: "var(--ink-400)" }}>Ticket</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--ink-900)" }}>USD {Number(validation.estimatedTicketUsd).toLocaleString()}</div>
+                      </div>
+                    )}
+                  </div>
+                  {validation.reasoning && (
+                    <div style={{ fontSize: 12.5, color: "var(--ink-600)", lineHeight: 1.6, borderTop: "1px solid var(--border-soft)", paddingTop: 10, marginTop: 4 }}>
+                      {validation.reasoning}
+                    </div>
+                  )}
+                </div>
+
+                {/* Your score */}
+                <div style={{ marginBottom: 16 }}>
+                  <SLabel>Tu puntuación (0–100)</SLabel>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <input type="number" min="0" max="100" value={humanScore} onChange={e => setHumanScore(e.target.value)}
+                      style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: "1px solid var(--border-soft)", background: "var(--bg-2)", color: "var(--ink-900)", fontSize: 18, fontWeight: 700, textAlign: "center", boxSizing: "border-box" }}/>
+                    <span style={{ fontSize: 12, color: "var(--ink-400)" }}>pre-cargado con score IA</span>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div style={{ marginBottom: 16 }}>
+                  <SLabel>Notas (opcional)</SLabel>
+                  <textarea rows={3} value={notes} onChange={e => setNotes(e.target.value)} placeholder="¿Qué ves que el agente no vio?"
+                    style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid var(--border-soft)", background: "var(--bg-2)", color: "var(--ink-900)", fontSize: 13, resize: "none", boxSizing: "border-box" }}/>
+                </div>
+
+                {reviewError && (
+                  <div style={{ marginBottom: 12, padding: "8px 12px", background: "var(--danger-soft, #fff5f5)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12.5, color: "var(--danger)" }}>
+                    {reviewError}
+                  </div>
+                )}
+
+                {/* Approve / Reject */}
+                {!isRejecting ? (
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button onClick={() => doReview("VALIDATED")} disabled={reviewing}
+                      style={{ flex: 2, padding: "14px 0", borderRadius: 10, border: "none", background: "var(--success)", color: "#fff", fontWeight: 700, fontSize: 14, cursor: reviewing ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                      <Icon.check size={16}/> {reviewing ? "Guardando…" : "Aprobar análisis"}
+                    </button>
+                    <button onClick={() => setIsRejecting(true)}
+                      style={{ flex: 1, padding: "14px 0", borderRadius: 10, border: "1px solid var(--danger)", background: "transparent", color: "var(--danger)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+                      Rechazar
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ background: "var(--danger-soft, #fff5f5)", borderRadius: 12, padding: "16px", border: "1px solid var(--danger)" }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: "var(--danger)", marginBottom: 12 }}>Motivo de rechazo</div>
+                    <select value={rejectionReason} onChange={e => setRejectionReason(e.target.value)}
+                      style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid var(--danger)", background: "var(--bg-1)", color: "var(--ink-900)", fontSize: 13, marginBottom: 12 }}>
+                      <option value="SIN_PRESUPUESTO">Sin presupuesto</option>
+                      <option value="SIN_DECISION_MAKER">Sin decisor</option>
+                      <option value="EMPRESA_PEQUENA">Empresa muy pequeña</option>
+                      <option value="MERCADO_INCORRECTO">Mercado incorrecto</option>
+                      <option value="COMPETENCIA_FUERTE">Competencia muy fuerte</option>
+                      <option value="YA_TIENE_PROVEEDOR">Ya tiene proveedor</option>
+                      <option value="OTRO">Otro motivo</option>
+                    </select>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => { setIsRejecting(false); setReviewError(""); }}
+                        style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "1px solid var(--border-soft)", background: "transparent", color: "var(--ink-600)", cursor: "pointer", fontSize: 13 }}>
+                        Cancelar
+                      </button>
+                      <button onClick={() => doReview("REJECTED")} disabled={reviewing}
+                        style={{ flex: 2, padding: "11px 0", borderRadius: 8, border: "none", background: "var(--danger)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: reviewing ? "not-allowed" : "pointer" }}>
+                        {reviewing ? "Guardando…" : "Confirmar rechazo"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════
+            TAB: HISTORIAL
+        ═══════════════════════════════════════════════ */}
+        {tab === "historial" && prospect && (
+          <div>
+            <SLabel>Línea de tiempo</SLabel>
+            <div style={{ position: "relative", paddingLeft: 24 }}>
+              {/* Vertical line */}
+              <div style={{ position: "absolute", left: 7, top: 8, bottom: 8, width: 2, background: "var(--border-soft)" }}/>
+
+              {/* Event: Research Agent */}
+              <div style={{ position: "relative", marginBottom: 24 }}>
+                <div style={{ position: "absolute", left: -24, top: 0, width: 16, height: 16, borderRadius: 999, background: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Icon.search size={8} color="#fff"/>
+                </div>
+                <div style={{ background: "var(--bg-2)", borderRadius: 10, padding: "12px 14px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink-800)" }}>Research Agent</span>
+                    <span style={{ fontSize: 11, color: "var(--ink-400)" }}>{new Date(prospect.createdAt).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--ink-600)" }}>Encontró la empresa · Detectó {prospect.problemasEncontrados?.length ?? 0} problemas · Score inicial {prospect.score}</div>
+                  {prospect.detectadoPor && <div style={{ fontSize: 11, color: "var(--ink-400)", marginTop: 4 }}>via {prospect.detectadoPor}</div>}
+                </div>
               </div>
 
-              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                {["VALIDATED", "REJECTED"].map(s => (
-                  <button key={s} onClick={() => setReviewStatus(s)}
-                    style={{
-                      flex: 1, padding: "8px 0", borderRadius: 6, border: "1px solid",
-                      cursor: "pointer", fontSize: 12.5, fontWeight: 500,
-                      borderColor: reviewStatus === s ? (s === "VALIDATED" ? "var(--success)" : "var(--danger)") : "var(--border-soft)",
-                      background: reviewStatus === s ? (s === "VALIDATED" ? "var(--success-soft, #ecfdf5)" : "var(--danger-soft, #fff5f5)") : "transparent",
-                      color: reviewStatus === s ? (s === "VALIDATED" ? "var(--success)" : "var(--danger)") : "var(--ink-600)",
-                    }}>
-                    {s === "VALIDATED" ? "✓ Aprobar" : "✗ Rechazar"}
-                  </button>
-                ))}
-              </div>
-
-              {reviewStatus === "REJECTED" && (
-                <div style={{ marginBottom: 10 }}>
-                  <label style={{ fontSize: 11, color: "var(--ink-500)", display: "block", marginBottom: 4 }}>Motivo</label>
-                  <select value={rejectionReason} onChange={e => setRejectionReason(e.target.value)}
-                    style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid var(--border-soft)", background: "var(--bg-2)", color: "var(--ink-900)", fontSize: 13 }}>
-                    <option value="SIN_PRESUPUESTO">Sin presupuesto</option>
-                    <option value="SIN_DECISION_MAKER">Sin decisor</option>
-                    <option value="EMPRESA_PEQUENA">Empresa muy pequeña</option>
-                    <option value="MERCADO_INCORRECTO">Mercado incorrecto</option>
-                    <option value="COMPETENCIA_FUERTE">Competencia muy fuerte</option>
-                    <option value="YA_TIENE_PROVEEDOR">Ya tiene proveedor</option>
-                    <option value="OTRO">Otro</option>
-                  </select>
+              {/* Event: Opportunity Agent */}
+              {validation && (
+                <div style={{ position: "relative", marginBottom: 24 }}>
+                  <div style={{ position: "absolute", left: -24, top: 0, width: 16, height: 16, borderRadius: 999, background: "var(--secondary, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Icon.robot size={8} color="#fff"/>
+                  </div>
+                  <div style={{ background: "var(--bg-2)", borderRadius: 10, padding: "12px 14px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink-800)" }}>Opportunity Agent</span>
+                      <span style={{ fontSize: 11, color: "var(--ink-400)" }}>Score IA: {validation.agentScore}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--ink-600)" }}>
+                      Calculó score {validation.agentScore} · Recomendó {validation.servicesRecommended?.length ?? 0} servicio(s)
+                      {validation.estimatedTicketUsd && ` · Ticket USD ${Number(validation.estimatedTicketUsd).toLocaleString()}`}
+                    </div>
+                    <div style={{ marginTop: 6 }}>
+                      <Badge tone={VAL_TONE[validation.status]} dot>{VAL_LABEL[validation.status]}</Badge>
+                    </div>
+                  </div>
                 </div>
               )}
 
-              <div style={{ marginBottom: 12 }}>
-                <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)}
-                  placeholder="Notas opcionales..."
-                  style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid var(--border-soft)", background: "var(--bg-2)", color: "var(--ink-900)", fontSize: 12.5, resize: "vertical", boxSizing: "border-box" }}/>
-              </div>
+              {/* Event: Human review */}
+              {validation?.validatedAt && (
+                <div style={{ position: "relative", marginBottom: 24 }}>
+                  <div style={{ position: "absolute", left: -24, top: 0, width: 16, height: 16, borderRadius: 999, background: validation.status === "VALIDATED" ? "var(--success)" : "var(--danger)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Icon.user size={8} color="#fff"/>
+                  </div>
+                  <div style={{ background: "var(--bg-2)", borderRadius: 10, padding: "12px 14px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink-800)" }}>Revisión humana</span>
+                      <span style={{ fontSize: 11, color: "var(--ink-400)" }}>{new Date(validation.validatedAt).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--ink-600)" }}>
+                      {validation.status === "VALIDATED" ? "✓ Aprobó el análisis" : "✗ Rechazó el análisis"}
+                      {validation.humanScore !== null && ` · Score asignado: ${validation.humanScore}`}
+                      {validation.feedback?.rejectionReason && ` · Motivo: ${validation.feedback.rejectionReason.replace(/_/g, " ")}`}
+                    </div>
+                    {validation.notes && <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 4, fontStyle: "italic" }}>"{validation.notes}"</div>}
+                  </div>
+                </div>
+              )}
 
-              <button onClick={doReview} disabled={!humanScore || reviewing}
-                style={{
-                  width: "100%", padding: "10px 0", borderRadius: 8, border: "none",
-                  background: reviewing ? "var(--border-soft)" : "var(--primary)", color: "#fff",
-                  fontWeight: 600, fontSize: 13.5, cursor: (!humanScore || reviewing) ? "not-allowed" : "pointer",
-                }}>
-                {reviewing ? "Guardando…" : "Confirmar revisión"}
-              </button>
+              {/* Future: Proposal Agent */}
+              {validation?.status === "VALIDATED" && (
+                <div style={{ position: "relative", opacity: 0.4 }}>
+                  <div style={{ position: "absolute", left: -24, top: 0, width: 16, height: 16, borderRadius: 999, border: "2px dashed var(--border-soft)", background: "var(--bg-1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Icon.doc size={8} color="var(--ink-300)"/>
+                  </div>
+                  <div style={{ background: "var(--bg-2)", borderRadius: 10, padding: "12px 14px", border: "1px dashed var(--border-soft)" }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink-500)" }}>Proposal Agent</div>
+                    <div style={{ fontSize: 12, color: "var(--ink-400)", marginTop: 4 }}>Próxima etapa — genera propuesta preliminar para revisión</div>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-
-          {/* Already reviewed */}
-          {validation.status !== "PENDING" && validation.notes && (
-            <div style={{ fontSize: 12, color: "var(--ink-600)", padding: "10px 12px", background: "var(--bg-2)", borderRadius: 8 }}>
-              <strong>Notas del revisor:</strong> {validation.notes}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div style={{ padding: "24px 16px", textAlign: "center", color: "var(--ink-400)", fontSize: 13 }}>
-          <Icon.robot size={32} style={{ marginBottom: 10, opacity: 0.3 }}/>
-          <div>Sin evaluación del Opportunity Agent</div>
-          <div style={{ fontSize: 11, marginTop: 4 }}>El agente aún no procesó este prospecto</div>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1866,7 +2212,7 @@ function Prospects({ onNav }) {
 
       {/* AI Assessment panel */}
       {selectedId && (
-        <ProspectAssessmentPanel
+        <ProspectDrawer
           prospectId={selectedId}
           validationById={validationById}
           onClose={() => setSelectedId(null)}
