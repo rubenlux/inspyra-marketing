@@ -1384,15 +1384,32 @@ function fmtDate(iso) {
 }
 
 // ── Prospect Drawer — 4 tabs: General · AI Assessment · Validación · Historial
-function ProspectDrawer({ prospectId, validationById, onClose }) {
+function ProspectDrawer({ prospectId, rowData, validationById, onClose }) {
   const [tab, setTab] = useState("assessment");
   const qc = useQueryClient();
 
-  const { data: prospect } = useQuery({
+  const isRealId = Boolean(prospectId) && !String(prospectId).startsWith("demo-");
+
+  const { data: fetchedProspect } = useQuery({
     queryKey: ["prospects", prospectId],
     queryFn: () => prospectsApi.get(prospectId),
-    enabled: Boolean(prospectId),
+    enabled: isRealId,
   });
+
+  // For demo rows, build a basic prospect shape from rowData
+  const prospect = fetchedProspect ?? (rowData && !isRealId ? {
+    nombreEmpresa: rowData.co,
+    rubro: rowData.rubro,
+    ciudad: rowData.city,
+    website: rowData.web !== "—" ? rowData.web : undefined,
+    instagram: rowData.ig !== "—" ? rowData.ig : undefined,
+    oportunidadDetectada: rowData.opp,
+    servicioSugerido: rowData.svc !== "—" ? rowData.svc : undefined,
+    score: rowData.score,
+    estado: "NUEVO",
+    problemasEncontrados: [],
+    createdAt: new Date().toISOString(),
+  } : null);
 
   const validation = validationById?.[prospectId];
   const df = validation?.decisionFactors;
@@ -1964,6 +1981,7 @@ function ProspectDrawer({ prospectId, validationById, onClose }) {
 function Prospects({ onNav }) {
   const [query, setQuery] = useStateProsp("inmobiliarias en Buenos Aires con web desactualizada y sin SEO local");
   const [selectedId, setSelectedId] = useState(null);
+  const [selectedRow, setSelectedRow] = useState(null);
   const [page, setPage] = useState(1);
   const hasToken = Boolean(getStoredToken());
 
@@ -1981,11 +1999,13 @@ function Prospects({ onNav }) {
     staleTime: 60000,
   });
 
-  const { data: prospectsData, isLoading } = useQuery({
+  const { data: prospectsData, isLoading, isError: listError, error: listErrorObj } = useQuery({
     queryKey: ["prospects", { page, limit: 20 }],
     queryFn: () => prospectsApi.list({ page, limit: 20 }),
     enabled: hasToken,
     staleTime: 30000,
+    retry: 1,
+    refetchOnWindowFocus: true,
   });
 
   const { data: validationsRaw } = useQuery({
@@ -2014,7 +2034,7 @@ function Prospects({ onNav }) {
   // ── Table data: real rows or mock fallback ────────────────────────────────
   const tableRows = React.useMemo(() => {
     if (!hasToken || isLoading || !prospectsData?.data) {
-      return PROSPECTS_DATA.map(p => ({ ...p, isReal: false }));
+      return PROSPECTS_DATA.map((p, i) => ({ ...p, id: `demo-${i}`, isReal: false }));
     }
     return prospectsData.data.map(p => ({
       id: p.id,
@@ -2122,12 +2142,13 @@ function Prospects({ onNav }) {
       </div>
 
       {/* Prospects table */}
-      <div className="card" style={{ marginRight: selectedId ? 392 : 0 }}>
+      <div className="card" style={{ marginRight: selectedId ? 532 : 0 }}>
         <div className="card-header">
           <div className="card-title">
             Prospectos descubiertos
             <Badge tone="outline">{isLoading ? "Cargando…" : `${tableRows.length} visibles · ${meta?.total ?? total} totales`}</Badge>
-            {!hasToken && <Badge tone="warning">Sin conexión API · mostrando demo</Badge>}
+            {!hasToken && <Badge tone="warning">Sin token · demo</Badge>}
+            {hasToken && listError && <Badge tone="danger" title={listErrorObj?.message}>API error · {listErrorObj?.message ?? "ver consola"}</Badge>}
           </div>
           <div className="row gap-sm">
             <div className="topbar-search" style={{ width: 220, height: 30, padding: "4px 10px" }}>
@@ -2161,8 +2182,8 @@ function Prospects({ onNav }) {
             <tbody>
               {tableRows.map((p, i) => (
                 <tr key={p.id ?? i}
-                  onClick={() => p.isReal && setSelectedId(selectedId === p.id ? null : p.id)}
-                  style={{ cursor: p.isReal ? "pointer" : "default", background: selectedId === p.id ? "var(--primary-soft)" : undefined }}>
+                  onClick={() => { const next = selectedId === p.id ? null : p.id; setSelectedId(next); setSelectedRow(next ? p : null); }}
+                  style={{ cursor: "pointer", background: selectedId === p.id ? "var(--primary-soft)" : undefined }}>
                   <td onClick={e => e.stopPropagation()}><input type="checkbox"/></td>
                   <td>
                     <div className="row gap-sm">
@@ -2214,8 +2235,9 @@ function Prospects({ onNav }) {
       {selectedId && (
         <ProspectDrawer
           prospectId={selectedId}
+          rowData={selectedRow}
           validationById={validationById}
-          onClose={() => setSelectedId(null)}
+          onClose={() => { setSelectedId(null); setSelectedRow(null); }}
         />
       )}
     </div>
