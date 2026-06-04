@@ -1472,7 +1472,7 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose }) {
     <div style={{
       position: "fixed", top: 56, right: 0, bottom: 0, width: 520,
       background: "var(--bg-1)", borderLeft: "1px solid var(--border-soft)",
-      zIndex: 50, display: "flex", flexDirection: "column",
+      zIndex: 99, display: "flex", flexDirection: "column",
       boxShadow: "-6px 0 32px rgba(0,0,0,0.14)",
     }}>
       {/* ── Header ── */}
@@ -2142,7 +2142,7 @@ function Prospects({ onNav }) {
       </div>
 
       {/* Prospects table */}
-      <div className="card" style={{ marginRight: selectedId ? 532 : 0 }}>
+      <div className="card">
         <div className="card-header">
           <div className="card-title">
             Prospectos descubiertos
@@ -2233,12 +2233,23 @@ function Prospects({ onNav }) {
 
       {/* AI Assessment panel */}
       {selectedId && (
-        <ProspectDrawer
-          prospectId={selectedId}
-          rowData={selectedRow}
-          validationById={validationById}
-          onClose={() => { setSelectedId(null); setSelectedRow(null); }}
-        />
+        <>
+          {/* Backdrop — tapa la página, clic cierra el drawer */}
+          <div
+            onClick={() => { setSelectedId(null); setSelectedRow(null); }}
+            style={{
+              position: "fixed", inset: 0, top: 56,
+              background: "rgba(0,0,0,0.35)",
+              zIndex: 98,
+            }}
+          />
+          <ProspectDrawer
+            prospectId={selectedId}
+            rowData={selectedRow}
+            validationById={validationById}
+            onClose={() => { setSelectedId(null); setSelectedRow(null); }}
+          />
+        </>
       )}
     </div>
   );
