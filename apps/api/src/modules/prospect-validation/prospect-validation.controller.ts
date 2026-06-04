@@ -27,6 +27,12 @@ export class ProspectValidationController {
     return this.service.findAll(user.tenantId, status);
   }
 
+  @Get('kpis')
+  @ApiOperation({ summary: 'Full KPI dashboard: avgDrift, medianDrift, approvalRate, topRejectionReason, topService' })
+  getKpis(@CurrentUser() user: JwtPayload) {
+    return this.service.getKpis(user.tenantId);
+  }
+
   @Get('drift')
   @ApiOperation({ summary: 'Score drift: IA vs human — learning signal' })
   getScoreDrift(@CurrentUser() user: JwtPayload) {

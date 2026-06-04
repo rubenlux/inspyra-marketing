@@ -1,4 +1,4 @@
-import { IsArray, IsDecimal, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsArray, IsEnum, IsInt, IsObject, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { Prioridad } from '@prisma/client';
 
 export class CreateValidationDto {
@@ -23,4 +23,8 @@ export class CreateValidationDto {
   @IsOptional()
   @IsString()
   reasoning?: string;
+
+  @IsOptional()
+  @IsObject()
+  decisionFactors?: Record<string, number>;
 }

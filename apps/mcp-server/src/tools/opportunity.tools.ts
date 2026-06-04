@@ -147,6 +147,12 @@ Never invent the score — use the value returned by inspyra_score_opportunity.`
         estimatedTicketUsd: z.number().min(0).describe('Estimated ticket from pricing engine'),
         prioridad: z.enum(['BAJA', 'MEDIA', 'ALTA']).describe('Commercial priority'),
         reasoning: z.string().optional().describe('Brief explanation of the score'),
+        decisionFactors: z.object({
+          problemScore: z.number(),
+          priorityScore: z.number(),
+          fitScore: z.number(),
+          ticketScore: z.number(),
+        }).optional().describe('Score component breakdown from inspyra_score_opportunity'),
       }).strict(),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },

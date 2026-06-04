@@ -1,5 +1,5 @@
 import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { ValidationStatus } from '@prisma/client';
+import { ValidationStatus, RejectionReason } from '@prisma/client';
 
 export class ReviewValidationDto {
   @IsInt()
@@ -13,4 +13,13 @@ export class ReviewValidationDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  // Required when status === REJECTED — the learning signal
+  @IsOptional()
+  @IsEnum(RejectionReason)
+  rejectionReason?: RejectionReason;
+
+  @IsOptional()
+  @IsString()
+  feedbackNotes?: string;
 }

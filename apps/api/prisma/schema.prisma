@@ -59,6 +59,7 @@ model User {
   createdServices  Service[]      @relation("ServiceCreator")
   auditLogs           AuditLog[]
   prospectValidations ProspectValidation[] @relation("ValidationReviewer")
+  feedbackReviews     ValidationFeedback[] @relation("FeedbackReviewer")
 
   @@unique([tenantId, email])
   @@map("users")
@@ -817,17 +818,46 @@ model ProspectValidation {
   estimatedTicketUsd   Decimal?         @db.Decimal(12, 2)
   prioridad            Prioridad        @default(MEDIA)
   reasoning            String?          @db.Text
+  decisionFactors      Json?            // component breakdown: { problems, priority, serviceFit, ticket }
   notes                String?          @db.Text
   validatedBy          String?
   validatedAt          DateTime?
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
-  prospect  Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
-  validator User?    @relation("ValidationReviewer", fields: [validatedBy], references: [id])
+  prospect  Prospect            @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  validator User?               @relation("ValidationReviewer", fields: [validatedBy], references: [id])
+  feedback  ValidationFeedback? @relation("FeedbackValidation")
 
   @@index([tenantId, status])
   @@map("prospect_validations")
+}
+
+// Captures WHY a validation was rejected — the learning signal for improving the Opportunity Agent.
+model ValidationFeedback {
+  id               String          @id @default(uuid())
+  tenantId         String
+  validationId     String          @unique
+  rejectionReason  RejectionReason
+  notes            String?         @db.Text
+  createdBy        String
+  createdAt        DateTime        @default(now())
+
+  validation ProspectValidation @relation("FeedbackValidation", fields: [validationId], references: [id], onDelete: Cascade)
+  reviewer   User               @relation("FeedbackReviewer", fields: [createdBy], references: [id])
+
+  @@index([tenantId, rejectionReason])
+  @@map("validation_feedback")
+}
+
+enum RejectionReason {
+  SIN_PRESUPUESTO
+  SIN_DECISION_MAKER
+  EMPRESA_PEQUENA
+  MERCADO_INCORRECTO
+  COMPETENCIA_FUERTE
+  YA_TIENE_PROVEEDOR
+  OTRO
 }
 
 enum ValidationStatus {
