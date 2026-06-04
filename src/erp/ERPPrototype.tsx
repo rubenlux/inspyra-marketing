@@ -1,7 +1,9 @@
 // @ts-nocheck
 import * as React from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { prospectsApi, validationsApi, getStoredToken, clearStoredToken } from '../api/inspyra'
 import DashboardV2 from './DashboardV2'
 import './erp.css'
 
@@ -1329,20 +1331,348 @@ const PROSPECTS_DATA = [
   { co: "Grupo Andén", rubro: "Inmobiliaria", web: "grupoanden.com.ar", ig: "@grupoanden", city: "Buenos Aires", opp: "Web vieja · sin filtros de búsqueda", svc: "Plataforma + SEO", score: 76, state: "Contactado", last: "Hace 3d", next: "31 May", who: "Sofía Vidal" },
 ];
 
+// ── Estado labels y tones ─────────────────────────────────────────────────────
+const ESTADO_LABEL = {
+  NUEVO: "Nuevo", INVESTIGADO: "Investigando", ENRIQUECIDO: "Enriquecido",
+  LISTO_OUTREACH: "Listo", CONTACTADO: "Contactado", RESPONDIO: "Respondió",
+  REUNION_AGENDADA: "Reunión", PASO_A_PIPELINE: "Pipeline",
+  CONVERTIDO: "Ganado", DESCARTADO: "Descartado", ARCHIVADO: "Archivado",
+};
+const ESTADO_TONE = {
+  NUEVO: "default", INVESTIGADO: "info", ENRIQUECIDO: "info",
+  LISTO_OUTREACH: "brand", CONTACTADO: "info", RESPONDIO: "warning",
+  REUNION_AGENDADA: "brand", PASO_A_PIPELINE: "warning",
+  CONVERTIDO: "success", DESCARTADO: "danger", ARCHIVADO: "default",
+};
+const VAL_TONE = { PENDING: "warning", VALIDATED: "success", REJECTED: "danger" };
+const VAL_LABEL = { PENDING: "Pendiente", VALIDATED: "Aprobado", REJECTED: "Rechazado" };
+
+function fmtDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = Math.round((now - d) / 86400000);
+  if (diff === 0) return "Hoy";
+  if (diff === 1) return "Ayer";
+  if (diff < 0) return d.toLocaleDateString("es-AR", { day: "numeric", month: "short" });
+  return `Hace ${diff}d`;
+}
+
+// ── AI Assessment Panel ───────────────────────────────────────────────────────
+function ProspectAssessmentPanel({ prospectId, validationById, onClose }) {
+  const qc = useQueryClient();
+  const { data: prospect } = useQuery({
+    queryKey: ["prospects", prospectId],
+    queryFn: () => prospectsApi.get(prospectId),
+    enabled: Boolean(prospectId),
+  });
+  const validation = validationById?.[prospectId];
+
+  const [humanScore, setHumanScore] = useState("");
+  const [reviewStatus, setReviewStatus] = useState("VALIDATED");
+  const [rejectionReason, setRejectionReason] = useState("SIN_PRESUPUESTO");
+  const [notes, setNotes] = useState("");
+  const [reviewing, setReviewing] = useState(false);
+
+  const doReview = async () => {
+    if (!validation?.id || !humanScore) return;
+    setReviewing(true);
+    try {
+      await validationsApi.review(validation.id, {
+        humanScore: parseInt(humanScore),
+        status: reviewStatus,
+        notes: notes || undefined,
+        rejectionReason: reviewStatus === "REJECTED" ? rejectionReason : undefined,
+      });
+      qc.invalidateQueries({ queryKey: ["validations"] });
+      qc.invalidateQueries({ queryKey: ["prospects"] });
+      onClose();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setReviewing(false);
+    }
+  };
+
+  const df = validation?.decisionFactors;
+  const dfTotal = df ? Object.values(df).reduce((a, b) => a + b, 0) : 0;
+
+  return (
+    <div style={{
+      position: "fixed", top: 0, right: 0, bottom: 0, width: 380,
+      background: "var(--bg-1)", borderLeft: "1px solid var(--border-soft)",
+      zIndex: 100, display: "flex", flexDirection: "column",
+      boxShadow: "-4px 0 24px rgba(0,0,0,0.12)", overflowY: "auto",
+    }}>
+      {/* Header */}
+      <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-soft)", display: "flex", alignItems: "center", gap: 10 }}>
+        <Icon.robot size={16} color="var(--primary-700)"/>
+        <span style={{ fontWeight: 600, fontSize: 14, flex: 1 }}>AI Assessment</span>
+        <button onClick={onClose} style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ink-500)", padding: 4 }}>
+          <Icon.x size={16}/>
+        </button>
+      </div>
+
+      {/* Prospect info */}
+      {prospect && (
+        <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border-soft)" }}>
+          <div style={{ fontWeight: 600, fontSize: 15, color: "var(--ink-900)", marginBottom: 4 }}>{prospect.nombreEmpresa}</div>
+          <div style={{ fontSize: 12, color: "var(--ink-500)", marginBottom: 8 }}>
+            {[prospect.ciudad, prospect.pais].filter(Boolean).join(", ")} · {prospect.rubro ?? "—"}
+          </div>
+          {prospect.problemasEncontrados?.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-500)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Problemas detectados</div>
+              {prospect.problemasEncontrados.map((p, i) => (
+                <div key={i} style={{ fontSize: 12, color: "var(--ink-700)", padding: "3px 0", display: "flex", gap: 6, alignItems: "flex-start" }}>
+                  <span style={{ color: "var(--warning)", marginTop: 1 }}>•</span> {p}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Validation */}
+      {validation ? (
+        <div style={{ padding: "14px 16px", flex: 1 }}>
+          {/* Score comparison */}
+          <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+            <div style={{ flex: 1, background: "var(--bg-2)", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
+              <div style={{ fontSize: 11, color: "var(--ink-500)", marginBottom: 4 }}>Score IA</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: validation.agentScore >= 70 ? "var(--success)" : validation.agentScore >= 50 ? "var(--warning)" : "var(--danger)" }}>
+                {validation.agentScore}
+              </div>
+            </div>
+            {validation.humanScore !== null && (
+              <div style={{ flex: 1, background: "var(--bg-2)", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
+                <div style={{ fontSize: 11, color: "var(--ink-500)", marginBottom: 4 }}>Score humano</div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: "var(--ink-900)" }}>{validation.humanScore}</div>
+                <div style={{ fontSize: 11, color: validation.agentScore - validation.humanScore > 0 ? "var(--warning)" : "var(--success)" }}>
+                  drift {validation.agentScore - validation.humanScore > 0 ? "+" : ""}{validation.agentScore - validation.humanScore}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Status */}
+          <div style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+            <Badge tone={VAL_TONE[validation.status] ?? "default"} dot>{VAL_LABEL[validation.status]}</Badge>
+            <span style={{ fontSize: 11.5, color: "var(--ink-500)" }}>{validation.prioridad}</span>
+          </div>
+
+          {/* Services */}
+          {validation.servicesRecommended?.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-500)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Servicios recomendados</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {validation.servicesRecommended.map((s, i) => <Badge key={i} tone="brand">{s}</Badge>)}
+              </div>
+            </div>
+          )}
+
+          {/* Ticket */}
+          {validation.estimatedTicketUsd && (
+            <div style={{ marginBottom: 14, padding: "10px 12px", background: "var(--bg-2)", borderRadius: 8 }}>
+              <div style={{ fontSize: 11, color: "var(--ink-500)" }}>Ticket estimado</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--ink-900)" }}>USD {Number(validation.estimatedTicketUsd).toLocaleString()}</div>
+            </div>
+          )}
+
+          {/* Decision factors breakdown */}
+          {df && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-500)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Score breakdown ({dfTotal}/100)</div>
+              {[
+                { k: "problemScore", l: "Problemas" },
+                { k: "priorityScore", l: "Severidad" },
+                { k: "fitScore", l: "Service fit" },
+                { k: "ticketScore", l: "Ticket" },
+              ].map(({ k, l }) => (
+                <div key={k} style={{ marginBottom: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
+                    <span style={{ color: "var(--ink-600)" }}>{l}</span>
+                    <span style={{ fontWeight: 600 }}>{df[k] ?? 0}/25</span>
+                  </div>
+                  <div style={{ height: 4, background: "var(--border-soft)", borderRadius: 2 }}>
+                    <div style={{ width: `${((df[k] ?? 0) / 25) * 100}%`, height: "100%", background: "var(--primary)", borderRadius: 2 }}/>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Reasoning */}
+          {validation.reasoning && (
+            <div style={{ marginBottom: 16, fontSize: 12.5, color: "var(--ink-700)", lineHeight: 1.6, padding: "10px 12px", background: "var(--bg-2)", borderRadius: 8, borderLeft: "3px solid var(--primary)" }}>
+              {validation.reasoning}
+            </div>
+          )}
+
+          {/* Review form — only when PENDING */}
+          {validation.status === "PENDING" && (
+            <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-700)", marginBottom: 12 }}>Tu revisión</div>
+
+              <div style={{ marginBottom: 10 }}>
+                <label style={{ fontSize: 11, color: "var(--ink-500)", display: "block", marginBottom: 4 }}>Tu score (0–100)</label>
+                <input
+                  type="number" min="0" max="100"
+                  value={humanScore} onChange={e => setHumanScore(e.target.value)}
+                  placeholder="Ej: 45"
+                  style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid var(--border-soft)", background: "var(--bg-2)", color: "var(--ink-900)", fontSize: 14, boxSizing: "border-box" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                {["VALIDATED", "REJECTED"].map(s => (
+                  <button key={s} onClick={() => setReviewStatus(s)}
+                    style={{
+                      flex: 1, padding: "8px 0", borderRadius: 6, border: "1px solid",
+                      cursor: "pointer", fontSize: 12.5, fontWeight: 500,
+                      borderColor: reviewStatus === s ? (s === "VALIDATED" ? "var(--success)" : "var(--danger)") : "var(--border-soft)",
+                      background: reviewStatus === s ? (s === "VALIDATED" ? "var(--success-soft, #ecfdf5)" : "var(--danger-soft, #fff5f5)") : "transparent",
+                      color: reviewStatus === s ? (s === "VALIDATED" ? "var(--success)" : "var(--danger)") : "var(--ink-600)",
+                    }}>
+                    {s === "VALIDATED" ? "✓ Aprobar" : "✗ Rechazar"}
+                  </button>
+                ))}
+              </div>
+
+              {reviewStatus === "REJECTED" && (
+                <div style={{ marginBottom: 10 }}>
+                  <label style={{ fontSize: 11, color: "var(--ink-500)", display: "block", marginBottom: 4 }}>Motivo</label>
+                  <select value={rejectionReason} onChange={e => setRejectionReason(e.target.value)}
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid var(--border-soft)", background: "var(--bg-2)", color: "var(--ink-900)", fontSize: 13 }}>
+                    <option value="SIN_PRESUPUESTO">Sin presupuesto</option>
+                    <option value="SIN_DECISION_MAKER">Sin decisor</option>
+                    <option value="EMPRESA_PEQUENA">Empresa muy pequeña</option>
+                    <option value="MERCADO_INCORRECTO">Mercado incorrecto</option>
+                    <option value="COMPETENCIA_FUERTE">Competencia muy fuerte</option>
+                    <option value="YA_TIENE_PROVEEDOR">Ya tiene proveedor</option>
+                    <option value="OTRO">Otro</option>
+                  </select>
+                </div>
+              )}
+
+              <div style={{ marginBottom: 12 }}>
+                <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)}
+                  placeholder="Notas opcionales..."
+                  style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid var(--border-soft)", background: "var(--bg-2)", color: "var(--ink-900)", fontSize: 12.5, resize: "vertical", boxSizing: "border-box" }}/>
+              </div>
+
+              <button onClick={doReview} disabled={!humanScore || reviewing}
+                style={{
+                  width: "100%", padding: "10px 0", borderRadius: 8, border: "none",
+                  background: reviewing ? "var(--border-soft)" : "var(--primary)", color: "#fff",
+                  fontWeight: 600, fontSize: 13.5, cursor: (!humanScore || reviewing) ? "not-allowed" : "pointer",
+                }}>
+                {reviewing ? "Guardando…" : "Confirmar revisión"}
+              </button>
+            </div>
+          )}
+
+          {/* Already reviewed */}
+          {validation.status !== "PENDING" && validation.notes && (
+            <div style={{ fontSize: 12, color: "var(--ink-600)", padding: "10px 12px", background: "var(--bg-2)", borderRadius: 8 }}>
+              <strong>Notas del revisor:</strong> {validation.notes}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{ padding: "24px 16px", textAlign: "center", color: "var(--ink-400)", fontSize: 13 }}>
+          <Icon.robot size={32} style={{ marginBottom: 10, opacity: 0.3 }}/>
+          <div>Sin evaluación del Opportunity Agent</div>
+          <div style={{ fontSize: 11, marginTop: 4 }}>El agente aún no procesó este prospecto</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Prospects({ onNav }) {
   const [query, setQuery] = useStateProsp("inmobiliarias en Buenos Aires con web desactualizada y sin SEO local");
+  const [selectedId, setSelectedId] = useState(null);
+  const [page, setPage] = useState(1);
+  const hasToken = Boolean(getStoredToken());
+
   const SUGGESTED = [
     "clínicas dentales con redes activas pero sin agenda online",
     "bodegas en Mendoza sin tienda online y con IG fuerte",
     "estudios jurídicos en La Plata sin presencia digital",
   ];
 
+  // ── Real API data ─────────────────────────────────────────────────────────
+  const { data: kpisData } = useQuery({
+    queryKey: ["prospects", "kpis"],
+    queryFn: prospectsApi.kpis,
+    enabled: hasToken,
+    staleTime: 60000,
+  });
+
+  const { data: prospectsData, isLoading } = useQuery({
+    queryKey: ["prospects", { page, limit: 20 }],
+    queryFn: () => prospectsApi.list({ page, limit: 20 }),
+    enabled: hasToken,
+    staleTime: 30000,
+  });
+
+  const { data: validationsRaw } = useQuery({
+    queryKey: ["validations"],
+    queryFn: () => validationsApi.list(),
+    enabled: hasToken,
+    staleTime: 30000,
+  });
+
+  // Map validationById for quick lookup
+  const validationById = React.useMemo(() => {
+    const m = {};
+    if (Array.isArray(validationsRaw)) {
+      for (const v of validationsRaw) m[v.prospectId] = v;
+    }
+    return m;
+  }, [validationsRaw]);
+
+  // ── KPIs (real with mock fallback) ────────────────────────────────────────
+  const total = kpisData?.total ?? 248;
+  const sinWeb = kpisData?.sinWeb ?? 86;
+  const scoreAlto = kpisData?.oportunidadAlta ?? 64;
+  const listosOutreach = kpisData?.listosOutreach ?? 38;
+  const nuevosEstaSemana = kpisData?.nuevosEstaSemana ?? 12;
+
+  // ── Table data: real rows or mock fallback ────────────────────────────────
+  const tableRows = React.useMemo(() => {
+    if (!hasToken || isLoading || !prospectsData?.data) {
+      return PROSPECTS_DATA.map(p => ({ ...p, isReal: false }));
+    }
+    return prospectsData.data.map(p => ({
+      id: p.id,
+      co: p.nombreEmpresa,
+      rubro: p.rubro ?? "—",
+      city: [p.ciudad, p.pais].filter(Boolean).join(", ") || "—",
+      web: p.website || "—",
+      ig: p.instagram || "—",
+      opp: p.oportunidadDetectada ?? p.problemasEncontrados?.slice(0, 2).join(" · ") ?? "—",
+      svc: p.servicioSugerido ?? validationById[p.id]?.servicesRecommended?.[0] ?? "—",
+      score: p.score,
+      state: ESTADO_LABEL[p.estado] ?? p.estado,
+      estado: p.estado,
+      last: fmtDate(p.ultimoContacto),
+      next: p.proximoSeguimiento ? new Date(p.proximoSeguimiento).toLocaleDateString("es-AR", { day: "numeric", month: "short" }) : "—",
+      who: p.owner ? `${p.owner.firstName} ${p.owner.lastName}` : "Sin asignar",
+      validation: validationById[p.id] ?? null,
+      isReal: true,
+    }));
+  }, [prospectsData, validationById, hasToken, isLoading]);
+
+  const meta = prospectsData?.meta;
+
   return (
     <div className="page">
       <div className="page-header">
         <div>
           <h1>Prospectos</h1>
-          <p>Lead Discovery · los buscamos nosotros (outbound) · 248 prospectos · 12 nuevos esta semana</p>
+          <p>Lead Discovery · los buscamos nosotros (outbound) · {total} prospectos · {nuevosEstaSemana} nuevos esta semana</p>
         </div>
         <div className="row gap-sm">
           <button className="btn"><Icon.download size={14}/> Exportar CSV</button>
@@ -1382,18 +1712,18 @@ function Prospects({ onNav }) {
         </div>
       </div>
 
-      {/* What the engine does — pipeline of enrichment */}
+      {/* Pipeline steps */}
       <div className="card" style={{ marginBottom: 16, padding: "12px 16px" }}>
         <div className="row" style={{ gap: 0, justifyContent: "space-between", flexWrap: "wrap" }}>
           {[
             { ic: "search", t: "Descubre", s: "Busca empresas por rubro y zona" },
             { ic: "layers", t: "Enriquece", s: "Web, IG, contacto, tamaño" },
-            { ic: "target", t: "Detecta oportunidad", s: "Qué les falta digitalmente" },
+            { ic: "trend", t: "Detecta oportunidad", s: "Qué les falta digitalmente" },
             { ic: "trend", t: "Califica (score)", s: "Prioridad comercial 0–100" },
             { ic: "users", t: "Asigna", s: "Reparte al equipo comercial" },
             { ic: "rocket", t: "Prepara outreach", s: "Listo para contactar" },
           ].map((st, i, arr) => {
-            const IconC = Icon[st.ic];
+            const IconC = Icon[st.ic] ?? Icon.trend;
             return (
               <React.Fragment key={i}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 150 }}>
@@ -1412,18 +1742,21 @@ function Prospects({ onNav }) {
         </div>
       </div>
 
+      {/* KPIs — real data */}
       <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
-        <MiniStatP label="Resultados" value="248" sub="+12 esta semana" c="var(--primary)"/>
-        <MiniStatP label="Sin web" value="86" sub="34.7% · oportunidad alta" c="var(--warning)"/>
-        <MiniStatP label="Score ≥ 80" value="64" sub="prioridad comercial" c="var(--success)"/>
-        <MiniStatP label="Listos para outreach" value="38" sub="asignados al equipo" c="var(--secondary)"/>
+        <MiniStatP label="Resultados" value={String(total)} sub={`+${nuevosEstaSemana} esta semana`} c="var(--primary)"/>
+        <MiniStatP label="Sin web" value={String(sinWeb)} sub={`${total > 0 ? ((sinWeb / total) * 100).toFixed(1) : 0}% · oportunidad alta`} c="var(--warning)"/>
+        <MiniStatP label="Score ≥ 80" value={String(scoreAlto)} sub="prioridad comercial" c="var(--success)"/>
+        <MiniStatP label="Listos para outreach" value={String(listosOutreach)} sub="asignados al equipo" c="var(--secondary)"/>
       </div>
 
-      <div className="card">
+      {/* Prospects table */}
+      <div className="card" style={{ marginRight: selectedId ? 392 : 0 }}>
         <div className="card-header">
           <div className="card-title">
             Prospectos descubiertos
-            <Badge tone="outline">10 visibles · 248 totales</Badge>
+            <Badge tone="outline">{isLoading ? "Cargando…" : `${tableRows.length} visibles · ${meta?.total ?? total} totales`}</Badge>
+            {!hasToken && <Badge tone="warning">Sin conexión API · mostrando demo</Badge>}
           </div>
           <div className="row gap-sm">
             <div className="topbar-search" style={{ width: 220, height: 30, padding: "4px 10px" }}>
@@ -1447,6 +1780,7 @@ function Prospects({ onNav }) {
                 <th>Servicio sugerido</th>
                 <th style={{ width: 70 }}>Score</th>
                 <th>Estado</th>
+                <th style={{ width: 90 }}>Validación IA</th>
                 <th>Últ. contacto</th>
                 <th>Próx. seguim.</th>
                 <th>Responsable</th>
@@ -1454,9 +1788,11 @@ function Prospects({ onNav }) {
               </tr>
             </thead>
             <tbody>
-              {PROSPECTS_DATA.map((p, i) => (
-                <tr key={i}>
-                  <td><input type="checkbox"/></td>
+              {tableRows.map((p, i) => (
+                <tr key={p.id ?? i}
+                  onClick={() => p.isReal && setSelectedId(selectedId === p.id ? null : p.id)}
+                  style={{ cursor: p.isReal ? "pointer" : "default", background: selectedId === p.id ? "var(--primary-soft)" : undefined }}>
+                  <td onClick={e => e.stopPropagation()}><input type="checkbox"/></td>
                   <td>
                     <div className="row gap-sm">
                       <span className="avatar sm" style={{ background: "var(--bg-2)", color: "var(--ink-700)", fontSize: 10 }}>
@@ -1468,30 +1804,49 @@ function Prospects({ onNav }) {
                   <td className="cell-muted">{p.rubro}</td>
                   <td className="cell-muted">{p.city}</td>
                   <td>
-                    {p.web !== "—" ? <span className="cell-mono" style={{ color: "var(--primary-700)" }}>{p.web}</span> : <span className="cell-muted">sin web</span>}
-                    <div className="cell-muted" style={{ fontSize: 11 }}>{p.ig}</div>
+                    {p.web && p.web !== "—" ? <span className="cell-mono" style={{ color: "var(--primary-700)" }}>{p.web}</span> : <span className="cell-muted">sin web</span>}
+                    {p.ig && p.ig !== "—" && <div className="cell-muted" style={{ fontSize: 11 }}>{p.ig}</div>}
                   </td>
                   <td style={{ maxWidth: 200 }}><span style={{ fontSize: 12.5, color: "var(--ink-800)" }}>{p.opp}</span></td>
-                  <td><Badge tone="brand">{p.svc}</Badge></td>
+                  <td>{p.svc && p.svc !== "—" ? <Badge tone="brand">{p.svc}</Badge> : <span className="cell-muted">—</span>}</td>
                   <td><Score v={p.score}/></td>
-                  <td><StateP s={p.state}/></td>
+                  <td>
+                    {p.isReal
+                      ? <Badge tone={ESTADO_TONE[p.estado] ?? "default"} dot>{ESTADO_LABEL[p.estado] ?? p.state ?? p.estado}</Badge>
+                      : <StateP s={p.state}/>}
+                  </td>
+                  <td>
+                    {p.validation
+                      ? <Badge tone={VAL_TONE[p.validation.status]} dot>{VAL_LABEL[p.validation.status]}</Badge>
+                      : <span className="cell-muted" style={{ fontSize: 11 }}>—</span>}
+                  </td>
                   <td className="cell-muted col-num">{p.last}</td>
                   <td className="col-num" style={{ color: /Hoy|Mañana/.test(p.next) ? "var(--warning-ink)" : "var(--ink-800)", fontWeight: p.next.includes("Hoy") ? 600 : 400 }}>{p.next}</td>
                   <td><div className="row gap-sm"><Avatar name={p.who} size="sm"/><span>{p.who.split(" ")[0]}</span></div></td>
-                  <td><button className="icon-btn" style={{ width: 26, height: 26, background: "transparent", border: 0 }}><Icon.more size={14}/></button></td>
+                  <td><button className="icon-btn" onClick={e => e.stopPropagation()} style={{ width: 26, height: 26, background: "transparent", border: 0 }}><Icon.more size={14}/></button></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <div className="row between" style={{ padding: "10px 14px", borderTop: "1px solid var(--border-soft)", fontSize: 12, color: "var(--ink-500)" }}>
-          <span>Mostrando 1–10 de 248 · 38 listos para outreach</span>
+          <span>Mostrando {tableRows.length} de {meta?.total ?? total} · {listosOutreach} listos para outreach</span>
           <div className="row gap-sm">
-            <button className="btn btn-sm btn-ghost">Anterior</button>
-            <button className="btn btn-sm btn-ghost">Siguiente</button>
+            <button className="btn btn-sm btn-ghost" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Anterior</button>
+            <span style={{ padding: "0 8px", lineHeight: "28px" }}>{page} / {meta?.totalPages ?? 1}</span>
+            <button className="btn btn-sm btn-ghost" disabled={!meta || page >= meta.totalPages} onClick={() => setPage(p => p + 1)}>Siguiente</button>
           </div>
         </div>
       </div>
+
+      {/* AI Assessment panel */}
+      {selectedId && (
+        <ProspectAssessmentPanel
+          prospectId={selectedId}
+          validationById={validationById}
+          onClose={() => setSelectedId(null)}
+        />
+      )}
     </div>
   );
 }
