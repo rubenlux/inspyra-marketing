@@ -18,6 +18,7 @@ import { registerCatalogTools } from './tools/catalog.tools.js';
 import { registerIntelTools } from './tools/intel.tools.js';
 import { registerPricingTools } from './tools/pricing.tools.js';
 import { registerDealTools } from './tools/deals.tools.js';
+import { registerOpportunityTools } from './tools/opportunity.tools.js';
 
 // ── Agent configuration ───────────────────────────────────────────────────────
 
@@ -69,10 +70,11 @@ function registerToolsForAgent(agentId: AgentId, server: McpServer, client: Insp
       break;
 
     case 'opportunity':
-      // Opportunity: read prospects + catalog + intel, update score/opportunity only
+      // Opportunity: score prospects, submit validations, list pending work
       registerProspectTools(server, client);
       registerCatalogTools(server, client);
       registerIntelTools(server, client);
+      registerOpportunityTools(server, client);
       break;
 
     case 'proposal':

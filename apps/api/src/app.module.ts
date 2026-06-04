@@ -13,6 +13,8 @@ import { PricingModule } from './modules/pricing/pricing.module';
 import { ServiceAccountsModule } from './modules/service-accounts/service-accounts.module';
 import { AgentRunsModule } from './modules/agent-runs/agent-runs.module';
 import { HealthModule } from './modules/health/health.module';
+import { ProspectValidationModule } from './modules/prospect-validation/prospect-validation.module';
+import { AgentRoiModule } from './modules/agent-roi/agent-roi.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -35,6 +37,8 @@ import configuration from './config/configuration';
     ServiceAccountsModule,
     AgentRunsModule,
     HealthModule,
+    ProspectValidationModule,
+    AgentRoiModule,
   ],
 })
 export class AppModule {}
