@@ -6,3 +6,14 @@ runtime-logs/
 *.local
 .DS_Store
 spec-driven/
+
+# Backups
+*.tar.gz
+*.zip
+
+# MCP local config (contains tokens)
+openclaw.json
+
+# Nested envs
+apps/**/.env
+apps/**/.env.local

@@ -1,0 +1,816 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// CORE FOUNDATION (ERP-023)
+// ─────────────────────────────────────────────
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  plan      String   @default("starter")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users            User[]
+  prospects        Prospect[]
+  deals            Deal[]
+  clients          Client[]
+  services         Service[]
+  catalog          ServiceCatalogItem[]
+  auditLogs        AuditLog[]
+  intelRules       ServiceIntelligenceRule[]
+  serviceAccounts  ServiceAccount[]
+
+  @@map("tenants")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  tenantId      String
+  email         String
+  password      String
+  firstName     String
+  lastName      String
+  role          UserRole  @default(MEMBER)
+  isActive      Boolean   @default(true)
+  emailVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  tenant           Tenant         @relation(fields: [tenantId], references: [id])
+  sessions         UserSession[]
+  ownedProspects   Prospect[]     @relation("ProspectOwner")
+  createdProspects Prospect[]     @relation("ProspectCreator")
+  ownedDeals       Deal[]         @relation("DealOwner")
+  dealMovements    DealStageHistory[]
+  ownedClients     Client[]       @relation("ClientOwner")
+  closedClients    Client[]       @relation("ClientCloser")
+  ownedServices    Service[]      @relation("ServiceOwner")
+  createdServices  Service[]      @relation("ServiceCreator")
+  auditLogs        AuditLog[]
+
+  @@unique([tenantId, email])
+  @@map("users")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  MEMBER
+  VIEWER
+}
+
+model UserSession {
+  id           String    @id @default(uuid())
+  userId       String
+  refreshToken String    @unique
+  deviceInfo   String?
+  ipAddress    String?
+  lastLoginAt  DateTime  @default(now())
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  tenantId   String
+  userId     String?
+  action     String
+  resource   String
+  resourceId String?
+  changes    Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id])
+  user   User?   @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, resource, resourceId])
+  @@index([tenantId, createdAt])
+  @@map("audit_logs")
+}
+
+// ─────────────────────────────────────────────
+// PROSPECTOS (ERP-001)
+// ─────────────────────────────────────────────
+
+model Prospect {
+  id String @id @default(uuid())
+
+  // Tenant
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  // Identificación
+  nombreEmpresa   String
+  nombreContacto  String?
+  cargo           String?
+  telefono        String?
+  email           String?
+
+  // Ubicación
+  pais      String?
+  ciudad    String?
+  direccion String?
+
+  // Negocio
+  rubro            String?
+  tamanoEmpresa    TamanoEmpresa?
+  empleadosEstimado Int?
+
+  // Digital Footprint
+  website        String?
+  instagram      String?
+  linkedin       String?
+  facebook       String?
+  googleBusiness String?
+
+  // Opportunity Detection
+  oportunidadDetectada  String?
+  problemasEncontrados  String[]
+  nivelOportunidad      NivelOportunidad?
+
+  // Comercial
+  servicioSugerido String?
+  score            Int       @default(0)
+  prioridad        Prioridad @default(MEDIA)
+  ownerId          String?
+  owner            User?     @relation("ProspectOwner", fields: [ownerId], references: [id])
+
+  // Seguimiento
+  ultimoContacto      DateTime?
+  proximoSeguimiento  DateTime?
+  estado              ProspectEstado @default(NUEVO)
+
+  // Metadata
+  fuente        ProspectFuente @default(MANUAL)
+  detectadoPor  DetectadoPor   @default(MANUAL)
+  creadoPorId   String?
+  creadoPor     User?          @relation("ProspectCreator", fields: [creadoPorId], references: [id])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+
+  // Relaciones
+  deals Deal[]
+
+  @@index([tenantId, estado])
+  @@index([tenantId, score])
+  @@index([tenantId, ownerId])
+  @@map("prospects")
+}
+
+enum TamanoEmpresa {
+  MICRO
+  PEQUENA
+  MEDIANA
+  GRANDE
+}
+
+enum NivelOportunidad {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+enum Prioridad {
+  BAJA
+  MEDIA
+  ALTA
+}
+
+enum ProspectEstado {
+  NUEVO
+  INVESTIGADO
+  ENRIQUECIDO
+  LISTO_OUTREACH
+  CONTACTADO
+  RESPONDIO
+  REUNION_AGENDADA
+  PASO_A_PIPELINE
+  CONVERTIDO
+  DESCARTADO
+  ARCHIVADO
+}
+
+enum ProspectFuente {
+  GOOGLE_MAPS
+  INSTAGRAM
+  LINKEDIN
+  META_ADS_LEAD
+  GOOGLE_ADS_LEAD
+  FORMULARIO_WEB
+  WHATSAPP
+  CSV_IMPORT
+  REFERRAL
+  MANUAL
+}
+
+enum DetectadoPor {
+  IA
+  MANUAL
+}
+
+// ─────────────────────────────────────────────
+// PIPELINE / DEALS (ERP-004)
+// ─────────────────────────────────────────────
+
+model Deal {
+  id String @id @default(uuid())
+
+  // Tenant
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  // Identificación y empresa
+  empresa          String
+  contactoNombre   String
+  contactoEmail    String?
+  contactoTelefono String?
+
+  // Comercial
+  servicioInteres      ServicioInteres
+  valorEstimadoUsd     Decimal         @default(0) @db.Decimal(12, 2)
+  probabilidadCierre   Int             @default(0)
+  fechaEstimadaCierre  DateTime?
+  ownerId              String
+  owner                User            @relation("DealOwner", fields: [ownerId], references: [id])
+  fuenteOrigen         DealFuente      @default(PROSPECTS)
+
+  // Estado y temperatura
+  etapa           DealEtapa   @default(NUEVO_INGRESO)
+  temperatura     Temperatura @default(TIBIA)
+  urgencia        Urgencia    @default(MEDIA)
+  estancada       Boolean     @default(false)
+
+  // Actividad y seguimiento
+  ultimoMovimientoAt DateTime  @default(now())
+  proximaAccion      String?
+  proximaAccionAt    DateTime?
+
+  // Relaciones opcionales
+  prospectId  String?
+  prospect    Prospect? @relation(fields: [prospectId], references: [id])
+  clienteId   String?
+  cliente     Client?   @relation("DealCurrentClient", fields: [clienteId], references: [id])
+  clienteOriginado Client? @relation("ClientOriginDeal")
+
+  // Cierre
+  motivoPerdida   MotivoPerdida?
+  notaCierre      String?
+  fechaCierreReal DateTime?
+
+  // IA / Metadata
+  notasInternas   String?
+  resumenIa       String?
+  riesgoPerdidaIa RiesgoIA?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  // Historial y relaciones inversas
+  stageHistory     DealStageHistory[]
+  services         Service[]
+
+  @@index([tenantId, etapa])
+  @@index([tenantId, ownerId])
+  @@index([tenantId, estancada])
+  @@map("deals")
+}
+
+model DealStageHistory {
+  id             String    @id @default(uuid())
+  dealId         String
+  deal           Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  etapaAnterior  DealEtapa
+  etapaNueva     DealEtapa
+  movidoPorId    String?
+  movidoPor      User?     @relation(fields: [movidoPorId], references: [id])
+  movidoPorTipo  MovidoPorTipo @default(HUMAN)
+  nota           String?
+  createdAt      DateTime  @default(now())
+
+  @@index([dealId])
+  @@map("deal_stage_history")
+}
+
+enum DealEtapa {
+  NUEVO_INGRESO
+  CONTACTADO
+  DESCUBRIMIENTO
+  REUNION_AGENDADA
+  REUNION_REALIZADA
+  PROPUESTA_PREPARACION
+  PROPUESTA_ENVIADA
+  NEGOCIACION
+  CIERRE_PENDIENTE
+  GANADO
+  PERDIDO
+  PAUSADO
+}
+
+enum ServicioInteres {
+  WEB
+  SEO
+  ADS
+  BRANDING
+  HOSTING
+  SOFTWARE
+  EMAIL_MKT
+  CLOUD_INFRA
+  OTRO
+}
+
+enum DealFuente {
+  PROSPECTS
+  CAMPAIGNS
+  FOLLOWUP
+  REFERRAL
+  MEETINGS
+  UPSELL
+  FORM
+}
+
+enum Temperatura {
+  FRIA
+  TIBIA
+  CALIENTE
+}
+
+enum Urgencia {
+  BAJA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+enum MotivoPerdida {
+  PRECIO
+  TIMING
+  SIN_RESPUESTA
+  COMPETENCIA
+  PRESUPUESTO_BAJO
+  CANCELADO
+  DECISION_INTERNA
+  OTRO
+}
+
+enum RiesgoIA {
+  BAJO
+  MEDIO
+  ALTO
+}
+
+enum MovidoPorTipo {
+  HUMAN
+  BOT
+}
+
+// ─────────────────────────────────────────────
+// CLIENTES (ERP-006)
+// ─────────────────────────────────────────────
+
+model Client {
+  id String @id @default(uuid())
+
+  // Tenant
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  // Identificación
+  razonSocial       String
+  nombreComercial   String
+  cuitIdentificacion String?
+  pais              String?
+  ciudad            String?
+  direccion         String?
+
+  // Gestión interna
+  accountOwnerId String
+  accountOwner   User          @relation("ClientOwner", fields: [accountOwnerId], references: [id])
+  estadoCuenta   EstadoCuenta  @default(ONBOARDING)
+  fechaAlta      DateTime      @default(now())
+
+  // Origen comercial
+  dealOrigenId       String?  @unique
+  dealOrigen         Deal?    @relation("ClientOriginDeal", fields: [dealOrigenId], references: [id])
+  comercialCierreId  String?
+  comercialCierre    User?    @relation("ClientCloser", fields: [comercialCierreId], references: [id])
+  ticketInicialUsd   Decimal? @db.Decimal(12, 2)
+
+  // Información financiera
+  billingCycle        BillingCycle @default(MENSUAL)
+  feeMensualUsd       Decimal      @default(0) @db.Decimal(12, 2)
+  feeAnualUsd         Decimal?     @db.Decimal(12, 2)
+  ultimaFacturaAt     DateTime?
+  proximoVencimientoAt DateTime?
+  deudaPendienteUsd   Decimal      @default(0) @db.Decimal(12, 2)
+  revenueLifetimeUsd  Decimal      @default(0) @db.Decimal(12, 2)
+  mrrUsd              Decimal      @default(0) @db.Decimal(12, 2)
+
+  // Infraestructura
+  dominio        String?
+  sslExpiraAt    DateTime?
+  emailService   String?
+
+  // Salud de cuenta (calculado)
+  healthScore           Int             @default(100)
+  satisfaccionEstimada  Satisfaccion    @default(ALTA)
+  riesgoChurn           RiesgoChurn     @default(BAJO)
+  oportunidadUpsell     Boolean         @default(false)
+  oportunidadCrosssell  Boolean         @default(false)
+
+  // Metadata
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relaciones
+  contactos ClientContact[]
+  services  Service[]
+  deals     Deal[] @relation("DealCurrentClient")
+
+  @@index([tenantId, estadoCuenta])
+  @@index([tenantId, accountOwnerId])
+  @@index([tenantId, riesgoChurn])
+  @@map("clients")
+}
+
+model ClientContact {
+  id        String  @id @default(uuid())
+  clientId  String
+  client    Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  nombre    String
+  cargo     String?
+  email     String?
+  telefono  String?
+  whatsapp  String?
+  esPrincipal Boolean @default(false)
+  notas     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+  @@map("client_contacts")
+}
+
+enum EstadoCuenta {
+  ONBOARDING
+  ACTIVO
+  PAUSADO
+  SUSPENDIDO
+  CANCELADO
+  FINALIZADO
+}
+
+enum BillingCycle {
+  MENSUAL
+  TRIMESTRAL
+  SEMESTRAL
+  ANUAL
+  UNICO
+}
+
+enum Satisfaccion {
+  BAJA
+  MEDIA
+  ALTA
+}
+
+enum RiesgoChurn {
+  BAJO
+  MEDIO
+  ALTO
+  CRITICO
+}
+
+// ─────────────────────────────────────────────
+// SERVICIOS (ERP-007)
+// ─────────────────────────────────────────────
+
+model Service {
+  id String @id @default(uuid())
+
+  // Tenant
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  // Identificación
+  clientId         String
+  client           Client          @relation(fields: [clientId], references: [id])
+  nombre           String
+  categoria        ServicioCategoria
+  descripcionAlcance String?
+
+  // Estado y fechas
+  estado                 ServiceEstado @default(PENDIENTE_ACTIVACION)
+  fechaInicio            DateTime?
+  fechaFin               DateTime?
+  duracionEstimadaDias   Int?
+
+  // Modelo económico
+  billingModel        BillingModel
+  precioVendidoUsd    Decimal      @db.Decimal(12, 2)
+  precioActualUsd     Decimal      @db.Decimal(12, 2)
+  costeInternoUsd     Decimal      @default(0) @db.Decimal(12, 2)
+  margenEstimadoPct   Decimal?     @db.Decimal(5, 2)
+  mrrUsd              Decimal      @default(0) @db.Decimal(12, 2)
+
+  // Operación
+  ownerId     String
+  owner       User     @relation("ServiceOwner", fields: [ownerId], references: [id])
+  equipoIds   String[]
+  entregables String[]
+  sla         String?
+
+  // Renovación
+  renovacionAutomatica    Boolean   @default(false)
+  proximaRenovacionAt     DateTime?
+  historialRenovaciones   Int       @default(0)
+
+  // Origen y trazabilidad
+  dealOrigenId String?
+  dealOrigen   Deal?   @relation(fields: [dealOrigenId], references: [id])
+
+  // Metadata
+  observaciones       String?
+  motivoCancelacion   String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
+  createdById         String?
+  createdBy           User?     @relation("ServiceCreator", fields: [createdById], references: [id])
+
+  deliverables ServiceDeliverable[]
+
+  @@index([tenantId, clientId])
+  @@index([tenantId, estado])
+  @@index([tenantId, ownerId])
+  @@map("services")
+}
+
+model ServiceDeliverable {
+  id             String             @id @default(uuid())
+  serviceId      String
+  service        Service            @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  nombre         String
+  estado         DeliverableEstado  @default(PENDIENTE)
+  fechaEsperada  DateTime?
+  fechaEntregado DateTime?
+  urlArchivo     String?
+  notas          String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([serviceId])
+  @@map("service_deliverables")
+}
+
+// ─────────────────────────────────────────────
+// CATÁLOGO DE SERVICIOS (ERP-007)
+// ─────────────────────────────────────────────
+
+model ServiceCatalogItem {
+  id                  String            @id @default(uuid())
+  tenantId            String
+  tenant              Tenant            @relation(fields: [tenantId], references: [id])
+  nombre              String
+  categoria           ServicioCategoria
+  descripcionDefault  String?
+  precioBaseUsd       Decimal           @db.Decimal(12, 2)
+  billingModelDefault BillingModel
+  activo              Boolean           @default(true)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([tenantId, categoria])
+  @@map("service_catalog")
+}
+
+enum ServicioCategoria {
+  WEB
+  SEO
+  ADS
+  BRANDING
+  HOSTING
+  CLOUD
+  SOFTWARE
+  EMAIL_MKT
+  SOPORTE
+  CONSULTORIA
+}
+
+enum BillingModel {
+  UNICO
+  MENSUAL
+  TRIMESTRAL
+  ANUAL
+  POR_HORAS
+  POR_PROYECTO
+  SUSCRIPCION
+}
+
+enum ServiceEstado {
+  PENDIENTE_ACTIVACION
+  ONBOARDING
+  ACTIVO
+  EN_EJECUCION
+  EN_REVISION
+  ESPERANDO_CLIENTE
+  PAUSADO
+  RENOVACION_PENDIENTE
+  FINALIZADO
+  CANCELADO
+  ARCHIVADO
+}
+
+enum DeliverableEstado {
+  PENDIENTE
+  EN_PROCESO
+  COMPLETADO
+  APROBADO
+  RECHAZADO
+}
+
+// ─────────────────────────────────────────────
+// AGENT SUPERVISOR (OpenClaw layer)
+// ─────────────────────────────────────────────
+
+model AgentRun {
+  id             String          @id @default(uuid())
+  tenantId       String
+  agentId        String
+  status         AgentRunStatus  @default(RUNNING)
+  triggeredBy    AgentTrigger    @default(HUMAN)
+  inputHash      String?
+  inputSummary   String?
+  outputSummary  String?
+  startedAt      DateTime        @default(now())
+  completedAt    DateTime?
+  durationMs     Int?
+  createdAt      DateTime        @default(now())
+
+  costs   AgentCost[]
+  errors  AgentError[]
+
+  @@index([tenantId, agentId])
+  @@index([tenantId, status])
+  @@index([tenantId, startedAt])
+  @@map("agent_runs")
+}
+
+model AgentCost {
+  id           String   @id @default(uuid())
+  runId        String
+  run          AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  provider     String
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  totalTokens  Int      @default(0)
+  costUsd      Decimal  @default(0) @db.Decimal(10, 6)
+  createdAt    DateTime @default(now())
+
+  @@index([runId])
+  @@map("agent_costs")
+}
+
+model AgentError {
+  id           String   @id @default(uuid())
+  runId        String
+  run          AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  errorCode    String
+  errorMessage String
+  stackTrace   String?
+  toolName     String?
+  retryCount   Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([runId])
+  @@map("agent_errors")
+}
+
+model AgentMetric {
+  id          String   @id @default(uuid())
+  tenantId    String
+  agentId     String
+  metricName  String
+  metricValue Decimal  @db.Decimal(12, 4)
+  period      String
+  createdAt   DateTime @default(now())
+
+  @@unique([tenantId, agentId, metricName, period])
+  @@index([tenantId, agentId, period])
+  @@map("agent_metrics")
+}
+
+enum AgentRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  BLOCKED
+}
+
+enum AgentTrigger {
+  HUMAN
+  SUPERVISOR
+  HEARTBEAT
+  WEBHOOK
+}
+
+// ─────────────────────────────────────────────
+// SERVICE INTELLIGENCE ENGINE
+// ─────────────────────────────────────────────
+
+model ServiceIntelligenceRule {
+  id                      String    @id @default(uuid())
+  tenantId                String
+  tenant                  Tenant    @relation(fields: [tenantId], references: [id])
+  problemPattern          String
+  impactoDescripcion      String
+  serviciosRecomendados   String[]
+  prioridad               Prioridad
+  ticketEstimadoUsd       Decimal   @db.Decimal(12, 2)
+  bundleSugerido          String?
+  activo                  Boolean   @default(true)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([tenantId, activo])
+  @@map("service_intelligence_rules")
+}
+
+// ─────────────────────────────────────────────
+// SERVICE ACCOUNTS (Agent identity layer)
+// ─────────────────────────────────────────────
+
+model ServiceAccount {
+  id         String         @id @default(uuid())
+  tenantId   String
+  tenant     Tenant         @relation(fields: [tenantId], references: [id])
+  name       String
+  agentName  String
+  scopes     String[]
+  isActive   Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+  lastUsedAt DateTime?
+  tokens     ServiceToken[]
+
+  @@unique([tenantId, agentName])
+  @@index([tenantId, isActive])
+  @@map("service_accounts")
+}
+
+model ServiceToken {
+  id               String         @id @default(uuid())
+  serviceAccountId String
+  serviceAccount   ServiceAccount @relation(fields: [serviceAccountId], references: [id], onDelete: Cascade)
+  tokenHash        String         @unique
+  expiresAt        DateTime?
+  createdAt        DateTime       @default(now())
+  revokedAt        DateTime?
+
+  @@index([tokenHash])
+  @@map("service_tokens")
+}
+
+// ─────────────────────────────────────────────
+// AGENT DECISIONS (audit trail per decision)
+// ─────────────────────────────────────────────
+
+model AgentDecision {
+  id         String   @id @default(uuid())
+  tenantId   String
+  agentId    String
+  runId      String?
+  prospectId String?
+  dealId     String?
+  decision   String
+  reason     String
+  confidence Decimal  @db.Decimal(5, 2)
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, agentId])
+  @@index([prospectId])
+  @@index([runId])
+  @@map("agent_decisions")
+}

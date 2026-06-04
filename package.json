@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "api": "cd apps/api && npm run start:dev",
+    "api:install": "cd apps/api && npm install",
+    "api:migrate": "cd apps/api && npm run prisma:migrate",
+    "api:seed": "cd apps/api && npm run prisma:seed"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.14",

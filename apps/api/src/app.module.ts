@@ -1,0 +1,45 @@
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { AgentAuditMiddleware } from './common/middleware/agent-audit.middleware';
+import { ConfigModule } from '@nestjs/config';
+import { DatabaseModule } from './database/database.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
+import { ProspectsModule } from './modules/prospects/prospects.module';
+import { DealsModule } from './modules/deals/deals.module';
+import { ClientsModule } from './modules/clients/clients.module';
+import { ServicesModule } from './modules/services/services.module';
+import { ServiceCatalogModule } from './modules/service-catalog/service-catalog.module';
+import { ServiceIntelligenceModule } from './modules/service-intelligence/service-intelligence.module';
+import { PricingModule } from './modules/pricing/pricing.module';
+import { ServiceAccountsModule } from './modules/service-accounts/service-accounts.module';
+import { AgentRunsModule } from './modules/agent-runs/agent-runs.module';
+import { HealthModule } from './modules/health/health.module';
+import configuration from './config/configuration';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [configuration],
+      envFilePath: ['.env'],
+    }),
+    DatabaseModule,
+    AuthModule,
+    UsersModule,
+    ProspectsModule,
+    DealsModule,
+    ClientsModule,
+    ServicesModule,
+    ServiceCatalogModule,
+    ServiceIntelligenceModule,
+    PricingModule,
+    ServiceAccountsModule,
+    AgentRunsModule,
+    HealthModule,
+  ],
+})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(AgentAuditMiddleware).forRoutes('*');
+  }
+}
