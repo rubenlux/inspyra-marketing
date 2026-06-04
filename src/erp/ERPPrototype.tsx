@@ -3,7 +3,7 @@ import * as React from 'react'
 import { useEffect, useState, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { prospectsApi, validationsApi, getStoredToken, clearStoredToken } from '../api/inspyra'
+import { authApi, prospectsApi, validationsApi, getStoredToken, setStoredToken, clearStoredToken } from '../api/inspyra'
 import DashboardV2 from './DashboardV2'
 import './erp.css'
 
@@ -501,9 +501,28 @@ function Topbar({ screen }) {
 }
 
 
-const useStateLogin = useState;
-
 function Login({ onEnter }) {
+  const [email, setEmail] = useState("admin@inspyra.io");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const { accessToken, refreshToken } = await authApi.login(email, password);
+      setStoredToken(accessToken, refreshToken);
+      onEnter();
+    } catch (e) {
+      setError(e.message || "Credenciales incorrectas");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKey = (e) => { if (e.key === "Enter") handleLogin(); };
+
   return (
     <div className="login-stage">
       <div className="login-form-side">
@@ -521,7 +540,7 @@ function Login({ onEnter }) {
 
           <div className="field">
             <label>Email corporativo</label>
-            <input className="input" defaultValue="mateo@inspyra.studio" style={{ height: 40 }}/>
+            <input className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={handleKey} style={{ height: 40 }}/>
           </div>
 
           <div className="field">
@@ -529,16 +548,22 @@ function Login({ onEnter }) {
               <label>Contraseña</label>
               <a style={{ fontSize: 11.5, color: "var(--primary-700)", textDecoration: "none" }}>¿Olvidaste tu contraseña?</a>
             </div>
-            <input className="input" type="password" defaultValue="••••••••••••" style={{ height: 40 }}/>
+            <input className="input" type="password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={handleKey} placeholder="••••••••" style={{ height: 40 }}/>
           </div>
+
+          {error && (
+            <div style={{ padding: "10px 12px", background: "var(--danger-soft, #fff5f5)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 13, color: "var(--danger)" }}>
+              {error}
+            </div>
+          )}
 
           <label className="row gap-sm" style={{ fontSize: 12.5, color: "var(--ink-700)", cursor: "pointer" }}>
             <input type="checkbox" defaultChecked/>
             Mantenerme conectado en este equipo
           </label>
 
-          <button className="btn btn-brand btn-lg" style={{ width: "100%", justifyContent: "center", height: 42, fontSize: 14 }} onClick={onEnter}>
-            Iniciar sesión <Icon.arrowRight size={14}/>
+          <button className="btn btn-brand btn-lg" style={{ width: "100%", justifyContent: "center", height: 42, fontSize: 14, opacity: loading ? 0.7 : 1 }} onClick={handleLogin} disabled={loading}>
+            {loading ? "Ingresando…" : <><span>Iniciar sesión</span> <Icon.arrowRight size={14}/></>}
           </button>
 
           <div style={{ position: "relative", textAlign: "center" }}>
@@ -5858,7 +5883,7 @@ function getScreenFromPath(pathname) {
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [authed, setAuthed] = useState(true); // default to logged in so reviewers land on the ERP
+  const [authed, setAuthed] = useState(() => Boolean(getStoredToken()));
   const [screen, setScreen] = useState(() => getScreenFromPath(location.pathname));
   const [clientDrawer, setClientDrawer] = useState(null);
 
@@ -5867,18 +5892,11 @@ function App() {
     navigate(ROUTE_BY_SCREEN[nextScreen] || "/erp/dashboard");
   };
 
-  // Persist screen across reload
-  useEffect(() => {
-    const auth = localStorage.getItem("inspyra-auth");
-    if (auth === "out") setAuthed(false);
-  }, []);
-
   useEffect(() => {
     setScreen(getScreenFromPath(location.pathname));
   }, [location.pathname]);
 
   useEffect(() => { localStorage.setItem("inspyra-screen", screen); }, [screen]);
-  useEffect(() => { localStorage.setItem("inspyra-auth", authed ? "in" : "out"); }, [authed]);
 
   if (!authed) {
     return <Login onEnter={() => { setAuthed(true); handleNav("dashboard"); }}/>;

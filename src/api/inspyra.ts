@@ -45,8 +45,8 @@ async function req<T>(
 
   if (res.status === 401) {
     clearStoredToken()
-    window.location.href = '/login'
-    throw new Error('Unauthorized — redirecting to login')
+    window.location.reload()
+    throw new Error('Sesión expirada')
   }
 
   if (!res.ok || !json.success) {

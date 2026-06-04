@@ -13,7 +13,6 @@ import { FAQ } from './components/sections/FAQ'
 import { Contact } from './components/sections/Contact'
 
 const ERPPrototype = lazy(() => import('./erp/ERPPrototype'))
-const LoginPage = lazy(() => import('./pages/LoginPage'))
 
 function MarketingHome() {
   return (
@@ -39,7 +38,6 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<MarketingHome />} />
-      <Route path="/login" element={<Suspense fallback={null}><LoginPage /></Suspense>} />
       <Route path="/erp" element={<Navigate to="/erp/dashboard" replace />} />
       <Route
         path="/erp/*"
