@@ -1050,3 +1050,5 @@ input, textarea, select { font-family: inherit; }
 }
 .bars > span.on { background: var(--primary); }
 .bars > span.hi { background: var(--ink-900); }
+
+@keyframes spin { to { transform: rotate(360deg); } }

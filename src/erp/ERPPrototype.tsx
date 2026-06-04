@@ -3,7 +3,7 @@ import * as React from 'react'
 import { useEffect, useState, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { authApi, prospectsApi, validationsApi, getStoredToken, setStoredToken, clearStoredToken } from '../api/inspyra'
+import { authApi, prospectsApi, validationsApi, researchApi, getStoredToken, setStoredToken, clearStoredToken } from '../api/inspyra'
 import DashboardV2 from './DashboardV2'
 import './erp.css'
 
@@ -1985,6 +1985,43 @@ function Prospects({ onNav }) {
   const [page, setPage] = useState(1);
   const hasToken = Boolean(getStoredToken());
 
+  // ── Research job state ──
+  const [activeJobId, setActiveJobId] = useState(null);
+  const [activeJob, setActiveJob] = useState(null);
+  const qc = useQueryClient();
+
+  // Poll active job every 3s while PENDING/RUNNING
+  React.useEffect(() => {
+    if (!activeJobId || !hasToken) return;
+    const running = activeJob?.status === 'PENDING' || activeJob?.status === 'RUNNING';
+    if (!running && activeJob) return;
+    const interval = setInterval(async () => {
+      try {
+        const job = await researchApi.getJob(activeJobId);
+        setActiveJob(job);
+        if (job.status === 'COMPLETED') {
+          qc.invalidateQueries({ queryKey: ['prospects'] });
+          qc.invalidateQueries({ queryKey: ['prospects', 'kpis'] });
+        }
+        if (job.status === 'COMPLETED' || job.status === 'FAILED') {
+          clearInterval(interval);
+        }
+      } catch { clearInterval(interval); }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [activeJobId, activeJob?.status, hasToken]);
+
+  const handleDescubrir = async () => {
+    if (!query.trim() || !hasToken) return;
+    try {
+      const job = await researchApi.createJob(query.trim());
+      setActiveJobId(job.id);
+      setActiveJob(job);
+    } catch (e) {
+      alert('Error al iniciar investigación: ' + e.message);
+    }
+  };
+
   const SUGGESTED = [
     "clínicas dentales con redes activas pero sin agenda online",
     "bodegas en Mendoza sin tienda online y con IG fuerte",
@@ -2090,9 +2127,51 @@ function Prospects({ onNav }) {
         </div>
         <div className="ai-input" style={{ background: "var(--bg-2)", borderRadius: "var(--r-md)", padding: "10px 14px" }}>
           <Icon.sparkles size={16}/>
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Describí qué empresas buscás…"/>
-          <button className="btn btn-brand btn-sm"><Icon.bolt size={13}/> Descubrir</button>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Describí qué empresas buscás…"
+            onKeyDown={(e) => e.key === 'Enter' && handleDescubrir()}
+            disabled={activeJob?.status === 'PENDING' || activeJob?.status === 'RUNNING'}
+          />
+          <button
+            className="btn btn-brand btn-sm"
+            onClick={handleDescubrir}
+            disabled={!hasToken || !query.trim() || activeJob?.status === 'PENDING' || activeJob?.status === 'RUNNING'}
+          >
+            <Icon.bolt size={13}/>
+            {activeJob?.status === 'RUNNING' ? ' Investigando…' : activeJob?.status === 'PENDING' ? ' Iniciando…' : ' Descubrir'}
+          </button>
         </div>
+
+        {/* Job status banner */}
+        {activeJob && (
+          <div style={{
+            marginTop: 10, padding: "10px 14px", borderRadius: 8,
+            background: activeJob.status === 'COMPLETED' ? "var(--success-soft, #ecfdf5)"
+              : activeJob.status === 'FAILED' ? "var(--danger-soft, #fff5f5)"
+              : "var(--primary-soft)",
+            border: `1px solid ${activeJob.status === 'COMPLETED' ? "var(--success)" : activeJob.status === 'FAILED' ? "var(--danger)" : "var(--primary)"}`,
+            display: "flex", alignItems: "center", gap: 10, fontSize: 13,
+          }}>
+            {(activeJob.status === 'PENDING' || activeJob.status === 'RUNNING') && (
+              <span style={{ display: "inline-block", width: 14, height: 14, borderRadius: "50%", border: "2px solid var(--primary)", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }}/>
+            )}
+            {activeJob.status === 'COMPLETED' && <span>✓</span>}
+            {activeJob.status === 'FAILED' && <span>✗</span>}
+            <span style={{ flex: 1, color: activeJob.status === 'FAILED' ? "var(--danger)" : "var(--ink-800)" }}>
+              {activeJob.status === 'PENDING' && 'Iniciando Research Agent…'}
+              {activeJob.status === 'RUNNING' && `Research Agent investigando: "${activeJob.query}"`}
+              {activeJob.status === 'COMPLETED' && `Investigación completa — ${activeJob.prospectsFound} prospectos nuevos encontrados`}
+              {activeJob.status === 'FAILED' && `Error: ${activeJob.errorMessage ?? 'Investigación fallida'}`}
+            </span>
+            {(activeJob.status === 'COMPLETED' || activeJob.status === 'FAILED') && (
+              <button onClick={() => { setActiveJob(null); setActiveJobId(null); }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink-400)", fontSize: 16, lineHeight: 1 }}>×</button>
+            )}
+          </div>
+        )}
+
         <div className="ai-foot">
           Probá:
           {SUGGESTED.map((s, i) => (

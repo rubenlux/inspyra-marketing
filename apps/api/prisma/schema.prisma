@@ -29,6 +29,7 @@ model Tenant {
   auditLogs        AuditLog[]
   intelRules       ServiceIntelligenceRule[]
   serviceAccounts  ServiceAccount[]
+  researchJobs     ResearchJob[]
 
   @@map("tenants")
 }
@@ -903,4 +904,36 @@ model AgentDecision {
   @@index([prospectId])
   @@index([runId])
   @@map("agent_decisions")
+}
+
+// ─────────────────────────────────────────────
+// RESEARCH ENGINE (ERP-Research)
+// ─────────────────────────────────────────────
+
+enum ResearchJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model ResearchJob {
+  id             String            @id @default(uuid())
+  tenantId       String
+  tenant         Tenant            @relation(fields: [tenantId], references: [id])
+  query          String
+  limit          Int               @default(10)
+  status         ResearchJobStatus @default(PENDING)
+  prospectsFound Int               @default(0)
+  errorMessage   String?           @db.Text
+  agentOutput    String?           @db.Text
+  createdBy      String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("research_jobs")
 }

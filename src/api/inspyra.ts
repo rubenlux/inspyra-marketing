@@ -192,6 +192,34 @@ export const validationsApi = {
     req<ProspectValidation>('PATCH', `/prospect-validations/${id}/review`, data),
 }
 
+// ─── Research Jobs ────────────────────────────────────────────────────────────
+
+export interface ResearchJob {
+  id: string
+  tenantId: string
+  query: string
+  limit: number
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED'
+  prospectsFound: number
+  errorMessage?: string | null
+  agentOutput?: string | null
+  createdBy?: string | null
+  createdAt: string
+  startedAt?: string | null
+  completedAt?: string | null
+}
+
+export const researchApi = {
+  createJob: (query: string, limit = 10) =>
+    req<ResearchJob>('POST', '/research/jobs', { query, limit }),
+
+  getJob: (id: string) =>
+    req<ResearchJob>('GET', `/research/jobs/${id}`),
+
+  listJobs: () =>
+    req<ResearchJob[]>('GET', '/research/jobs'),
+}
+
 // ─── Agent ROI ────────────────────────────────────────────────────────────────
 
 export interface AgentRoiRow {

@@ -15,6 +15,7 @@ import { AgentRunsModule } from './modules/agent-runs/agent-runs.module';
 import { HealthModule } from './modules/health/health.module';
 import { ProspectValidationModule } from './modules/prospect-validation/prospect-validation.module';
 import { AgentRoiModule } from './modules/agent-roi/agent-roi.module';
+import { ResearchModule } from './modules/research/research.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -39,6 +40,7 @@ import configuration from './config/configuration';
     HealthModule,
     ProspectValidationModule,
     AgentRoiModule,
+    ResearchModule,
   ],
 })
 export class AppModule {}
