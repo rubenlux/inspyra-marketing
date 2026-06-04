@@ -1470,10 +1470,10 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose }) {
 
   return (
     <div style={{
-      position: "fixed", top: 56, right: 0, bottom: 0, width: 520,
-      background: "var(--bg-1)", borderLeft: "1px solid var(--border-soft)",
+      position: "fixed", top: 56, right: 0, bottom: 0, width: 480,
+      background: "#ffffff", borderLeft: "1px solid #e5e7eb",
       zIndex: 99, display: "flex", flexDirection: "column",
-      boxShadow: "-6px 0 32px rgba(0,0,0,0.14)",
+      boxShadow: "-8px 0 24px rgba(0,0,0,0.15)", overflow: "hidden",
     }}>
       {/* ── Header ── */}
       <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border-soft)", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
