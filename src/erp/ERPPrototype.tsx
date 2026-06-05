@@ -3,7 +3,7 @@ import * as React from 'react'
 import { useEffect, useState, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { authApi, prospectsApi, validationsApi, researchApi, getStoredToken, setStoredToken, clearStoredToken, ResearchCandidate } from '../api/inspyra'
+import { authApi, prospectsApi, validationsApi, researchApi, getStoredToken, setStoredToken, clearStoredToken } from '../api/inspyra'
 import DashboardV2 from './DashboardV2'
 import './erp.css'
 
@@ -1980,8 +1980,8 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose }) {
 
 // ── Research Job Detail Drawer ────────────────────────────────────────────────
 
-function ResearchJobDetailDrawer({ jobId, onClose }: { jobId: string; onClose: () => void }) {
-  const [tab, setTab] = useState<'discovered' | 'evaluated' | 'promoted'>('discovered');
+function ResearchJobDetailDrawer({ jobId, onClose }) {
+  const [tab, setTab] = useState('discovered');
 
   const { data: candidates, isLoading } = useQuery({
     queryKey: ['research-candidates', jobId],
@@ -2008,7 +2008,7 @@ function ResearchJobDetailDrawer({ jobId, onClose }: { jobId: string; onClose: (
     );
   };
 
-  const CandidateCard = ({ c }: { c: ResearchCandidate }) => {
+  const CandidateCard = ({ c }) => {
     const [open, setOpen] = useState(false);
     const statusColor = c.status === 'PROMOTED' ? "#059669" : c.status === 'DISCARDED' ? "#dc2626" : "#6b7280";
     const statusLabel = c.status === 'PROMOTED' ? "Promovido" : c.status === 'DISCARDED' ? "Descartado" : "Descubierto";
