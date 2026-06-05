@@ -1799,13 +1799,19 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                   </div>
                   <div style={{ flex: 1, background: "var(--bg-2)", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
                     <SLabel>Tu score</SLabel>
-                    <div style={{ fontSize: 26, fontWeight: 700, color: "var(--ink-900)" }}>{validation.humanScore}</div>
+                    <div style={{ fontSize: 26, fontWeight: 700, color: "var(--ink-900)" }}>
+                      {validation.humanScore ?? "—"}
+                    </div>
                   </div>
                   <div style={{ flex: 1, background: "var(--bg-2)", borderRadius: 10, padding: "12px 14px", textAlign: "center" }}>
                     <SLabel>Drift</SLabel>
-                    <div style={{ fontSize: 26, fontWeight: 700, color: Math.abs(validation.agentScore - validation.humanScore) <= 10 ? "var(--success)" : "var(--warning)" }}>
-                      {validation.agentScore - validation.humanScore > 0 ? "+" : ""}{validation.agentScore - validation.humanScore}
-                    </div>
+                    {validation.humanScore != null ? (
+                      <div style={{ fontSize: 26, fontWeight: 700, color: Math.abs(validation.agentScore - validation.humanScore) <= 10 ? "var(--success)" : "var(--warning)" }}>
+                        {validation.agentScore - validation.humanScore > 0 ? "+" : ""}{validation.agentScore - validation.humanScore}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 26, fontWeight: 700, color: "var(--ink-400)" }}>—</div>
+                    )}
                   </div>
                 </div>
 

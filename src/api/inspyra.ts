@@ -144,6 +144,7 @@ export interface Prospect {
   validation?: {
     id: string
     agentScore: number
+    humanScore: number | null
     status: 'PENDING' | 'VALIDATED' | 'REJECTED'
     prioridad: string
     estimatedTicketUsd: string | null
@@ -151,6 +152,9 @@ export interface Prospect {
     decisionFactors: DecisionFactors | null
     validationVersion: string
     reasoning: string | null
+    validatedAt: string | null
+    notes: string | null
+    feedback?: { rejectionReason: string; notes: string | null } | null
   } | null
 }
 

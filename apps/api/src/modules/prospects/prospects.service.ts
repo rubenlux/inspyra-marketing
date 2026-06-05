@@ -66,9 +66,11 @@ export class ProspectsService {
           owner: { select: { id: true, firstName: true, lastName: true, email: true } },
           validation: {
             select: {
-              id: true, agentScore: true, status: true, prioridad: true,
+              id: true, agentScore: true, humanScore: true, status: true, prioridad: true,
               estimatedTicketUsd: true, servicesRecommended: true,
               decisionFactors: true, validationVersion: true, reasoning: true,
+              validatedAt: true, notes: true,
+              feedback: { select: { rejectionReason: true, notes: true } },
             },
           },
         },
