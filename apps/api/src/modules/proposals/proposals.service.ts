@@ -270,7 +270,7 @@ OPORTUNIDAD DETECTADA:
 ${prospect.oportunidadDetectada ?? 'No especificada'}
 
 PROBLEMAS IDENTIFICADOS:
-${(prospect.problemasEncontrados ?? []).map(p => `- ${p}`).join('\n') || '- No especificados'}
+${(prospect.problemasEncontrados ?? []).map((p: string) => `- ${p}`).join('\n') || '- No especificados'}
 
 EVALUACIÓN DE OPORTUNIDAD (Opportunity Agent):
 - Opportunity Score: ${v?.agentScore ?? 'N/A'} / 100
