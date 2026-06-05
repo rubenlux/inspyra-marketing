@@ -17,3 +17,8 @@ openclaw.json
 # Nested envs
 apps/**/.env
 apps/**/.env.local
+
+# Local dev scripts and logs
+apps/api/gen-token.ts
+vite.log
+*.log
