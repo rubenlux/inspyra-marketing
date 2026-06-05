@@ -226,6 +226,13 @@ const NAV = [
 ];
 
 function Sidebar({ active, onNav }) {
+  const { data: sidebarKpis } = useQuery({
+    queryKey: ["prospects", "kpis"],
+    queryFn: prospectsApi.kpis,
+    enabled: Boolean(getStoredToken()),
+    staleTime: 60000,
+  });
+
   return (
     <aside className="sb">
       <div className="sb-head">
@@ -259,6 +266,9 @@ function Sidebar({ active, onNav }) {
             {g.items.map((it) => {
               const IconC = Icon[it.icon];
               const isActive = active === it.id;
+              const badge = it.id === 'prospects' && sidebarKpis?.total != null
+                ? String(sidebarKpis.total)
+                : it.badge;
               return (
                 <button
                   key={it.id}
@@ -267,7 +277,7 @@ function Sidebar({ active, onNav }) {
                 >
                   {IconC && <IconC size={15} stroke={1.6}/>}
                   <span className="sb-item-label">{it.label}</span>
-                  {it.badge && <span className="sb-item-badge">{it.badge}</span>}
+                  {badge && <span className="sb-item-badge">{badge}</span>}
                   {it.pin && <span className="sb-item-pin">Lab</span>}
                 </button>
               );
@@ -1021,18 +1031,27 @@ const COM_TABS = [
 ];
 
 function ComercialTabs({ active, onNav }) {
+  const { data: tabKpis } = useQuery({
+    queryKey: ["prospects", "kpis"],
+    queryFn: prospectsApi.kpis,
+    enabled: Boolean(getStoredToken()),
+    staleTime: 60000,
+  });
+  const prospectTotal = tabKpis?.total;
+
   return (
     <div className="com-tabs">
       {COM_TABS.map((t) => {
         const IconC = Icon[t.icon];
         const on = active === t.id;
+        const badge = t.id === 'prospects' && prospectTotal != null ? String(prospectTotal) : t.badge;
         return (
           <button key={t.id} className={`com-tab ${on ? "active" : ""}`} onClick={() => onNav?.(t.id)}>
             <span className="com-tab-ic">{IconC && <IconC size={16}/>}</span>
             <span className="com-tab-text">
               <span className="com-tab-label">
                 {t.label}
-                {t.badge && <span className={`com-tab-badge ${t.alert ? "alert" : ""}`}>{t.badge}</span>}
+                {badge && <span className={`com-tab-badge ${t.alert ? "alert" : ""}`}>{badge}</span>}
               </span>
               <span className="com-tab-hint">{t.hint}</span>
             </span>
@@ -1070,7 +1089,7 @@ function ChannelTag({ ch, sm }) {
 
 /* Score de oportunidad — 0..100 with color band */
 function Score({ v }) {
-  const tone = v >= 80 ? "#10B981" : v >= 60 ? "#5B5BF7" : v >= 40 ? "#F59E0B" : "#9CA3AF";
+  const tone = v >= 90 ? "#10B981" : v >= 75 ? "#5B5BF7" : v >= 60 ? "#F59E0B" : "#9CA3AF";
   return (
     <span className="score">
       <span className="score-ring" style={{ "--p": v + "%", "--c": tone }}>
@@ -1371,6 +1390,11 @@ const ESTADO_TONE = {
 };
 const VAL_TONE = { PENDING: "warning", VALIDATED: "success", REJECTED: "danger" };
 const VAL_LABEL = { PENDING: "Pendiente", VALIDATED: "Aprobado", REJECTED: "Rechazado" };
+
+const aiStateFromScore = (s: number) => s >= 90 ? "PRIORIDAD_MAXIMA" : s >= 75 ? "APROBADO_IA" : s >= 60 ? "REVISAR" : "DESCARTADO_IA";
+const AI_STATE_LABEL = { PRIORIDAD_MAXIMA: "Prioridad máxima", APROBADO_IA: "Aprobado IA", REVISAR: "Revisar", DESCARTADO_IA: "Descartado IA" };
+const AI_STATE_TONE  = { PRIORIDAD_MAXIMA: "success", APROBADO_IA: "brand", REVISAR: "warning", DESCARTADO_IA: "danger" };
+const AI_STATE_COLOR = { PRIORIDAD_MAXIMA: "#10B981", APROBADO_IA: "#5B5BF7", REVISAR: "#F59E0B", DESCARTADO_IA: "#9CA3AF" };
 
 function fmtDate(iso) {
   if (!iso) return "—";
@@ -2164,7 +2188,8 @@ function Prospects({ onNav }) {
   const [selectedId, setSelectedId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
   const [page, setPage] = useState(1);
-  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortBy, setSortBy] = useState('score');
+  const [aiFilter, setAiFilter] = useState("ACTIVOS");
   const [jobDetailId, setJobDetailId] = useState(null);
   const hasToken = Boolean(getStoredToken());
 
@@ -2257,12 +2282,13 @@ function Prospects({ onNav }) {
   const H24 = 24 * 60 * 60 * 1000;
 
   // ── Table data ────────────────────────────────────────────────────────────────
-  const tableRows = React.useMemo(() => {
+  const allRows = React.useMemo(() => {
     if (!hasToken) {
-      return PROSPECTS_DATA.map((p, i) => ({ ...p, id: `demo-${i}`, isReal: false, isNew: false }));
+      return PROSPECTS_DATA.map((p, i) => ({ ...p, id: `demo-${i}`, isReal: false, isNew: false, aiState: aiStateFromScore(p.score) }));
     }
-    if (!prospectsData?.data) return [];
-    return prospectsData.data.map(p => ({
+    const items = Array.isArray(prospectsData) ? prospectsData : prospectsData?.data;
+    if (!items?.length) return [];
+    return items.map(p => ({
       id: p.id,
       co: p.nombreEmpresa,
       rubro: p.rubro ?? "—",
@@ -2272,6 +2298,7 @@ function Prospects({ onNav }) {
       opp: p.oportunidadDetectada ?? p.problemasEncontrados?.slice(0, 2).join(" · ") ?? "—",
       svc: p.servicioSugerido ?? validationById[p.id]?.servicesRecommended?.[0] ?? "—",
       score: p.score,
+      aiState: aiStateFromScore(p.score),
       state: ESTADO_LABEL[p.estado] ?? p.estado,
       estado: p.estado,
       last: fmtDate(p.ultimoContacto),
@@ -2283,7 +2310,20 @@ function Prospects({ onNav }) {
     }));
   }, [prospectsData, validationById, hasToken]);
 
-  const meta = prospectsData?.meta;
+  const aiCounts = React.useMemo(() => {
+    const c = { PRIORIDAD_MAXIMA: 0, APROBADO_IA: 0, REVISAR: 0, DESCARTADO_IA: 0 };
+    for (const r of allRows) c[r.aiState] = (c[r.aiState] ?? 0) + 1;
+    return c;
+  }, [allRows]);
+
+  const tableRows = React.useMemo(() => {
+    if (aiFilter === "TODOS") return allRows;
+    if (aiFilter === "ACTIVOS") return allRows.filter(r => r.aiState !== "DESCARTADO_IA");
+    return allRows.filter(r => r.aiState === aiFilter);
+  }, [allRows, aiFilter]);
+
+  // meta comes nested ({ data, meta }) or flat on json root via json.meta (old interceptor)
+  const meta = Array.isArray(prospectsData) ? null : prospectsData?.meta;
 
   return (
     <div className="page">
@@ -2411,9 +2451,37 @@ function Prospects({ onNav }) {
       {/* KPIs — real data */}
       <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
         <MiniStatP label="Resultados" value={String(total)} sub={`+${nuevosEstaSemana} esta semana`} c="var(--primary)"/>
-        <MiniStatP label="Sin web" value={String(sinWeb)} sub={`${total > 0 ? ((sinWeb / total) * 100).toFixed(1) : 0}% · oportunidad alta`} c="var(--warning)"/>
-        <MiniStatP label="Score ≥ 80" value={String(scoreAlto)} sub="prioridad comercial" c="var(--success)"/>
-        <MiniStatP label="Listos para outreach" value={String(listosOutreach)} sub="asignados al equipo" c="var(--secondary)"/>
+        <MiniStatP label="Prioridad máxima" value={String(aiCounts.PRIORIDAD_MAXIMA)} sub="score 90–100 · asignar ya" c="#10B981"/>
+        <MiniStatP label="Aprobados IA" value={String(aiCounts.APROBADO_IA)} sub="score 75–89 · listos para outreach" c="#5B5BF7"/>
+        <MiniStatP label="Revisar" value={String(aiCounts.REVISAR)} sub="score 60–74 · necesita criterio humano" c="#F59E0B"/>
+      </div>
+
+      {/* AI State Filter Tabs */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+        {([
+          { id: "ACTIVOS",         label: "Activos",          count: aiCounts.APROBADO_IA + aiCounts.REVISAR + aiCounts.PRIORIDAD_MAXIMA, color: "var(--primary)" },
+          { id: "PRIORIDAD_MAXIMA",label: "Prioridad máxima", count: aiCounts.PRIORIDAD_MAXIMA, color: "#10B981" },
+          { id: "APROBADO_IA",     label: "Aprobado IA",      count: aiCounts.APROBADO_IA,      color: "#5B5BF7" },
+          { id: "REVISAR",         label: "Revisar",          count: aiCounts.REVISAR,          color: "#F59E0B" },
+          { id: "DESCARTADO_IA",   label: "Descartado IA",    count: aiCounts.DESCARTADO_IA,    color: "#9CA3AF" },
+          { id: "TODOS",           label: "Todos",            count: allRows.length,            color: "var(--ink-400)" },
+        ] as const).map(f => {
+          const active = aiFilter === f.id;
+          return (
+            <button key={f.id} onClick={() => setAiFilter(f.id)} style={{
+              padding: "5px 11px", borderRadius: 20, fontSize: 12, fontWeight: active ? 700 : 400,
+              background: active ? f.color : "var(--bg-2)",
+              color: active ? "#fff" : "var(--ink-600)",
+              border: `1px solid ${active ? f.color : "var(--border-soft)"}`,
+              cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, transition: "all 100ms",
+            }}>
+              {f.label}
+              <span style={{ background: active ? "rgba(255,255,255,0.22)" : "var(--bg-3)", borderRadius: 10, padding: "0 5px", fontSize: 10, fontWeight: 700 }}>
+                {f.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Prospects table */}
@@ -2432,11 +2500,11 @@ function Prospects({ onNav }) {
             </div>
             <button className="btn btn-sm"><Icon.filter size={13}/> Filtros</button>
             <button
-              className={`btn btn-sm${sortBy === 'createdAt' ? ' btn-brand' : ''}`}
+              className={`btn btn-sm${sortBy === 'score' ? ' btn-brand' : ''}`}
               onClick={() => { setSortBy(s => s === 'score' ? 'createdAt' : 'score'); setPage(1); }}
-              title={sortBy === 'score' ? 'Ordenando por score — click para ver recientes primero' : 'Ordenando por recientes — click para volver a score'}
+              title={sortBy === 'score' ? 'Ordenando por score — click para ver más recientes' : 'Ordenando por fecha — click para volver a score'}
             >
-              <Icon.sort size={13}/> {sortBy === 'createdAt' ? 'Recientes' : 'Score'}
+              <Icon.sort size={13}/> {sortBy === 'score' ? 'Mayor score' : 'Recientes'}
             </button>
           </div>
         </div>
