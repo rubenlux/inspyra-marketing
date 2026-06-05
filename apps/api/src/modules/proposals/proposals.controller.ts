@@ -12,8 +12,17 @@ export class ProposalsController {
   constructor(private readonly proposalsService: ProposalsService) {}
 
   @Post('generate/:prospectId')
-  generate(@Param('prospectId') prospectId: string, @Request() req: AuthRequest) {
-    return this.proposalsService.generate(prospectId, req.user.tenantId, req.user.id);
+  generate(
+    @Param('prospectId') prospectId: string,
+    @Body() body: { proposalType?: 'OUTREACH' | 'COMMERCIAL' },
+    @Request() req: AuthRequest,
+  ) {
+    return this.proposalsService.generate(
+      prospectId,
+      req.user.tenantId,
+      req.user.id,
+      body?.proposalType ?? 'OUTREACH',
+    );
   }
 
   @Get('prospect/:prospectId')

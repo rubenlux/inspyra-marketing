@@ -434,32 +434,43 @@ export const enrichmentApi = {
 
 // ─── Proposals ───────────────────────────────────────────────────────────────
 
-export interface ProposalServiceItem {
-  nombre: string
+// ── Outreach Brief (Stage 1 — conseguir respuesta) ───────────────────────────
+
+export interface OutreachBriefData {
+  proposalType: 'OUTREACH'
+  problemasDetectados: Array<{ problema: string; impacto: string }>
+  oportunidades: Array<{ oportunidad: string; beneficio: string }>
+  riesgos: string[]
+  recomendacionesGenerales: string[]
+  diagnosticoResumen: string
+  cta: string
+}
+
+// ── Commercial Proposal (Stage 2 — tras interacción positiva) ────────────────
+
+export interface ProposalPackage {
+  nombre: 'Esencial' | 'Crecimiento' | 'Completo'
   descripcion: string
-  precio: number
-  billingModel: string
-  prioridad: string
+  incluye: string[]
+  ticketRange?: string
+  pricing?: { setup: number; mensual: number }
+  destacado?: boolean
 }
 
-export interface ProposalPricing {
-  setup: number
-  mensual: number
-  total12Meses: number
-  nota: string
+export interface CommercialProposalData {
+  proposalType: 'COMMERCIAL'
+  resumenEjecutivo: string
+  diagnostico: string
+  problemasDetectados: Array<{ problema: string; impacto: string }>
+  objetivos: string[]
+  paquetes: ProposalPackage[]
+  paqueteRecomendado: 'Esencial' | 'Crecimiento' | 'Completo'
+  preguntasCalificacion?: string[]
+  justificacion: string
+  cta: string
 }
 
-export interface ProposalData {
-  resumenEjecutivo?: string
-  diagnostico?: string
-  problemasDetectados?: Array<{ problema: string; impacto: string }>
-  objetivos?: string[]
-  serviciosRecomendados?: ProposalServiceItem[]
-  pricing?: ProposalPricing
-  cronograma?: Array<{ semana: number; entregable: string }>
-  justificacion?: string
-  cta?: string
-}
+export type ProposalData = OutreachBriefData | CommercialProposalData
 
 export interface Proposal {
   id: string
@@ -467,6 +478,7 @@ export interface Proposal {
   prospectId: string
   version: number
   parentProposalId: string | null
+  proposalType: 'OUTREACH' | 'COMMERCIAL'
   status: 'DRAFT' | 'APPROVED' | 'REJECTED'
   jobStatus: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED'
   generatedBy: string
@@ -484,8 +496,8 @@ export interface Proposal {
 }
 
 export const proposalsApi = {
-  generate: (prospectId: string) =>
-    req<Proposal>('POST', `/proposals/generate/${prospectId}`),
+  generate: (prospectId: string, proposalType: 'OUTREACH' | 'COMMERCIAL' = 'OUTREACH') =>
+    req<Proposal>('POST', `/proposals/generate/${prospectId}`, { proposalType }),
 
   findByProspect: (prospectId: string) =>
     req<Proposal[]>('GET', `/proposals/prospect/${prospectId}`),

@@ -15,8 +15,9 @@ model Tenant {
   id        String   @id @default(uuid())
   name      String
   slug      String   @unique
-  plan      String   @default("starter")
-  isActive  Boolean  @default(true)
+  plan          String       @default("starter")
+  isActive      Boolean      @default(true)
+  marketProfile MarketProfile @default(ARGENTINA)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1099,8 +1100,21 @@ model EnrichmentResult {
 }
 
 // ─────────────────────────────────────────────
-// PROPOSAL ENGINE (ERP-026)
+// PROPOSAL ENGINE (ERP-026 / ERP-027)
 // ─────────────────────────────────────────────
+
+enum MarketProfile {
+  ARGENTINA
+  LATAM
+  USA
+  CANADA
+  EUROPE
+}
+
+enum ProposalType {
+  OUTREACH    // Stage 1 — get a meeting, no full pricing
+  COMMERCIAL  // Stage 2 — full proposal after engagement
+}
 
 enum ProposalStatus {
   DRAFT
@@ -1127,6 +1141,9 @@ model Proposal {
   parentProposalId String?
   parentProposal   Proposal?  @relation("ProposalVersions", fields: [parentProposalId], references: [id])
   childProposals   Proposal[] @relation("ProposalVersions")
+
+  // Stage — OUTREACH (get meeting) or COMMERCIAL (full proposal after engagement)
+  proposalType ProposalType      @default(OUTREACH)
 
   // Lifecycle
   status       ProposalStatus    @default(DRAFT)

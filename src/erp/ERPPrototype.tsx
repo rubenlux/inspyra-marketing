@@ -1438,10 +1438,10 @@ function ProposalNextStep({ prospectId, latestProposal, isGenerating, onGenerate
           opacity: (loading || isGenerating) ? 0.7 : 1,
         }}>
         <Icon.doc size={15}/>
-        {loading ? "Iniciando…" : isGenerating ? "⏳ Generando propuesta…" : hasActiveDraft ? "Ver propuesta generada" : "Generar propuesta"}
+        {loading ? "Iniciando…" : isGenerating ? "⏳ Generando Outreach Brief…" : hasActiveDraft ? "Ver Outreach Brief generado" : "✉ Generar Outreach Brief"}
       </button>
       <div style={{ fontSize: 11.5, color: "var(--ink-400)", textAlign: "center", marginTop: 8 }}>
-        {isGenerating ? "El agente está construyendo la propuesta" : hasActiveDraft ? "Revisá la propuesta en la pestaña Propuesta" : "El Proposal Agent construirá una propuesta personalizada"}
+        {isGenerating ? "El agente está construyendo el brief" : hasActiveDraft ? "Revisá el brief en la pestaña Propuesta" : "Consigue una respuesta antes de enviar la propuesta completa"}
       </div>
     </>
   );
@@ -1932,10 +1932,10 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                           isGenerating={isGeneratingProposal}
                           onGenerate={async () => {
                             try {
-                              await proposalsApi.generate(prospectId);
+                              await proposalsApi.generate(prospectId, 'OUTREACH');
                               qc.invalidateQueries({ queryKey: ["proposals", prospectId] });
                               qc.invalidateQueries({ queryKey: ["prospects"] });
-                            } catch (e: any) { alert("Error al generar propuesta: " + e.message); }
+                            } catch (e: any) { alert("Error al generar brief: " + e.message); }
                           }}
                           onGoToTab={() => setTab("propuesta")}
                         />
@@ -2236,8 +2236,8 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                 <div style={{ fontWeight: 600, fontSize: 14, color: "var(--ink-700)", marginBottom: 6 }}>Sin propuesta generada</div>
                 <div style={{ fontSize: 13, color: "var(--ink-400)", lineHeight: 1.6 }}>
                   {rowData?.estado === "LISTO_PROPUESTA"
-                    ? 'Hacé clic en "Siguiente paso" en la pestaña Validación para generar la propuesta.'
-                    : "El prospecto debe estar en estado Listo propuesta para generar una propuesta."}
+                    ? 'Hacé clic en "Siguiente paso" en la pestaña Validación para generar el Outreach Brief.'
+                    : "El prospecto debe estar en estado Listo propuesta para generar el brief."}
                 </div>
               </div>
             )}
@@ -2247,37 +2247,42 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                 {/* Proposal header */}
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, padding: "12px 14px", background: "var(--bg-2)", borderRadius: 10 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-400)", textTransform: "uppercase", marginBottom: 2 }}>Versión {latestProposal.version}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99,
+                        background: latestProposal.proposalType === "OUTREACH" ? "#EDE9FE" : "#DBEAFE",
+                        color: latestProposal.proposalType === "OUTREACH" ? "#6D28D9" : "#1D4ED8" }}>
+                        {latestProposal.proposalType === "OUTREACH" ? "✉ Outreach Brief" : "📋 Propuesta Comercial"}
+                      </span>
+                      <span style={{ fontSize: 11, color: "var(--ink-400)" }}>v{latestProposal.version}</span>
+                      {latestProposal.version > 1 && (
+                        <span style={{ fontSize: 11, color: "var(--ink-400)" }}>· {proposals?.length} versiones</span>
+                      )}
+                    </div>
                     <div style={{ fontSize: 13, fontWeight: 700, color:
                       latestProposal.status === "APPROVED" ? "var(--success)" :
                       latestProposal.status === "REJECTED" ? "var(--danger)" : "var(--warning)" }}>
                       {latestProposal.jobStatus === "PENDING" ? "⏳ En cola…"
-                        : latestProposal.jobStatus === "RUNNING" ? "⚙ Generando propuesta…"
+                        : latestProposal.jobStatus === "RUNNING" ? "⚙ Generando…"
                         : latestProposal.jobStatus === "FAILED" ? "✗ Error al generar"
-                        : latestProposal.status === "APPROVED" ? "✓ Propuesta aprobada"
-                        : latestProposal.status === "REJECTED" ? "✗ Rechazada"
+                        : latestProposal.status === "APPROVED" ? "✓ Aprobado"
+                        : latestProposal.status === "REJECTED" ? "✗ Rechazado"
                         : "📄 Borrador listo para revisión"}
                     </div>
                   </div>
-                  {latestProposal.version > 1 && (
-                    <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, background: "var(--bg-3)", color: "var(--ink-500)" }}>
-                      v{latestProposal.version} de {proposals?.length}
-                    </span>
-                  )}
                 </div>
 
-                {/* In progress state */}
+                {/* In progress */}
                 {(latestProposal.jobStatus === "PENDING" || latestProposal.jobStatus === "RUNNING") && (
                   <div style={{ textAlign: "center", padding: "32px 20px", background: "var(--bg-2)", borderRadius: 12, marginBottom: 16 }}>
                     <div style={{ fontSize: 28, marginBottom: 10 }}>⚙️</div>
                     <div style={{ fontWeight: 600, fontSize: 14, color: "var(--ink-700)", marginBottom: 6 }}>
-                      El Proposal Agent está generando la propuesta…
+                      {latestProposal.proposalType === "OUTREACH" ? "Generando Outreach Brief…" : "Generando Propuesta Comercial…"}
                     </div>
                     <div style={{ fontSize: 12, color: "var(--ink-400)" }}>Actualizando automáticamente cada 5 segundos</div>
                   </div>
                 )}
 
-                {/* Failed state */}
+                {/* Failed */}
                 {latestProposal.jobStatus === "FAILED" && (
                   <div style={{ padding: "14px 16px", borderRadius: 10, background: "#fff5f5", border: "1px solid var(--danger)", marginBottom: 16 }}>
                     <div style={{ fontWeight: 700, color: "var(--danger)", marginBottom: 4 }}>Error al generar</div>
@@ -2285,8 +2290,119 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                   </div>
                 )}
 
-                {/* Proposal content — COMPLETED */}
-                {latestProposal.jobStatus === "COMPLETED" && latestProposal.proposalMarkdown && (
+                {/* OUTREACH BRIEF — structured view */}
+                {latestProposal.jobStatus === "COMPLETED" && latestProposal.proposalData?.proposalType === "OUTREACH" && (() => {
+                  const d = latestProposal.proposalData as any;
+                  return (
+                    <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                      {d.diagnosticoResumen && (
+                        <div style={{ padding: "12px 14px", background: "#F5F3FF", borderRadius: 10, borderLeft: "3px solid #7C3AED" }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#6D28D9", textTransform: "uppercase", marginBottom: 6 }}>Diagnóstico</div>
+                          <div style={{ fontSize: 13, color: "var(--ink-800)", lineHeight: 1.6 }}>{d.diagnosticoResumen}</div>
+                        </div>
+                      )}
+                      {d.problemasDetectados?.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-400)", textTransform: "uppercase", marginBottom: 8 }}>Problemas detectados</div>
+                          {d.problemasDetectados.map((p: any, i: number) => (
+                            <div key={i} style={{ padding: "8px 12px", background: "#FFF7ED", borderRadius: 8, marginBottom: 6, borderLeft: "2px solid #F59E0B" }}>
+                              <div style={{ fontWeight: 600, fontSize: 12.5, color: "#92400E" }}>{p.problema}</div>
+                              <div style={{ fontSize: 12, color: "#78350F", marginTop: 2 }}>{p.impacto}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {d.oportunidades?.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-400)", textTransform: "uppercase", marginBottom: 8 }}>Oportunidades</div>
+                          {d.oportunidades.map((o: any, i: number) => (
+                            <div key={i} style={{ padding: "8px 12px", background: "#ECFDF5", borderRadius: 8, marginBottom: 6, borderLeft: "2px solid #10B981" }}>
+                              <div style={{ fontWeight: 600, fontSize: 12.5, color: "#065F46" }}>{o.oportunidad}</div>
+                              <div style={{ fontSize: 12, color: "#047857", marginTop: 2 }}>{o.beneficio}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {d.recomendacionesGenerales?.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-400)", textTransform: "uppercase", marginBottom: 8 }}>Recomendaciones</div>
+                          {d.recomendacionesGenerales.map((r: string, i: number) => (
+                            <div key={i} style={{ fontSize: 13, color: "var(--ink-700)", padding: "4px 0", borderBottom: "1px solid var(--border-soft)" }}>· {r}</div>
+                          ))}
+                        </div>
+                      )}
+                      {d.cta && (
+                        <div style={{ padding: "14px 16px", background: "#EDE9FE", borderRadius: 10, borderLeft: "3px solid #7C3AED" }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#6D28D9", textTransform: "uppercase", marginBottom: 6 }}>CTA — Primer mensaje</div>
+                          <div style={{ fontSize: 13.5, color: "#4C1D95", fontWeight: 500, lineHeight: 1.6 }}>"{d.cta}"</div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* COMMERCIAL — packages view */}
+                {latestProposal.jobStatus === "COMPLETED" && latestProposal.proposalData?.proposalType === "COMMERCIAL" && (() => {
+                  const d = latestProposal.proposalData as any;
+                  return (
+                    <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                      {d.resumenEjecutivo && (
+                        <div style={{ padding: "12px 14px", background: "#EFF6FF", borderRadius: 10, borderLeft: "3px solid #3B82F6" }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#1D4ED8", textTransform: "uppercase", marginBottom: 6 }}>Resumen</div>
+                          <div style={{ fontSize: 13, color: "var(--ink-800)", lineHeight: 1.6 }}>{d.resumenEjecutivo}</div>
+                        </div>
+                      )}
+                      {d.paquetes?.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-400)", textTransform: "uppercase", marginBottom: 10 }}>Planes</div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                            {d.paquetes.map((pkg: any, i: number) => (
+                              <div key={i} style={{ padding: "12px 14px", borderRadius: 10,
+                                background: pkg.destacado ? "#EEF2FF" : "var(--bg-2)",
+                                border: pkg.destacado ? "2px solid #6366F1" : "1px solid var(--border-soft)" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                                  <div style={{ fontWeight: 700, fontSize: 13, color: pkg.destacado ? "#4338CA" : "var(--ink-800)" }}>
+                                    {pkg.destacado ? "⭐ " : ""}{pkg.nombre}
+                                  </div>
+                                  {(pkg.ticketRange || pkg.pricing) && (
+                                    <span style={{ fontSize: 12, fontWeight: 600, color: pkg.destacado ? "#4338CA" : "var(--ink-500)", whiteSpace: "nowrap" }}>
+                                      {pkg.ticketRange ?? `USD ${pkg.pricing?.setup}${pkg.pricing?.mensual ? ` + ${pkg.pricing.mensual}/mes` : ''}`}
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: 12, color: "var(--ink-600)", marginBottom: 6 }}>{pkg.descripcion}</div>
+                                {pkg.incluye?.length > 0 && (
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                                    {pkg.incluye.map((item: string, j: number) => (
+                                      <span key={j} style={{ fontSize: 11, padding: "2px 7px", borderRadius: 6, background: pkg.destacado ? "#C7D2FE" : "var(--bg-3)", color: pkg.destacado ? "#3730A3" : "var(--ink-600)" }}>{item}</span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {d.preguntasCalificacion?.length > 0 && (
+                        <div style={{ padding: "12px 14px", background: "#FFFBEB", borderRadius: 10, borderLeft: "3px solid #F59E0B" }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#92400E", textTransform: "uppercase", marginBottom: 8 }}>Preguntas de calificación</div>
+                          {d.preguntasCalificacion.map((q: string, i: number) => (
+                            <div key={i} style={{ fontSize: 12.5, color: "#78350F", padding: "3px 0" }}>{i + 1}. {q}</div>
+                          ))}
+                        </div>
+                      )}
+                      {d.cta && (
+                        <div style={{ padding: "12px 14px", background: "#EFF6FF", borderRadius: 10 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#1D4ED8", textTransform: "uppercase", marginBottom: 6 }}>Próximo paso</div>
+                          <div style={{ fontSize: 13, color: "var(--ink-800)", lineHeight: 1.6 }}>{d.cta}</div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Fallback: raw markdown (no structured data) */}
+                {latestProposal.jobStatus === "COMPLETED" && !latestProposal.proposalData?.proposalType && latestProposal.proposalMarkdown && (
                   <div style={{ marginBottom: 16 }}>
                     <div style={{ background: "var(--bg-2)", borderRadius: 10, padding: "16px", fontSize: 13, lineHeight: 1.7, color: "var(--ink-800)", whiteSpace: "pre-wrap", fontFamily: "inherit", maxHeight: 400, overflowY: "auto" }}>
                       {latestProposal.proposalMarkdown}
@@ -2294,7 +2410,7 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                   </div>
                 )}
 
-                {/* Action buttons — only for DRAFT + COMPLETED */}
+                {/* Action buttons — DRAFT + COMPLETED */}
                 {latestProposal.status === "DRAFT" && latestProposal.jobStatus === "COMPLETED" && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <button
@@ -2306,7 +2422,7 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                         } catch (e: any) { alert("Error al aprobar: " + e.message); }
                       }}
                       style={{ width: "100%", padding: "12px 0", borderRadius: 10, border: "1px solid var(--success)", background: "var(--success)", color: "#fff", fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
-                      ✓ Aprobar propuesta → LISTO OUTREACH
+                      ✓ Aprobar → LISTO OUTREACH
                     </button>
                     <div style={{ display: "flex", gap: 8 }}>
                       <button
@@ -2335,12 +2451,12 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                   </div>
                 )}
 
-                {/* Approved state */}
+                {/* Approved */}
                 {latestProposal.status === "APPROVED" && (
                   <div style={{ padding: "14px 16px", borderRadius: 10, background: "#ecfdf5", border: "1px solid var(--success)", display: "flex", alignItems: "center", gap: 10 }}>
                     <span style={{ fontSize: 20 }}>✓</span>
                     <div>
-                      <div style={{ fontWeight: 700, color: "#065f46" }}>Propuesta aprobada</div>
+                      <div style={{ fontWeight: 700, color: "#065f46" }}>Brief aprobado</div>
                       <div style={{ fontSize: 12, color: "#047857", marginTop: 2 }}>Prospecto avanzó a LISTO OUTREACH</div>
                     </div>
                   </div>

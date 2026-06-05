@@ -9,28 +9,93 @@ import { PrismaService } from '../../database/prisma.service';
 import { spawn } from 'child_process';
 import * as path from 'path';
 
-interface ProposalData {
-  resumenEjecutivo?: string;
-  diagnostico?: string;
-  problemasDetectados?: Array<{ problema: string; impacto: string }>;
-  objetivos?: string[];
-  serviciosRecomendados?: Array<{
-    nombre: string;
-    descripcion: string;
-    precio: number;
-    billingModel: string;
-    prioridad: string;
-  }>;
-  pricing?: {
-    setup: number;
-    mensual: number;
-    total12Meses: number;
-    nota: string;
-  };
-  cronograma?: Array<{ semana: number; entregable: string }>;
-  justificacion?: string;
-  cta?: string;
+// ── Tipos de salida del agente ───────────────────────────────────────────────
+
+/** Stage 1: Conseguir respuesta. Sin precios, sin cierre. */
+interface OutreachBriefData {
+  proposalType: 'OUTREACH';
+  problemasDetectados: Array<{ problema: string; impacto: string }>;
+  oportunidades: Array<{ oportunidad: string; beneficio: string }>;
+  riesgos: string[];
+  recomendacionesGenerales: string[];
+  diagnosticoResumen: string;
+  cta: string; // Siempre "¿Te gustaría recibirlo?" o variante
 }
+
+/** Stage 2: Propuesta completa tras interacción positiva. */
+interface CommercialProposalData {
+  proposalType: 'COMMERCIAL';
+  resumenEjecutivo: string;
+  diagnostico: string;
+  problemasDetectados: Array<{ problema: string; impacto: string }>;
+  objetivos: string[];
+  paquetes: Array<{
+    nombre: 'Esencial' | 'Crecimiento' | 'Completo';
+    descripcion: string;
+    incluye: string[];
+    ticketRange?: string;   // ARGENTINA/LATAM — rangos, no números exactos
+    pricing?: { setup: number; mensual: number }; // USA/CANADA/EUROPE
+    destacado?: boolean;
+  }>;
+  paqueteRecomendado: 'Esencial' | 'Crecimiento' | 'Completo';
+  preguntasCalificacion?: string[]; // max 3 — para mercados de entrada
+  justificacion: string;
+  cta: string;
+}
+
+type ProposalData = OutreachBriefData | CommercialProposalData;
+
+// ── Estrategias por mercado ──────────────────────────────────────────────────
+
+const MARKET_CONFIG: Record<string, {
+  strategy: string;
+  pricingStyle: 'ranges' | 'exact';
+  esencialRange: string;
+  crecimientoRange: string;
+  completoRange: string;
+  avoidAnnualTotal: boolean;
+}> = {
+  ARGENTINA: {
+    strategy: 'Reducir fricción. Mostrar paquetes de entrada. Generar confianza antes de pedir inversión. NUNCA mostrar inversión anual completa.',
+    pricingStyle: 'ranges',
+    esencialRange: 'USD 300–600 (setup único)',
+    crecimientoRange: 'USD 600–1.200 (setup) + desde USD 150/mes',
+    completoRange: 'USD 1.200–2.500 (setup) + desde USD 300/mes',
+    avoidAnnualTotal: true,
+  },
+  LATAM: {
+    strategy: 'ROI rápido. Implementación gradual. Mostrar paquetes escalables. Evitar contratos extensos.',
+    pricingStyle: 'ranges',
+    esencialRange: 'USD 400–800',
+    crecimientoRange: 'USD 800–1.800',
+    completoRange: 'USD 1.800–3.500',
+    avoidAnnualTotal: true,
+  },
+  USA: {
+    strategy: 'Mayor valor percibido. Propuestas completas. Tickets premium. Permitir servicios avanzados.',
+    pricingStyle: 'exact',
+    esencialRange: 'USD 1.500–3.000',
+    crecimientoRange: 'USD 3.000–6.000',
+    completoRange: 'USD 6.000–15.000+',
+    avoidAnnualTotal: false,
+  },
+  CANADA: {
+    strategy: 'Similar a USA. Mayor valor percibido. Profesionalismo. Servicios premium.',
+    pricingStyle: 'exact',
+    esencialRange: 'CAD 1.500–3.000',
+    crecimientoRange: 'CAD 3.000–6.000',
+    completoRange: 'CAD 6.000–15.000+',
+    avoidAnnualTotal: false,
+  },
+  EUROPE: {
+    strategy: 'Profesionalismo. Compliance. Escalabilidad. Retorno a largo plazo.',
+    pricingStyle: 'exact',
+    esencialRange: 'EUR 1.200–2.500',
+    crecimientoRange: 'EUR 2.500–5.000',
+    completoRange: 'EUR 5.000–12.000+',
+    avoidAnnualTotal: false,
+  },
+};
 
 @Injectable()
 export class ProposalsService {
@@ -41,14 +106,23 @@ export class ProposalsService {
 
   // ── Public API ────────────────────────────────────────────────────────────────
 
-  async generate(prospectId: string, tenantId: string, userId: string) {
-    const prospect = await this.prisma.prospect.findFirst({
-      where: { id: prospectId, tenantId, deletedAt: null },
-      include: {
-        validation: true,
-        enrichmentResult: true,
-      },
-    });
+  async generate(
+    prospectId: string,
+    tenantId: string,
+    userId: string,
+    proposalType: 'OUTREACH' | 'COMMERCIAL' = 'OUTREACH',
+  ) {
+    const [prospect, tenant] = await Promise.all([
+      this.prisma.prospect.findFirst({
+        where: { id: prospectId, tenantId, deletedAt: null },
+        include: { validation: true, enrichmentResult: true },
+      }),
+      this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { marketProfile: true },
+      }),
+    ]);
+
     if (!prospect) throw new NotFoundException(`Prospecto ${prospectId} no encontrado`);
 
     // Gate 1: prospect must be in LISTO_PROPUESTA
@@ -62,7 +136,7 @@ export class ProposalsService {
     // Gate 2: enrichment must be APPROVED
     if (!prospect.enrichmentResult || prospect.enrichmentResult.reviewStatus !== 'APPROVED') {
       throw new BadRequestException(
-        `El enriquecimiento no fue aprobado por un humano. ` +
+        `El enriquecimiento no fue aprobado. ` +
         `Aprobá los datos de contacto antes de generar una propuesta.`,
       );
     }
@@ -79,7 +153,7 @@ export class ProposalsService {
       );
     }
 
-    // Compute next version number
+    // Compute next version
     const lastProposal = await this.prisma.proposal.findFirst({
       where: { prospectId, tenantId },
       orderBy: { version: 'desc' },
@@ -93,20 +167,26 @@ export class ProposalsService {
         prospectId,
         version,
         parentProposalId: lastProposal?.id ?? null,
+        proposalType,
         status: 'DRAFT',
         generatedBy: 'proposal-agent',
         jobStatus: 'PENDING',
       },
     });
 
-    // Load catalog items for pricing
-    const catalog = await this.prisma.serviceCatalogItem.findMany({
-      where: { tenantId, activo: true },
-      select: { nombre: true, descripcionDefault: true, precioBaseUsd: true, billingModelDefault: true, categoria: true },
-    });
+    const marketProfile = (tenant?.marketProfile ?? 'ARGENTINA') as string;
+
+    // Load catalog only for COMMERCIAL proposals
+    let catalog: any[] = [];
+    if (proposalType === 'COMMERCIAL') {
+      catalog = await this.prisma.serviceCatalogItem.findMany({
+        where: { tenantId, activo: true },
+        select: { nombre: true, descripcionDefault: true, precioBaseUsd: true, billingModelDefault: true, categoria: true },
+      });
+    }
 
     setImmediate(() =>
-      this.runProposalAgent(proposal.id, tenantId, prospect, catalog).catch(err =>
+      this.runProposalAgent(proposal.id, tenantId, prospect, catalog, proposalType, marketProfile).catch(err =>
         this.logger.error(`[ProposalJob ${proposal.id}] Unhandled: ${err.message}`),
       ),
     );
@@ -131,21 +211,17 @@ export class ProposalsService {
   async approve(proposalId: string, tenantId: string, userId: string) {
     const proposal = await this.prisma.proposal.findFirst({
       where: { id: proposalId, tenantId },
-      include: {
-        prospect: {
-          include: { enrichmentResult: true },
-        },
-      },
+      include: { prospect: { include: { enrichmentResult: true } } },
     });
     if (!proposal) throw new NotFoundException(`Propuesta ${proposalId} no encontrada`);
     if (proposal.status !== 'DRAFT') {
       throw new BadRequestException(`Solo se puede aprobar una propuesta en estado DRAFT (actual: ${proposal.status})`);
     }
     if (proposal.jobStatus !== 'COMPLETED') {
-      throw new BadRequestException(`La propuesta no terminó de generarse aún (jobStatus: ${proposal.jobStatus})`);
+      throw new BadRequestException(`La propuesta no terminó de generarse (jobStatus: ${proposal.jobStatus})`);
     }
 
-    // Gate: enrichment must still be APPROVED before advancing to LISTO_OUTREACH
+    // Gate: enrichment must still be APPROVED
     const enrichment = proposal.prospect.enrichmentResult;
     if (!enrichment || enrichment.reviewStatus !== 'APPROVED') {
       throw new BadRequestException(
@@ -165,19 +241,15 @@ export class ProposalsService {
     ]);
 
     this.logger.log(`[Proposal ${proposalId}] APPROVED → prospect ${proposal.prospectId} → LISTO_OUTREACH`);
-
     return this.prisma.proposal.findUnique({ where: { id: proposalId } });
   }
 
   async reject(proposalId: string, tenantId: string, rejectionReason: string) {
-    const proposal = await this.prisma.proposal.findFirst({
-      where: { id: proposalId, tenantId },
-    });
+    const proposal = await this.prisma.proposal.findFirst({ where: { id: proposalId, tenantId } });
     if (!proposal) throw new NotFoundException(`Propuesta ${proposalId} no encontrada`);
     if (proposal.status !== 'DRAFT') {
       throw new BadRequestException(`Solo se puede rechazar una propuesta en estado DRAFT`);
     }
-
     return this.prisma.proposal.update({
       where: { id: proposalId },
       data: { status: 'REJECTED', rejectionReason },
@@ -187,20 +259,16 @@ export class ProposalsService {
   async regenerate(proposalId: string, tenantId: string, userId: string) {
     const existing = await this.prisma.proposal.findFirst({
       where: { id: proposalId, tenantId },
-      include: {
-        prospect: { include: { validation: true, enrichmentResult: true } },
-      },
+      include: { prospect: { include: { validation: true, enrichmentResult: true } } },
     });
     if (!existing) throw new NotFoundException(`Propuesta ${proposalId} no encontrada`);
 
-    // Mark old version as rejected
     await this.prisma.proposal.update({
       where: { id: proposalId },
       data: { status: 'REJECTED', rejectionReason: 'Regenerada por usuario' },
     });
 
-    // Delegate to generate() — it will compute next version and set parentProposalId correctly
-    return this.generate(existing.prospectId, tenantId, userId);
+    return this.generate(existing.prospectId, tenantId, userId, existing.proposalType as 'OUTREACH' | 'COMMERCIAL');
   }
 
   // ── Agent ──────────────────────────────────────────────────────────────────────
@@ -210,20 +278,26 @@ export class ProposalsService {
     tenantId: string,
     prospect: any,
     catalog: any[],
+    proposalType: 'OUTREACH' | 'COMMERCIAL',
+    marketProfile: string,
   ) {
     await this.prisma.proposal.update({
       where: { id: proposalId },
       data: { jobStatus: 'RUNNING', startedAt: new Date() },
     });
 
-    this.logger.log(`[ProposalJob ${proposalId}] Start — ${prospect.nombreEmpresa}`);
+    this.logger.log(`[ProposalJob ${proposalId}] Start — ${prospect.nombreEmpresa} | type:${proposalType} | market:${marketProfile}`);
 
     try {
-      const prompt = this.buildPrompt(prospect, catalog);
-      const raw = await this.spawnClaude(prompt, 'claude-sonnet-4-6', 120_000);
+      const prompt = proposalType === 'OUTREACH'
+        ? this.buildOutreachPrompt(prospect, marketProfile)
+        : this.buildCommercialPrompt(prospect, catalog, marketProfile);
 
-      const data = this.parseProposalOutput(raw);
-      const markdown = this.toMarkdown(data, prospect);
+      const raw = await this.spawnClaude(prompt, 'claude-sonnet-4-6', 120_000);
+      const data = this.parseAgentOutput(raw);
+      const markdown = proposalType === 'OUTREACH'
+        ? this.toOutreachMarkdown(data as OutreachBriefData, prospect)
+        : this.toCommercialMarkdown(data as CommercialProposalData, prospect);
 
       await this.prisma.proposal.update({
         where: { id: proposalId },
@@ -246,97 +320,223 @@ export class ProposalsService {
     }
   }
 
-  private buildPrompt(prospect: any, catalog: any[]): string {
+  // ── Outreach Brief Prompt ─────────────────────────────────────────────────────
+
+  private buildOutreachPrompt(prospect: any, marketProfile: string): string {
     const v = prospect.validation;
     const e = prospect.enrichmentResult;
+    const market = MARKET_CONFIG[marketProfile] ?? MARKET_CONFIG['ARGENTINA'];
 
-    const catalogLines = catalog
-      .map(c => `- ${c.nombre}: USD ${Number(c.precioBaseUsd)} (${c.billingModelDefault}) — ${c.descripcionDefault ?? ''}`)
-      .join('\n');
+    return `Sos un especialista en prospección B2B para agencias de marketing digital en ${marketProfile}.
 
-    const serviciosRecomendados = v?.servicesRecommended?.length
-      ? v.servicesRecommended.join(', ')
-      : prospect.servicioSugerido ?? 'No especificado';
-
-    return `Sos un consultor estratégico digital especializado en agencias de marketing para PYMES latinoamericanas. Tu tarea es generar una propuesta comercial profesional y personalizada.
+CONTEXTO ESTRATÉGICO:
+El objetivo de este mensaje NO es vender ni cerrar. Es conseguir UNA RESPUESTA del prospecto.
+No pedir reunión todavía. No mostrar precios. No listar servicios con costos.
+El CTA debe ser una pregunta simple sobre si le interesa recibir un diagnóstico gratuito.
+Estrategia de mercado: ${market.strategy}
 
 DATOS DEL PROSPECTO:
 - Empresa: ${prospect.nombreEmpresa}
 - Rubro: ${prospect.rubro ?? 'No especificado'}
-- Ubicación: ${[prospect.ciudad, prospect.pais].filter(Boolean).join(', ') || 'No especificada'}
+- País/Ciudad: ${[prospect.ciudad, prospect.pais].filter(Boolean).join(', ') || 'No especificado'}
 - Website: ${prospect.website ?? 'Sin web'}
 
-OPORTUNIDAD DETECTADA:
+OPORTUNIDAD DETECTADA POR RESEARCH AGENT:
 ${prospect.oportunidadDetectada ?? 'No especificada'}
 
 PROBLEMAS IDENTIFICADOS:
 ${(prospect.problemasEncontrados ?? []).map((p: string) => `- ${p}`).join('\n') || '- No especificados'}
 
-EVALUACIÓN DE OPORTUNIDAD (Opportunity Agent):
-- Opportunity Score: ${v?.agentScore ?? 'N/A'} / 100
-- Ticket estimado: USD ${v?.estimatedTicketUsd ?? 'N/A'}
-- Servicios recomendados: ${serviciosRecomendados}
-- Razonamiento del agente: ${v?.reasoning ?? 'No disponible'}
-${v?.decisionFactors ? `- Factores: Problema=${v.decisionFactors.problemScore}, Prioridad=${v.decisionFactors.priorityScore}, Fit=${v.decisionFactors.fitScore}, Ticket=${v.decisionFactors.ticketScore}` : ''}
+EVALUACIÓN DE OPORTUNIDAD:
+- Score: ${v?.agentScore ?? 'N/A'} / 100
+- Servicios potenciales: ${v?.servicesRecommended?.join(', ') ?? prospect.servicioSugerido ?? 'N/A'}
+- Razonamiento: ${v?.reasoning ?? 'No disponible'}
 
-DATOS DE CONTACTO (Enrichment):
-- Contactabilidad: ${e?.contactabilityScore ?? 'N/A'} / 100
-- Decisor: ${e?.nombreDecidsor ?? 'No identificado'}${e?.rolDecidsor ? ` (${e.rolDecidsor})` : ''}
+DATOS DE CONTACTABILIDAD:
+- Score contactabilidad: ${e?.contactabilityScore ?? 'N/A'} / 100
+- Decisor identificado: ${e?.nombreDecidsor ?? 'No identificado'}${e?.rolDecidsor ? ` (${e.rolDecidsor})` : ''}
 
-CATÁLOGO DE SERVICIOS DISPONIBLES (usar precios exactos del catálogo, sin modificar):
-${catalogLines}
-
-INSTRUCCIONES:
-1. Generá una propuesta personalizada para esta empresa específica
-2. Usá los precios EXACTOS del catálogo — no inventes precios ni hagas descuentos
-3. Elegí solo los servicios que realmente resuelven los problemas detectados
-4. El diagnóstico debe mencionar situaciones concretas de esta empresa
-5. El CTA debe ser directo y orientado a agendar una reunión
-6. Respondé SOLO con JSON válido (sin markdown, sin texto adicional)
+INSTRUCCIONES CRÍTICAS:
+1. NO mostrar precios ni inversiones en este brief
+2. NO pedir logo, manual de marca, historia corporativa ni material de branding
+3. NO proponer reunión directamente
+4. El CTA debe ser tipo: "¿Te gustaría recibirlo?" referido a un diagnóstico gratuito
+5. Máximo 1 página de contenido (breve y directo)
+6. Respondé SOLO con JSON válido
 
 {
-  "resumenEjecutivo": "string — 2-3 oraciones sobre la oportunidad",
-  "diagnostico": "string — situación actual de la empresa, sus problemas y el impacto en el negocio",
-  "problemasDetectados": [{"problema": "string", "impacto": "string"}],
-  "objetivos": ["string"],
-  "serviciosRecomendados": [
-    {
-      "nombre": "string — nombre exacto del catálogo",
-      "descripcion": "string — por qué este servicio para esta empresa",
-      "precio": number,
-      "billingModel": "UNICO|MENSUAL|POR_HORAS",
-      "prioridad": "ALTA|MEDIA|BAJA"
-    }
+  "proposalType": "OUTREACH",
+  "problemasDetectados": [
+    {"problema": "string — problema concreto de esta empresa", "impacto": "string — impacto real en el negocio"}
   ],
-  "pricing": {
-    "setup": number,
-    "mensual": number,
-    "total12Meses": number,
-    "nota": "string"
-  },
-  "cronograma": [{"semana": number, "entregable": "string"}],
-  "justificacion": "string — por qué esta propuesta es la correcta para esta empresa",
-  "cta": "string — llamada a la acción concreta"
+  "oportunidades": [
+    {"oportunidad": "string — oportunidad específica detectada", "beneficio": "string — beneficio concreto que obtendría"}
+  ],
+  "riesgos": ["string — riesgo de no actuar ahora"],
+  "recomendacionesGenerales": ["string — recomendación general sin mencionar precios ni servicios específicos"],
+  "diagnosticoResumen": "string — párrafo breve (3-4 oraciones) describiendo la situación actual de la empresa y el potencial detectado. Tono consultivo, no vendedor.",
+  "cta": "string — pregunta simple orientada a conseguir respuesta. Ejemplo: '¿Te gustaría recibir un diagnóstico breve y gratuito sobre la presencia digital de [empresa]?' NO 'Agendemos una llamada'."
 }`;
   }
 
-  private parseProposalOutput(raw: string): ProposalData {
+  // ── Commercial Proposal Prompt ────────────────────────────────────────────────
+
+  private buildCommercialPrompt(prospect: any, catalog: any[], marketProfile: string): string {
+    const v = prospect.validation;
+    const e = prospect.enrichmentResult;
+    const market = MARKET_CONFIG[marketProfile] ?? MARKET_CONFIG['ARGENTINA'];
+    const isHighValueMarket = ['USA', 'CANADA', 'EUROPE'].includes(marketProfile);
+
+    const catalogLines = catalog.length
+      ? catalog.map(c => `- ${c.nombre}: USD ${Number(c.precioBaseUsd)} (${c.billingModelDefault}) — ${c.descripcionDefault ?? ''}`).join('\n')
+      : 'Sin items en catálogo — usá precios de referencia del mercado';
+
+    const pricingInstructions = isHighValueMarket
+      ? `Usá los precios EXACTOS del catálogo. Podés mostrar inversión total.`
+      : `NO uses precios exactos del catálogo. Usá RANGOS: Esencial ${market.esencialRange}, Crecimiento ${market.crecimientoRange}, Completo ${market.completoRange}. ${market.avoidAnnualTotal ? 'NO mostrar total anual.' : ''}`;
+
+    return `Sos un consultor estratégico digital especializado para el mercado ${marketProfile}. Tu tarea es generar una propuesta comercial estructurada.
+
+IMPORTANTE: Esta propuesta se genera DESPUÉS de que el prospecto mostró interés. Es el segundo contacto.
+Estrategia de mercado: ${market.strategy}
+
+DATOS DEL PROSPECTO:
+- Empresa: ${prospect.nombreEmpresa}
+- Rubro: ${prospect.rubro ?? 'No especificado'}
+- País/Ciudad: ${[prospect.ciudad, prospect.pais].filter(Boolean).join(', ') || 'No especificado'}
+- Website: ${prospect.website ?? 'Sin web'}
+
+OPORTUNIDAD:
+${prospect.oportunidadDetectada ?? 'No especificada'}
+
+PROBLEMAS IDENTIFICADOS:
+${(prospect.problemasEncontrados ?? []).map((p: string) => `- ${p}`).join('\n') || '- No especificados'}
+
+EVALUACIÓN DE OPORTUNIDAD:
+- Score: ${v?.agentScore ?? 'N/A'} / 100
+- Ticket estimado: USD ${v?.estimatedTicketUsd ?? 'N/A'}
+- Servicios recomendados: ${v?.servicesRecommended?.join(', ') ?? prospect.servicioSugerido ?? 'N/A'}
+- Razonamiento: ${v?.reasoning ?? 'No disponible'}
+
+CATÁLOGO DE SERVICIOS:
+${catalogLines}
+
+INSTRUCCIONES DE PRICING:
+${pricingInstructions}
+
+INSTRUCCIONES GENERALES:
+1. Construir SIEMPRE tres paquetes: Esencial, Crecimiento (destacado), Completo
+2. Esencial: resolver el problema principal con menor inversión
+3. Crecimiento: balance costo-beneficio — DEBE ser la opción destacada
+4. Completo: máximo impacto, todos los servicios relevantes
+${!isHighValueMarket ? '5. Incluir 2-3 preguntas de calificación para el siguiente contacto (ej: "¿Actualmente trabajan con alguien de marketing?")' : ''}
+6. Respondé SOLO con JSON válido
+
+{
+  "proposalType": "COMMERCIAL",
+  "resumenEjecutivo": "string — 2-3 oraciones sobre la oportunidad",
+  "diagnostico": "string — situación actual, problemas, impacto en el negocio",
+  "problemasDetectados": [{"problema": "string", "impacto": "string"}],
+  "objetivos": ["string"],
+  "paquetes": [
+    {
+      "nombre": "Esencial",
+      "descripcion": "string — qué problema resuelve este paquete",
+      "incluye": ["string — servicio o entregable incluido"],
+      ${isHighValueMarket ? '"pricing": {"setup": number, "mensual": number},' : `"ticketRange": "string — rango como '${market.esencialRange}'",`}
+      "destacado": false
+    },
+    {
+      "nombre": "Crecimiento",
+      "descripcion": "string",
+      "incluye": ["string"],
+      ${isHighValueMarket ? '"pricing": {"setup": number, "mensual": number},' : `"ticketRange": "string — rango como '${market.crecimientoRange}'",`}
+      "destacado": true
+    },
+    {
+      "nombre": "Completo",
+      "descripcion": "string",
+      "incluye": ["string"],
+      ${isHighValueMarket ? '"pricing": {"setup": number, "mensual": number},' : `"ticketRange": "string — rango como '${market.completoRange}'",`}
+      "destacado": false
+    }
+  ],
+  "paqueteRecomendado": "Crecimiento",
+  ${!isHighValueMarket ? '"preguntasCalificacion": ["string — máximo 3 preguntas breves para calificar al prospecto"],' : ''}
+  "justificacion": "string — por qué esta propuesta es la correcta para esta empresa",
+  "cta": "string — próximo paso concreto"
+}`;
+  }
+
+  // ── Parser ─────────────────────────────────────────────────────────────────────
+
+  private parseAgentOutput(raw: string): ProposalData {
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       this.logger.warn('ProposalAgent: no JSON found in output');
-      return {};
+      return { proposalType: 'OUTREACH', problemasDetectados: [], oportunidades: [], riesgos: [], recomendacionesGenerales: [], diagnosticoResumen: '', cta: '' };
     }
     try {
       return JSON.parse(jsonMatch[0]) as ProposalData;
     } catch {
       this.logger.warn('ProposalAgent: JSON parse error');
-      return {};
+      return { proposalType: 'OUTREACH', problemasDetectados: [], oportunidades: [], riesgos: [], recomendacionesGenerales: [], diagnosticoResumen: '', cta: '' };
     }
   }
 
-  private toMarkdown(data: ProposalData, prospect: any): string {
-    const lines: string[] = [];
+  // ── Markdown renderers ────────────────────────────────────────────────────────
 
+  private toOutreachMarkdown(data: OutreachBriefData, prospect: any): string {
+    const lines: string[] = [];
+    lines.push(`# Outreach Brief — ${prospect.nombreEmpresa}`);
+    lines.push('');
+
+    if (data.diagnosticoResumen) {
+      lines.push('## Diagnóstico');
+      lines.push(data.diagnosticoResumen);
+      lines.push('');
+    }
+
+    if (data.problemasDetectados?.length) {
+      lines.push('## Problemas Detectados');
+      data.problemasDetectados.forEach(p => {
+        lines.push(`**${p.problema}**`);
+        lines.push(`_${p.impacto}_`);
+        lines.push('');
+      });
+    }
+
+    if (data.oportunidades?.length) {
+      lines.push('## Oportunidades');
+      data.oportunidades.forEach(o => {
+        lines.push(`**${o.oportunidad}**`);
+        lines.push(`_${o.beneficio}_`);
+        lines.push('');
+      });
+    }
+
+    if (data.riesgos?.length) {
+      lines.push('## Riesgos de No Actuar');
+      data.riesgos.forEach(r => lines.push(`- ${r}`));
+      lines.push('');
+    }
+
+    if (data.recomendacionesGenerales?.length) {
+      lines.push('## Recomendaciones');
+      data.recomendacionesGenerales.forEach(r => lines.push(`- ${r}`));
+      lines.push('');
+    }
+
+    if (data.cta) {
+      lines.push('## Próximo Paso');
+      lines.push(data.cta);
+    }
+
+    return lines.join('\n');
+  }
+
+  private toCommercialMarkdown(data: CommercialProposalData, prospect: any): string {
+    const lines: string[] = [];
     lines.push(`# Propuesta Comercial — ${prospect.nombreEmpresa}`);
     lines.push('');
 
@@ -356,7 +556,7 @@ INSTRUCCIONES:
       lines.push('## Problemas Detectados');
       data.problemasDetectados.forEach(p => {
         lines.push(`**${p.problema}**`);
-        lines.push(`_Impacto: ${p.impacto}_`);
+        lines.push(`_${p.impacto}_`);
         lines.push('');
       });
     }
@@ -367,28 +567,30 @@ INSTRUCCIONES:
       lines.push('');
     }
 
-    if (data.serviciosRecomendados?.length) {
-      lines.push('## Servicios Recomendados');
-      data.serviciosRecomendados.forEach(s => {
-        const precio = s.billingModel === 'MENSUAL' ? `USD ${s.precio}/mes` : `USD ${s.precio}`;
-        lines.push(`### ${s.nombre} — ${precio}`);
-        lines.push(s.descripcion);
+    if (data.paquetes?.length) {
+      lines.push('## Planes');
+      lines.push('');
+      data.paquetes.forEach(pkg => {
+        const star = pkg.destacado ? ' ⭐ (Recomendado)' : '';
+        lines.push(`### Plan ${pkg.nombre}${star}`);
+        lines.push(pkg.descripcion);
+        if (pkg.incluye?.length) {
+          lines.push('');
+          lines.push('**Incluye:**');
+          pkg.incluye.forEach(i => lines.push(`- ${i}`));
+        }
+        if (pkg.ticketRange) lines.push(`\n_Inversión referencial: ${pkg.ticketRange}_`);
+        if (pkg.pricing) {
+          if (pkg.pricing.setup) lines.push(`\n_Setup: USD ${pkg.pricing.setup}_`);
+          if (pkg.pricing.mensual) lines.push(`_Fee mensual: USD ${pkg.pricing.mensual}_`);
+        }
         lines.push('');
       });
     }
 
-    if (data.pricing) {
-      lines.push('## Inversión');
-      if (data.pricing.setup > 0) lines.push(`- **Setup inicial:** USD ${data.pricing.setup}`);
-      if (data.pricing.mensual > 0) lines.push(`- **Fee mensual:** USD ${data.pricing.mensual}/mes`);
-      if (data.pricing.total12Meses > 0) lines.push(`- **Total 12 meses:** USD ${data.pricing.total12Meses}`);
-      if (data.pricing.nota) lines.push(`_${data.pricing.nota}_`);
-      lines.push('');
-    }
-
-    if (data.cronograma?.length) {
-      lines.push('## Cronograma');
-      data.cronograma.forEach(c => lines.push(`- **Semana ${c.semana}:** ${c.entregable}`));
+    if (data.preguntasCalificacion?.length) {
+      lines.push('## Preguntas para el Próximo Contacto');
+      data.preguntasCalificacion.forEach(q => lines.push(`- ${q}`));
       lines.push('');
     }
 
@@ -406,6 +608,8 @@ INSTRUCCIONES:
     return lines.join('\n');
   }
 
+  // ── Claude spawner ────────────────────────────────────────────────────────────
+
   private spawnClaude(prompt: string, model: string, timeoutMs: number): Promise<string> {
     return new Promise((resolve, reject) => {
       const args = [
@@ -413,7 +617,6 @@ INSTRUCCIONES:
         '--output-format', 'text',
         '--dangerously-skip-permissions',
         '--model', model,
-        // No WebFetch/WebSearch — proposal builds from DB snapshot only
       ];
       this.logger.log(`Spawning claude | model: ${model}`);
 
