@@ -1087,7 +1087,7 @@ function ChannelTag({ ch, sm }) {
   );
 }
 
-/* Score de oportunidad — 0..100 with color band */
+/* Research Score ring — 0..100 with color band */
 function Score({ v }) {
   const tone = v >= 90 ? "#10B981" : v >= 75 ? "#5B5BF7" : v >= 60 ? "#F59E0B" : "#9CA3AF";
   return (
@@ -1377,7 +1377,7 @@ const PROSPECTS_DATA = [
 
 // ── Estado labels y tones ─────────────────────────────────────────────────────
 const ESTADO_LABEL = {
-  NUEVO: "Nuevo", INVESTIGADO: "Investigando", ENRIQUECIDO: "Enriquecido",
+  NUEVO: "Nuevo", INVESTIGADO: "Investigado", ENRIQUECIDO: "Enriquecido",
   LISTO_OUTREACH: "Listo", CONTACTADO: "Contactado", RESPONDIO: "Respondió",
   REUNION_AGENDADA: "Reunión", PASO_A_PIPELINE: "Pipeline",
   CONVERTIDO: "Ganado", DESCARTADO: "Descartado", ARCHIVADO: "Archivado",
@@ -2504,6 +2504,7 @@ function Prospects({ onNav }) {
       opp: p.oportunidadDetectada ?? p.problemasEncontrados?.slice(0, 2).join(" · ") ?? "—",
       svc: p.servicioSugerido ?? validationById[p.id]?.servicesRecommended?.[0] ?? "—",
       score: p.score,
+      opportunityScore: validationById[p.id]?.agentScore ?? null,
       commercialScore: p.commercialScore ?? null,
       aiState: aiStateFromScore(validationById[p.id]?.agentScore),
       state: ESTADO_LABEL[p.estado] ?? p.estado,
@@ -2790,7 +2791,7 @@ function Prospects({ onNav }) {
                 <th>Web · IG</th>
                 <th>Oportunidad detectada</th>
                 <th>Servicio sugerido</th>
-                <th style={{ width: 70 }}>Score</th>
+                <th style={{ width: 80 }}>Research · Opp.</th>
                 <th style={{ width: 90 }}>Estado IA</th>
                 <th>Estado</th>
                 <th style={{ width: 80 }}>Contactable</th>
@@ -2832,7 +2833,16 @@ function Prospects({ onNav }) {
                   </td>
                   <td style={{ maxWidth: 200 }}><span style={{ fontSize: 12.5, color: "var(--ink-800)" }}>{p.opp}</span></td>
                   <td>{p.svc && p.svc !== "—" ? <Badge tone="brand">{p.svc}</Badge> : <span className="cell-muted">—</span>}</td>
-                  <td><Score v={p.score}/></td>
+                  <td style={{ textAlign: "center" }}>
+                    <Score v={p.score}/>
+                    {p.opportunityScore != null ? (
+                      <div style={{ fontSize: 10.5, fontWeight: 700, marginTop: 1, color: AI_STATE_COLOR[aiStateFromScore(p.opportunityScore)] }}>
+                        Opp {p.opportunityScore}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 10, color: "var(--ink-300)", marginTop: 1 }}>Opp —</div>
+                    )}
+                  </td>
                   <td>
                     <Badge tone={AI_STATE_TONE[p.aiState]} dot>{AI_STATE_LABEL[p.aiState]}</Badge>
                   </td>
