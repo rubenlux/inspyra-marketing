@@ -1478,8 +1478,8 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
     queryKey: ["enrichment", "jobs", prospectId],
     queryFn: () => enrichmentApi.listJobs(prospectId),
     enabled: isRealId,
-    refetchInterval: (data: any) =>
-      data?.some((j: any) => j.status === 'PENDING' || j.status === 'RUNNING') ? 5000 : false,
+    refetchInterval: (query: any) =>
+      query.state.data?.some((j: any) => j.status === 'PENDING' || j.status === 'RUNNING') ? 5000 : false,
   });
   const isEnriching = (enrichmentJobs ?? []).some(j => j.status === 'PENDING' || j.status === 'RUNNING');
 
@@ -1494,8 +1494,8 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
     queryKey: ["proposals", prospectId],
     queryFn: () => proposalsApi.findByProspect(prospectId),
     enabled: isRealId,
-    refetchInterval: (data: any) =>
-      data?.some((p: any) => p.jobStatus === 'PENDING' || p.jobStatus === 'RUNNING') ? 5000 : false,
+    refetchInterval: (query: any) =>
+      query.state.data?.some((p: any) => p.jobStatus === 'PENDING' || p.jobStatus === 'RUNNING') ? 5000 : false,
   });
   const latestProposal = proposals?.[0] ?? null;
   const isGeneratingProposal = latestProposal?.jobStatus === 'PENDING' || latestProposal?.jobStatus === 'RUNNING';
