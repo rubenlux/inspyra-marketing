@@ -63,6 +63,7 @@ Use before triggering enrichment to understand current queue depth.`,
       title: 'Get Enrichment Result',
       description: `Get the enrichment result for a specific prospect.
 Returns all contact data, digital presence, company info and decision maker found by the Enrichment Agent.
+Also returns contactabilityScore (0-100), confianza (ALTA/MEDIA/BAJA) and reviewStatus (PENDING/APPROVED/REJECTED).
 Returns null if the prospect has not been enriched yet.`,
       inputSchema: z.object({
         prospectId: z.string().uuid().describe('UUID of the prospect'),
@@ -71,6 +72,27 @@ Returns null if the prospect has not been enriched yet.`,
     },
     async ({ prospectId }) => {
       const data = await client.get(`/enrichment/prospects/${prospectId}/result`);
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }], structuredContent: data };
+    },
+  );
+
+  server.registerTool(
+    'inspyra_review_enrichment',
+    {
+      title: 'Review Enrichment Result',
+      description: `Human validation step for enrichment results.
+APPROVE: marks result as validated. If contactable=true, advances prospect to LISTO_OUTREACH automatically.
+REJECT: reverts prospect to INVESTIGADO for possible re-enrichment.
+IMPORTANT: Only APPROVED + contactable prospects can proceed to outreach.`,
+      inputSchema: z.object({
+        resultId: z.string().uuid().describe('UUID of the EnrichmentResult (not the prospect)'),
+        status: z.enum(['APPROVED', 'REJECTED']).describe('Review decision'),
+        notes: z.string().optional().describe('Review notes or reason for rejection'),
+      }).strict(),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ resultId, status, notes }) => {
+      const data = await client.patch(`/enrichment/results/${resultId}/review`, { status, notes });
       return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }], structuredContent: data };
     },
   );

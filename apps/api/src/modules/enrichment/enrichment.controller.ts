@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { EnrichmentService } from './enrichment.service';
 import { CreateEnrichmentJobDto } from './dto/create-enrichment-job.dto';
+import { ReviewEnrichmentDto } from './dto/review-enrichment.dto';
 
 interface AuthRequest {
   user: { id: string; tenantId: string };
@@ -35,5 +36,20 @@ export class EnrichmentController {
   @Get('prospects/:prospectId/result')
   getResult(@Param('prospectId') prospectId: string, @Request() req: AuthRequest) {
     return this.enrichmentService.getResultByProspect(prospectId, req.user.tenantId);
+  }
+
+  @Patch('results/:id/review')
+  reviewResult(
+    @Param('id') id: string,
+    @Body() dto: ReviewEnrichmentDto,
+    @Request() req: AuthRequest,
+  ) {
+    return this.enrichmentService.reviewEnrichment(
+      id,
+      req.user.tenantId,
+      req.user.id,
+      dto.status,
+      dto.notes,
+    );
   }
 }

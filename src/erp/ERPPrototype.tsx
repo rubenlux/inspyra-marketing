@@ -2281,6 +2281,7 @@ function Prospects({ onNav }) {
   });
 
   const [enrichingId, setEnrichingId] = useState<string | null>(null);
+  const [reviewingProspectId, setReviewingProspectId] = useState<string | null>(null);
 
   const handleEnrich = async (prospectId: string) => {
     if (!hasToken || enrichingId) return;
@@ -2493,8 +2494,13 @@ function Prospects({ onNav }) {
           )}
           {enrichQueue.pending > 0 && <span style={{ color: "var(--ink-500)" }}>{enrichQueue.pending} en cola</span>}
           {enrichQueue.completed > 0 && <span style={{ color: "#10B981" }}>{enrichQueue.completed} completados</span>}
-          <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4, fontWeight: 700, color: enrichQueue.contactable > 0 ? "#10B981" : "var(--ink-400)" }}>
-            <Icon.check size={12}/> {enrichQueue.contactable} contactables
+          {(enrichQueue.pendingReview ?? 0) > 0 && (
+            <span style={{ color: "#92400E", fontWeight: 700, background: "#fef3c7", padding: "2px 8px", borderRadius: 10 }}>
+              {enrichQueue.pendingReview} por revisar
+            </span>
+          )}
+          <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4, fontWeight: 700, color: (enrichQueue.approved ?? enrichQueue.contactable) > 0 ? "#10B981" : "var(--ink-400)" }}>
+            <Icon.check size={12}/> {enrichQueue.approved ?? enrichQueue.contactable} aprobados
           </span>
         </div>
       )}
@@ -2615,8 +2621,15 @@ function Prospects({ onNav }) {
                   </td>
                   <td onClick={e => e.stopPropagation()}>
                     {p.isReal && (p.aiState === "APROBADO_IA" || p.aiState === "PRIORIDAD_MAXIMA") ? (
-                      p.estado === "ENRIQUECIDO" ? (
-                        <span style={{ fontSize: 12, color: "#10B981", fontWeight: 600 }}>✅ Sí</span>
+                      p.estado === "LISTO_OUTREACH" ? (
+                        <span style={{ fontSize: 11, color: "#10B981", fontWeight: 700 }}>🚀 Listo</span>
+                      ) : p.estado === "ENRIQUECIDO" ? (
+                        <button
+                          onClick={() => setReviewingProspectId(p.id)}
+                          style={{ fontSize: 11, padding: "3px 9px", borderRadius: 12, border: "1px solid #F59E0B", background: "transparent", color: "#92400E", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}
+                        >
+                          Revisar datos
+                        </button>
                       ) : (
                         <button
                           onClick={() => handleEnrich(p.id)}
@@ -2676,6 +2689,14 @@ function Prospects({ onNav }) {
           onClose={() => setJobDetailId(null)}
         />
       )}
+
+      {/* Enrichment Review Modal */}
+      {reviewingProspectId && (
+        <EnrichmentReviewModal
+          prospectId={reviewingProspectId}
+          onClose={() => setReviewingProspectId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -2695,6 +2716,190 @@ function MiniStatP({ label, value, sub, c }) {
       <div style={{ fontSize: 22, fontWeight: 600, fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>{value}</div>
       <div style={{ fontSize: 11.5, color: "var(--ink-500)", marginTop: 2 }}>{sub}</div>
     </div>
+  );
+}
+
+// ── Enrichment Review Modal ───────────────────────────────────────────────────
+
+function EnrichmentReviewModal({ prospectId, onClose }: { prospectId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+
+  const { data: result, isLoading } = useQuery({
+    queryKey: ["enrichment", "result", prospectId],
+    queryFn: () => enrichmentApi.getResult(prospectId),
+  });
+
+  const [reviewNotes, setReviewNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const scoreColor = (s: number) => s >= 70 ? "#10B981" : s >= 40 ? "#F59E0B" : "#9CA3AF";
+
+  const doReview = async (status: "APPROVED" | "REJECTED") => {
+    if (!result?.id) return;
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      await enrichmentApi.reviewResult(result.id, status, reviewNotes || undefined);
+      qc.invalidateQueries({ queryKey: ["prospects"] });
+      qc.invalidateQueries({ queryKey: ["enrichment"] });
+      onClose();
+    } catch (e: any) {
+      setSubmitError(e.message ?? "Error al revisar");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const FieldRow = ({ label, value }: { label: string; value?: string | null }) => (
+    <div style={{ display: "flex", gap: 8, padding: "5px 0", borderBottom: "1px solid var(--border-soft)", fontSize: 12.5 }}>
+      <span style={{ color: "var(--ink-400)", minWidth: 90, flexShrink: 0 }}>{label}</span>
+      <span style={{ color: value ? "var(--ink-900)" : "var(--ink-300)", fontWeight: value ? 600 : 400, wordBreak: "break-all" }}>
+        {value || "—"}
+      </span>
+    </div>
+  );
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, top: 56, background: "rgba(0,0,0,0.45)", zIndex: 110 }}/>
+      <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: 480, maxHeight: "82vh", overflowY: "auto", background: "var(--bg-1)", borderRadius: 14, boxShadow: "0 20px 60px rgba(0,0,0,0.25)", zIndex: 111, padding: 24 }}>
+
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+          <div>
+            <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Revisar datos de enriquecimiento</h3>
+            <p style={{ fontSize: 12, color: "var(--ink-400)", margin: "3px 0 0" }}>Validación humana · Fase B</p>
+          </div>
+          <button onClick={onClose} style={{ border: 0, background: "transparent", cursor: "pointer", fontSize: 20, color: "var(--ink-400)", lineHeight: 1 }}>×</button>
+        </div>
+
+        {isLoading && (
+          <div style={{ textAlign: "center", padding: 40, color: "var(--ink-400)" }}>Cargando datos...</div>
+        )}
+
+        {!isLoading && !result && (
+          <div style={{ textAlign: "center", padding: 40, color: "var(--ink-400)", fontSize: 13 }}>
+            Sin datos de enriquecimiento para este prospecto.
+          </div>
+        )}
+
+        {result && (
+          <>
+            {/* Contactability Score */}
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20, padding: "12px 16px", background: "var(--bg-2)", borderRadius: 10 }}>
+              <div style={{ textAlign: "center", minWidth: 56 }}>
+                <div style={{ fontSize: 30, fontWeight: 800, color: scoreColor(result.contactabilityScore ?? 0), lineHeight: 1 }}>
+                  {result.contactabilityScore ?? 0}
+                </div>
+                <div style={{ fontSize: 10, color: "var(--ink-400)", fontWeight: 600, textTransform: "uppercase", marginTop: 2 }}>Score</div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ height: 8, background: "var(--bg-3)", borderRadius: 4, marginBottom: 8, overflow: "hidden" }}>
+                  <div style={{ width: `${result.contactabilityScore ?? 0}%`, height: "100%", background: scoreColor(result.contactabilityScore ?? 0), borderRadius: 4, transition: "width 600ms ease" }}/>
+                </div>
+                <div style={{ fontSize: 11.5, color: "var(--ink-500)", display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <span>Confianza: <strong>{result.confianza ?? "N/A"}</strong></span>
+                  <span>·</span>
+                  {result.contactable
+                    ? <span style={{ color: "#10B981", fontWeight: 600 }}>✔ Contactable</span>
+                    : <span style={{ color: "#EF4444", fontWeight: 600 }}>✗ No contactable</span>
+                  }
+                  {result.reviewStatus !== "PENDING" && (
+                    <>
+                      <span>·</span>
+                      <span style={{ color: result.reviewStatus === "APPROVED" ? "#10B981" : "#EF4444", fontWeight: 600 }}>
+                        {result.reviewStatus === "APPROVED" ? "Aprobado" : "Rechazado"}
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Contact data */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-400)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Contacto</div>
+              <FieldRow label="Email" value={result.email}/>
+              <FieldRow label="Teléfono" value={result.telefono}/>
+              <FieldRow label="WhatsApp" value={result.whatsapp}/>
+              <FieldRow label="Formulario" value={result.formularioWeb}/>
+            </div>
+
+            {/* Digital presence */}
+            {(result.googleBusiness || result.linkedin || result.facebook || result.instagram) && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-400)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Presencia digital</div>
+                {result.googleBusiness && <FieldRow label="Google Business" value={result.googleBusiness}/>}
+                {result.linkedin && <FieldRow label="LinkedIn" value={result.linkedin}/>}
+                {result.facebook && <FieldRow label="Facebook" value={result.facebook}/>}
+                {result.instagram && <FieldRow label="Instagram" value={result.instagram}/>}
+              </div>
+            )}
+
+            {/* Decision maker */}
+            {result.nombreDecidsor && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-400)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Decisor</div>
+                <div style={{ padding: "8px 12px", background: "var(--bg-2)", borderRadius: 8, fontSize: 13 }}>
+                  <strong>{result.nombreDecidsor}</strong>
+                  {result.rolDecidsor && <span style={{ color: "var(--ink-500)", marginLeft: 8 }}>· {result.rolDecidsor}</span>}
+                  {result.linkedinDecidsor && (
+                    <div style={{ marginTop: 4 }}>
+                      <a href={result.linkedinDecidsor} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontSize: 12 }}>
+                        Ver LinkedIn →
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Review notes */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-400)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Notas de revisión</div>
+              <textarea
+                value={reviewNotes}
+                onChange={e => setReviewNotes(e.target.value)}
+                placeholder="Correcciones, observaciones, motivo de rechazo..."
+                style={{ width: "100%", height: 68, padding: "8px 10px", fontSize: 13, borderRadius: 8, border: "1px solid var(--border-soft)", background: "var(--bg-2)", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box", color: "var(--ink-900)" }}
+              />
+            </div>
+
+            {submitError && (
+              <div style={{ fontSize: 12, color: "#EF4444", marginBottom: 12, padding: "6px 10px", background: "#fee2e2", borderRadius: 6 }}>
+                {submitError}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => doReview("REJECTED")}
+                disabled={submitting}
+                style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #EF4444", background: "transparent", color: "#EF4444", cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+              >
+                Rechazar
+              </button>
+              <button
+                onClick={() => doReview("APPROVED")}
+                disabled={submitting || !result.contactable}
+                title={!result.contactable ? "No contactable — sin datos de contacto suficientes para aprobar" : ""}
+                style={{
+                  padding: "8px 18px", borderRadius: 8, border: 0,
+                  background: result.contactable ? "#10B981" : "var(--ink-200)",
+                  color: result.contactable ? "#fff" : "var(--ink-400)",
+                  cursor: result.contactable ? "pointer" : "not-allowed",
+                  fontWeight: 700, fontSize: 13,
+                }}
+              >
+                {submitting ? "…" : "Aprobar → Outreach"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </>
   );
 }
 

@@ -280,6 +280,8 @@ export interface EnrichmentResult {
   id: string
   prospectId: string
   contactable: boolean
+  contactabilityScore: number
+  confianza?: 'ALTA' | 'MEDIA' | 'BAJA'
   email?: string
   telefono?: string
   whatsapp?: string
@@ -294,6 +296,12 @@ export interface EnrichmentResult {
   nombreDecidsor?: string
   rolDecidsor?: string
   linkedinDecidsor?: string
+  reviewStatus: 'PENDING' | 'APPROVED' | 'REJECTED'
+  reviewedBy?: string
+  reviewedAt?: string
+  reviewNotes?: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface EnrichmentQueue {
@@ -302,6 +310,8 @@ export interface EnrichmentQueue {
   completed: number
   failed: number
   contactable: number
+  pendingReview: number
+  approved: number
 }
 
 export const enrichmentApi = {
@@ -319,6 +329,9 @@ export const enrichmentApi = {
 
   getResult: (prospectId: string) =>
     req<EnrichmentResult | null>('GET', `/enrichment/prospects/${prospectId}/result`),
+
+  reviewResult: (id: string, status: 'APPROVED' | 'REJECTED', notes?: string) =>
+    req<EnrichmentResult>('PATCH', `/enrichment/results/${id}/review`, { status, notes }),
 }
 
 // ─── Agent ROI ────────────────────────────────────────────────────────────────

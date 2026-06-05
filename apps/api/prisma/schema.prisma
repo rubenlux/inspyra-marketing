@@ -994,7 +994,7 @@ model ResearchCandidate {
 }
 
 // ─────────────────────────────────────────────
-// ENRICHMENT ENGINE (Fase A.5)
+// ENRICHMENT ENGINE (Fase A.5 + Fase B)
 // ─────────────────────────────────────────────
 
 enum EnrichmentJobStatus {
@@ -1002,6 +1002,12 @@ enum EnrichmentJobStatus {
   RUNNING
   COMPLETED
   FAILED
+}
+
+enum EnrichmentReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model EnrichmentJob {
@@ -1041,6 +1047,10 @@ model EnrichmentResult {
   formularioWeb String?
   contactable   Boolean @default(false)
 
+  // Contactability Score (0-100, weighted channels × confianza multiplier)
+  contactabilityScore Int     @default(0)
+  confianza           String? // ALTA | MEDIA | BAJA
+
   // Presencia digital verificada
   googleBusiness   String?
   linkedin         String?
@@ -1057,6 +1067,12 @@ model EnrichmentResult {
   rolDecidsor      String?
   linkedinDecidsor String?
 
+  // Validación humana (Fase B)
+  reviewStatus EnrichmentReviewStatus @default(PENDING)
+  reviewedBy   String?
+  reviewedAt   DateTime?
+  reviewNotes  String?
+
   // Trazabilidad
   rawOutput String? @db.Text
 
@@ -1064,5 +1080,6 @@ model EnrichmentResult {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId, prospectId])
+  @@index([tenantId, reviewStatus])
   @@map("enrichment_results")
 }

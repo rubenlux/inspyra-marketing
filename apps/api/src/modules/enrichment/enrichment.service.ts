@@ -26,6 +26,7 @@ interface EnrichmentData {
   nombreDecidsor?: string;
   rolDecidsor?: string;
   linkedinDecidsor?: string;
+  confianza?: string;
 }
 
 @Injectable()
@@ -87,14 +88,60 @@ export class EnrichmentService {
       this.prisma.enrichmentJob.count({ where: { tenantId, status: 'COMPLETED' } }),
       this.prisma.enrichmentJob.count({ where: { tenantId, status: 'FAILED' } }),
     ]);
-    const contactable = await this.prisma.enrichmentResult.count({
-      where: { tenantId, contactable: true },
-    });
-    return { pending, running, completed, failed, contactable };
+    const [contactable, pendingReview, approved] = await Promise.all([
+      this.prisma.enrichmentResult.count({ where: { tenantId, contactable: true } }),
+      this.prisma.enrichmentResult.count({ where: { tenantId, reviewStatus: 'PENDING' } }),
+      this.prisma.enrichmentResult.count({ where: { tenantId, reviewStatus: 'APPROVED' } }),
+    ]);
+    return { pending, running, completed, failed, contactable, pendingReview, approved };
   }
 
   async getResultByProspect(prospectId: string, tenantId: string) {
     return this.prisma.enrichmentResult.findFirst({ where: { prospectId, tenantId } });
+  }
+
+  async reviewEnrichment(
+    resultId: string,
+    tenantId: string,
+    reviewedBy: string,
+    status: 'APPROVED' | 'REJECTED',
+    notes?: string,
+  ) {
+    const result = await this.prisma.enrichmentResult.findFirst({
+      where: { id: resultId, tenantId },
+      include: { prospect: true },
+    });
+    if (!result) throw new NotFoundException(`Enrichment result ${resultId} no encontrado`);
+
+    const updated = await this.prisma.enrichmentResult.update({
+      where: { id: resultId },
+      data: {
+        reviewStatus: status,
+        reviewedBy,
+        reviewedAt: new Date(),
+        reviewNotes: notes ?? null,
+      },
+    });
+
+    if (status === 'APPROVED' && result.contactable) {
+      // Gate passed: advance prospect to LISTO_OUTREACH
+      await this.prisma.prospect.updateMany({
+        where: { id: result.prospectId, tenantId, estado: 'ENRIQUECIDO' },
+        data: { estado: 'LISTO_OUTREACH' },
+      });
+      this.logger.log(`[EnrichReview] Prospect ${result.prospectId} → LISTO_OUTREACH`);
+    } else if (status === 'APPROVED' && !result.contactable) {
+      this.logger.warn(`[EnrichReview] Approved but not contactable — prospect stays ENRIQUECIDO`);
+    } else if (status === 'REJECTED') {
+      // Revert to INVESTIGADO for possible re-enrichment
+      await this.prisma.prospect.updateMany({
+        where: { id: result.prospectId, tenantId, estado: 'ENRIQUECIDO' },
+        data: { estado: 'INVESTIGADO' },
+      });
+      this.logger.log(`[EnrichReview] Rejected — prospect ${result.prospectId} → INVESTIGADO`);
+    }
+
+    return updated;
   }
 
   // ── Pipeline ──────────────────────────────────────────────────────────────────
@@ -110,6 +157,7 @@ export class EnrichmentService {
       pais?: string | null;
       website?: string | null;
       instagram?: string | null;
+      linkedin?: string | null;
       oportunidadDetectada?: string | null;
     },
   ) {
@@ -127,6 +175,7 @@ export class EnrichmentService {
       const data = this.parseEnrichmentOutput(raw);
 
       const contactable = Boolean(data.email || data.telefono || data.whatsapp || data.formularioWeb);
+      const contactabilityScore = this.computeContactabilityScore(data);
 
       await this.prisma.enrichmentResult.upsert({
         where: { prospectId: prospect.id },
@@ -136,11 +185,15 @@ export class EnrichmentService {
           jobId,
           ...data,
           contactable,
+          contactabilityScore,
+          reviewStatus: 'PENDING',
           rawOutput: raw,
         },
         update: {
           ...data,
           contactable,
+          contactabilityScore,
+          reviewStatus: 'PENDING',
           rawOutput: raw,
           jobId,
         },
@@ -154,10 +207,14 @@ export class EnrichmentService {
 
       await this.prisma.enrichmentJob.update({
         where: { id: jobId },
-        data: { status: 'COMPLETED', completedAt: new Date(), agentOutput: `Completado. Contactable: ${contactable}` },
+        data: {
+          status: 'COMPLETED',
+          completedAt: new Date(),
+          agentOutput: `Completado. Contactable: ${contactable} | Score: ${contactabilityScore} | Confianza: ${data.confianza ?? 'N/A'}`,
+        },
       });
 
-      this.logger.log(`[EnrichJob ${jobId}] Done — contactable: ${contactable}`);
+      this.logger.log(`[EnrichJob ${jobId}] Done — contactable: ${contactable}, score: ${contactabilityScore}`);
     } catch (err) {
       this.logger.error(`[EnrichJob ${jobId}] Failed: ${err.message}`);
       await this.prisma.enrichmentJob.update({
@@ -167,6 +224,32 @@ export class EnrichmentService {
     }
   }
 
+  // ── Contactability Score ──────────────────────────────────────────────────────
+
+  private computeContactabilityScore(data: EnrichmentData): number {
+    let points = 0;
+    if (data.email)         points += 35;
+    if (data.telefono)      points += 30;
+    if (data.whatsapp)      points += 20;
+    if (data.formularioWeb) points += 15;
+    if (data.googleBusiness) points += 5;
+    if (data.linkedin)      points += 5;
+    if (data.nombreDecidsor) points += 5;
+    if (data.facebook)      points += 2;
+    if (data.instagram)     points += 2;
+
+    const raw = Math.min(points, 100);
+
+    const mult =
+      data.confianza === 'ALTA'  ? 1.0 :
+      data.confianza === 'MEDIA' ? 0.85 :
+      0.65; // BAJA or missing
+
+    return Math.round(raw * mult);
+  }
+
+  // ── Enrichment Prompt (Sonnet + web search instructions) ─────────────────────
+
   private async enrichWithSonnet(prospect: {
     nombreEmpresa: string;
     rubro?: string | null;
@@ -174,48 +257,57 @@ export class EnrichmentService {
     pais?: string | null;
     website?: string | null;
     instagram?: string | null;
+    linkedin?: string | null;
     oportunidadDetectada?: string | null;
   }): Promise<string> {
-    const prompt = `Eres un agente de enriquecimiento de leads B2B para una agencia de marketing digital.
+    const website = prospect.website ?? null;
+    const instagram = prospect.instagram ?? null;
+    const linkedin = prospect.linkedin ?? null;
+
+    const prompt = `Eres un agente de enriquecimiento de leads B2B especializado en encontrar datos de contacto reales de empresas latinoamericanas.
 
 EMPRESA A ENRIQUECER:
 - Nombre: ${prospect.nombreEmpresa}
 - Rubro: ${prospect.rubro ?? 'Desconocido'}
-- Ciudad: ${[prospect.ciudad, prospect.pais].filter(Boolean).join(', ') || 'Desconocida'}
-- Website: ${prospect.website ?? 'Sin web'}
-- Instagram: ${prospect.instagram ?? 'Desconocido'}
+- Ubicación: ${[prospect.ciudad, prospect.pais].filter(Boolean).join(', ') || 'Desconocida'}
+- Website: ${website ?? 'Sin web conocida'}
+- Instagram: ${instagram ?? 'Desconocido'}
+- LinkedIn: ${linkedin ?? 'Desconocido'}
 - Oportunidad detectada: ${prospect.oportunidadDetectada ?? 'N/A'}
 
-OBJETIVO: Encontrar datos de contacto y presencia digital verificada de esta empresa.
+OBJETIVO: Encontrar datos de contacto REALES y verificados de esta empresa para iniciar contacto comercial.
 
 INSTRUCCIONES:
-1. Analiza el nombre, rubro y ciudad para inferir datos de contacto probables
-2. Si tiene website, infiere el email de contacto típico (ej: info@, contacto@, hola@)
-3. Busca o infiere su presencia en Google Business, LinkedIn, Facebook
-4. Identifica quién podría ser el decisor (dueño, fundador, gerente comercial)
-5. Estima datos de la empresa si son inferibles
+1. Usa WebFetch para visitar el website si está disponible y extrae emails, teléfonos, formularios de contacto, links a redes sociales
+2. Busca en Google: "${prospect.nombreEmpresa} ${prospect.ciudad ?? ''} contacto"
+3. Busca su perfil en Google Business / Google Maps
+4. Busca su perfil de LinkedIn empresarial
+5. Identifica al decisor clave: dueño, fundador, gerente comercial o director
+6. Prioriza datos VERIFICADOS sobre inferidos
+7. Para el campo "confianza": usa ALTA si encontraste datos reales, MEDIA si son de redes sociales, BAJA si solo son inferencias
 
-Responde SOLO con un JSON válido sin texto adicional:
+Responde SOLO con un JSON válido (sin texto adicional, sin markdown):
 
 {
   "email": "string o null",
-  "telefono": "string o null (con código de país)",
-  "whatsapp": "string o null",
-  "formularioWeb": "URL del formulario de contacto o null",
-  "googleBusiness": "URL de Google Business o null",
+  "telefono": "string o null (con código de país, ej: +54911XXXXXXXX)",
+  "whatsapp": "string o null (número con código de país)",
+  "formularioWeb": "URL completa del formulario de contacto o null",
+  "googleBusiness": "URL de Google Maps/Business o null",
   "linkedin": "URL LinkedIn empresa o null",
   "facebook": "URL Facebook o null",
-  "instagram": "handle o URL Instagram o null",
+  "instagram": "handle @empresa o URL Instagram o null",
   "direccion": "dirección física o null",
-  "anioFundacion": número o null,
-  "empleadosReal": número estimado o null,
-  "nombreDecidsor": "nombre del decisor o null",
-  "rolDecidsor": "Dueño|Fundador|Gerente Comercial|Director o null",
+  "anioFundacion": número_entero o null,
+  "empleadosReal": número_estimado o null,
+  "nombreDecidsor": "nombre completo del decisor o null",
+  "rolDecidsor": "Dueño|Fundador|Gerente Comercial|Director|CEO o null",
   "linkedinDecidsor": "URL LinkedIn del decisor o null",
-  "confianza": "ALTA|MEDIA|BAJA"
+  "confianza": "ALTA|MEDIA|BAJA",
+  "fuentesDatos": ["lista de URLs o fuentes consultadas"]
 }`;
 
-    return this.spawnClaudeText(prompt, 'claude-haiku-4-5-20251001', 90_000);
+    return this.spawnClaudeText(prompt, 'claude-sonnet-4-6', 180_000);
   }
 
   private parseEnrichmentOutput(raw: string): EnrichmentData {
@@ -241,6 +333,7 @@ Responde SOLO con un JSON válido sin texto adicional:
       if (parsed.nombreDecidsor && typeof parsed.nombreDecidsor === 'string') clean.nombreDecidsor = parsed.nombreDecidsor;
       if (parsed.rolDecidsor && typeof parsed.rolDecidsor === 'string') clean.rolDecidsor = parsed.rolDecidsor;
       if (parsed.linkedinDecidsor && typeof parsed.linkedinDecidsor === 'string') clean.linkedinDecidsor = parsed.linkedinDecidsor;
+      if (parsed.confianza && ['ALTA', 'MEDIA', 'BAJA'].includes(parsed.confianza)) clean.confianza = parsed.confianza;
       return clean;
     } catch {
       this.logger.warn('Enrichment: JSON parse error');
@@ -254,7 +347,13 @@ Responde SOLO con un JSON válido sin texto adicional:
 
   private spawnClaudeText(prompt: string, model: string, timeoutMs: number): Promise<string> {
     return new Promise((resolve, reject) => {
-      const args = ['-p', prompt, '--output-format', 'text', '--dangerously-skip-permissions', '--model', model];
+      const args = [
+        '-p', prompt,
+        '--output-format', 'text',
+        '--dangerously-skip-permissions',
+        '--model', model,
+        '--allowedTools', 'WebFetch,WebSearch',
+      ];
       this.logger.log(`Spawning claude | model: ${model}`);
 
       const child = spawn('claude', args, {
