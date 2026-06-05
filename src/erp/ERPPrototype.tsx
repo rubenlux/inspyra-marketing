@@ -3336,7 +3336,7 @@ function EnrichmentReviewModal({ prospectId, onClose }: { prospectId: string; on
     >
       <div
         onClick={e => e.stopPropagation()}
-        style={{ width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", background: "var(--bg-1)", borderRadius: 14, boxShadow: "0 20px 60px rgba(0,0,0,0.3)", padding: 24 }}
+        style={{ width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", background: "#ffffff", borderRadius: 14, boxShadow: "0 20px 60px rgba(0,0,0,0.3)", padding: 24 }}
       >
 
         {/* Header */}
