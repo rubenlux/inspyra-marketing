@@ -153,6 +153,7 @@ export interface ProspectValidation {
   prioridad: string
   reasoning: string | null
   decisionFactors: DecisionFactors | null
+  validationVersion: string
   notes: string | null
   validatedBy: string | null
   validatedAt: string | null
@@ -194,6 +195,9 @@ export const validationsApi = {
 
   runAgent: (prospectId: string) =>
     req<ProspectValidation>('POST', `/prospect-validations/run/${prospectId}`),
+
+  recalculate: (prospectId: string) =>
+    req<ProspectValidation>('POST', `/prospect-validations/recalculate/${prospectId}`),
 }
 
 // ─── Research Jobs ────────────────────────────────────────────────────────────

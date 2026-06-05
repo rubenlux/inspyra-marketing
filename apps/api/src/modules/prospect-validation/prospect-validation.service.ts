@@ -289,7 +289,7 @@ export class ProspectValidationService {
       servicesRecommended: recommendedNames,
       estimatedTicketUsd,
       prioridad: prioridadMap[topPrioridad] ?? 'MEDIA',
-      reasoning: `Opportunity Agent: ${problems.length} problemas detectados, score ${agentScore}/100.`,
+      reasoning: `Evaluador: ${problems.length} problemas detectados, score ${agentScore}/100.`,
       decisionFactors: {
         problemScore: problems.length >= 5 ? 25 : problems.length >= 3 ? 15 : 10,
         priorityScore: Math.round(
@@ -297,6 +297,71 @@ export class ProspectValidationService {
         ),
         fitScore: serviceFit > 0.75 ? 25 : serviceFit > 0.5 ? 15 : serviceFit > 0.25 ? 8 : 0,
         ticketScore: estimatedTicketUsd > 3000 ? 25 : estimatedTicketUsd > 2000 ? 20 : estimatedTicketUsd > 1000 ? 12 : estimatedTicketUsd > 500 ? 5 : 0,
+      },
+    });
+  }
+
+  async recalculate(prospectId: string, tenantId: string) {
+    const existing = await this.prisma.prospectValidation.findFirst({
+      where: { prospectId, tenantId },
+    });
+    if (!existing) throw new NotFoundException('No validation found — run the scoring agent first');
+
+    const prospect = await this.prisma.prospect.findFirst({
+      where: { id: prospectId, tenantId, deletedAt: null },
+    });
+    if (!prospect) throw new NotFoundException(`Prospect ${prospectId} not found`);
+
+    const problems: string[] = prospect.problemasEncontrados ?? [];
+    if (problems.length === 0) throw new BadRequestException('No problems to score');
+
+    const analysis = await this.intel.analyze(tenantId, problems);
+    const recommendedNames = [...new Set(analysis.flatMap((r) => r.serviciosRecomendados))];
+    const catalogItems = await this.prisma.serviceCatalogItem.findMany({
+      where: { tenantId, activo: true, nombre: { in: recommendedNames } },
+      select: { id: true, nombre: true },
+    });
+
+    let estimatedTicketUsd = 0;
+    if (catalogItems.length > 0) {
+      const pricingResult = await this.pricing.calculate(tenantId, {
+        items: catalogItems.map((i) => ({ catalogItemId: i.id, cantidad: 1 })),
+      }) as unknown as Record<string, number>;
+      estimatedTicketUsd = pricingResult['total'] ?? 0;
+    }
+
+    const serviceFit = recommendedNames.length > 0 ? catalogItems.length / recommendedNames.length : 0;
+    const agentScore = calcOpportunityScore(problems, analysis, estimatedTicketUsd, serviceFit);
+    const topPrioridad = analysis.reduce((best, r) =>
+      (PRIORITY_WEIGHT[r.prioridad] ?? 0) > (PRIORITY_WEIGHT[best] ?? 0) ? r.prioridad : best, 'BAJA');
+    const prioridadMap: Record<string, 'BAJA' | 'MEDIA' | 'ALTA'> = { BAJA: 'BAJA', MEDIA: 'MEDIA', ALTA: 'ALTA', CRITICA: 'ALTA' };
+
+    // Bump version: v1 → v2 → v3 ...
+    const match = existing.validationVersion?.match(/^v(\d+)$/);
+    const nextVersion = match ? `v${parseInt(match[1]) + 1}` : 'v2';
+
+    return this.prisma.prospectValidation.update({
+      where: { id: existing.id },
+      data: {
+        agentScore,
+        servicesRecommended: recommendedNames,
+        estimatedTicketUsd,
+        prioridad: prioridadMap[topPrioridad] ?? 'MEDIA',
+        reasoning: `Evaluador ${nextVersion}: ${problems.length} problemas detectados, score ${agentScore}/100.`,
+        decisionFactors: {
+          problemScore: problems.length >= 5 ? 25 : problems.length >= 3 ? 15 : 10,
+          priorityScore: Math.round(
+            (Math.max(...analysis.map((r) => PRIORITY_WEIGHT[r.prioridad] ?? 0), 0) / 4) * 25,
+          ),
+          fitScore: serviceFit > 0.75 ? 25 : serviceFit > 0.5 ? 15 : serviceFit > 0.25 ? 8 : 0,
+          ticketScore: estimatedTicketUsd > 3000 ? 25 : estimatedTicketUsd > 2000 ? 20 : estimatedTicketUsd > 1000 ? 12 : estimatedTicketUsd > 500 ? 5 : 0,
+        },
+        validationVersion: nextVersion,
+        // Reset human review so the new score gets fresh human validation
+        status: 'PENDING',
+        humanScore: null,
+        validatedBy: null,
+        validatedAt: null,
       },
     });
   }

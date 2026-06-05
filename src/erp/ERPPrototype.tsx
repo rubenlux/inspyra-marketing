@@ -1663,7 +1663,8 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, padding: "8px 12px", background: "var(--bg-2)", borderRadius: 8 }}>
                   <Icon.robot size={13} color="var(--primary-700)"/>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--primary-700)" }}>Opportunity Agent</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--primary-700)" }}>Evaluador de oportunidad</span>
+                  <span style={{ fontSize: 10, color: "var(--ink-400)", fontFamily: "monospace" }}>{validation.validationVersion ?? "v1"}</span>
                   <Badge tone={VAL_TONE[validation.status]} dot style={{ marginLeft: "auto" }}>{VAL_LABEL[validation.status]}</Badge>
                 </div>
 
@@ -2464,6 +2465,7 @@ function Prospects({ onNav }) {
   const [enrichingId, setEnrichingId] = useState<string | null>(null);
   const [reviewingProspectId, setReviewingProspectId] = useState<string | null>(null);
   const [qualifyingId, setQualifyingId] = useState<string | null>(null);
+  const [recalculatingId, setRecalculatingId] = useState<string | null>(null);
   const [batchQualifying, setBatchQualifying] = useState(false);
 
   const handleEnrich = async (prospectId: string) => {
@@ -2490,6 +2492,20 @@ function Prospects({ onNav }) {
       alert("Error al calificar: " + e.message);
     } finally {
       setQualifyingId(null);
+    }
+  };
+
+  const handleRecalculate = async (prospectId: string) => {
+    if (!hasToken || recalculatingId) return;
+    setRecalculatingId(prospectId);
+    try {
+      await validationsApi.recalculate(prospectId);
+      qc.invalidateQueries({ queryKey: ["validations"] });
+      qc.invalidateQueries({ queryKey: ["prospects"] });
+    } catch (e) {
+      alert("Error al recalcular: " + e.message);
+    } finally {
+      setRecalculatingId(null);
     }
   };
 
@@ -2927,7 +2943,18 @@ function Prospects({ onNav }) {
                   </td>
                   <td onClick={e => e.stopPropagation()}>
                     {p.validation
-                      ? <Badge tone={VAL_TONE[p.validation.status]} dot>{VAL_LABEL[p.validation.status]}</Badge>
+                      ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "flex-start" }}>
+                          <Badge tone={VAL_TONE[p.validation.status]} dot>{VAL_LABEL[p.validation.status]}</Badge>
+                          <button
+                            onClick={() => handleRecalculate(p.id)}
+                            disabled={recalculatingId === p.id}
+                            style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, border: "1px solid var(--border-soft)", background: "transparent", color: "var(--ink-400)", cursor: "pointer", fontWeight: 500 }}
+                          >
+                            {recalculatingId === p.id ? "…" : `↺ ${p.validation.validationVersion ?? "v1"}`}
+                          </button>
+                        </div>
+                      )
                       : p.isReal && p.estado === "INVESTIGADO"
                         ? (
                           <button

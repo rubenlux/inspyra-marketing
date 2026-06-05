@@ -57,8 +57,14 @@ export class ProspectValidationController {
   }
 
   @Post('run/:prospectId')
-  @ApiOperation({ summary: 'Run Opportunity Agent inline — scores prospect using Service Intelligence + Pricing Engine' })
+  @ApiOperation({ summary: 'Run scoring engine — scores prospect using Service Intelligence + Pricing Engine' })
   runAgent(@Param('prospectId') prospectId: string, @CurrentUser() user: JwtPayload) {
     return this.service.runAgent(prospectId, user.tenantId);
+  }
+
+  @Post('recalculate/:prospectId')
+  @ApiOperation({ summary: 'Recalculate existing validation — re-runs scoring engine, bumps validationVersion' })
+  recalculate(@Param('prospectId') prospectId: string, @CurrentUser() user: JwtPayload) {
+    return this.service.recalculate(prospectId, user.tenantId);
   }
 }
