@@ -1983,6 +1983,7 @@ function Prospects({ onNav }) {
   const [selectedId, setSelectedId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState('score');
   const hasToken = Boolean(getStoredToken());
 
   // ── Research job state ──
@@ -2000,6 +2001,8 @@ function Prospects({ onNav }) {
         const job = await researchApi.getJob(activeJobId);
         setActiveJob(job);
         if (job.status === 'COMPLETED') {
+          setPage(1);
+          setSortBy('createdAt');
           qc.invalidateQueries({ queryKey: ['prospects'] });
           qc.invalidateQueries({ queryKey: ['prospects', 'kpis'] });
         }
@@ -2037,8 +2040,8 @@ function Prospects({ onNav }) {
   });
 
   const { data: prospectsData, isLoading, isError: listError, error: listErrorObj } = useQuery({
-    queryKey: ["prospects", { page, limit: 20 }],
-    queryFn: () => prospectsApi.list({ page, limit: 20 }),
+    queryKey: ["prospects", { page, limit: 20, sortBy }],
+    queryFn: () => prospectsApi.list({ page, limit: 20, sortBy }),
     enabled: hasToken,
     staleTime: 30000,
     retry: 1,
@@ -2235,7 +2238,13 @@ function Prospects({ onNav }) {
               <input placeholder="Filtrar empresa..."/>
             </div>
             <button className="btn btn-sm"><Icon.filter size={13}/> Filtros</button>
-            <button className="btn btn-sm"><Icon.sort size={13}/> Score</button>
+            <button
+              className={`btn btn-sm${sortBy === 'createdAt' ? ' btn-brand' : ''}`}
+              onClick={() => { setSortBy(s => s === 'score' ? 'createdAt' : 'score'); setPage(1); }}
+              title={sortBy === 'score' ? 'Ordenando por score — click para ver recientes primero' : 'Ordenando por recientes — click para volver a score'}
+            >
+              <Icon.sort size={13}/> {sortBy === 'createdAt' ? 'Recientes' : 'Score'}
+            </button>
           </div>
         </div>
         <div style={{ overflowX: "auto" }}>

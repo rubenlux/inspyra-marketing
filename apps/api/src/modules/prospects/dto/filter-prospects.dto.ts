@@ -63,4 +63,9 @@ export class FilterProspectsDto extends PaginationDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional({ enum: ['score', 'createdAt'], default: 'score' })
+  @IsOptional()
+  @IsString()
+  sortBy?: 'score' | 'createdAt';
 }

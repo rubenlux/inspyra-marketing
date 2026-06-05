@@ -30,7 +30,7 @@ export class ProspectsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(tenantId: string, filters: FilterProspectsDto) {
-    const { page = 1, limit = 20, search, scoreMin, scoreMax, ...rest } = filters;
+    const { page = 1, limit = 20, search, scoreMin, scoreMax, sortBy, ...rest } = filters;
     const { skip, take } = paginate(page, limit);
 
     const where: Prisma.ProspectWhereInput = {
@@ -59,7 +59,9 @@ export class ProspectsService {
         where,
         skip,
         take,
-        orderBy: [{ score: 'desc' }, { createdAt: 'desc' }],
+        orderBy: sortBy === 'createdAt'
+          ? [{ createdAt: 'desc' }]
+          : [{ score: 'desc' }, { createdAt: 'desc' }],
         include: { owner: { select: { id: true, firstName: true, lastName: true, email: true } } },
       }),
       this.prisma.prospect.count({ where }),
