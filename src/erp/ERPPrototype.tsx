@@ -2463,6 +2463,8 @@ function Prospects({ onNav }) {
 
   const [enrichingId, setEnrichingId] = useState<string | null>(null);
   const [reviewingProspectId, setReviewingProspectId] = useState<string | null>(null);
+  const [qualifyingId, setQualifyingId] = useState<string | null>(null);
+  const [batchQualifying, setBatchQualifying] = useState(false);
 
   const handleEnrich = async (prospectId: string) => {
     if (!hasToken || enrichingId) return;
@@ -2475,6 +2477,38 @@ function Prospects({ onNav }) {
     } finally {
       setEnrichingId(null);
     }
+  };
+
+  const handleRunAgent = async (prospectId: string) => {
+    if (!hasToken || qualifyingId) return;
+    setQualifyingId(prospectId);
+    try {
+      await validationsApi.runAgent(prospectId);
+      qc.invalidateQueries({ queryKey: ["validations"] });
+      qc.invalidateQueries({ queryKey: ["prospects"] });
+    } catch (e) {
+      alert("Error al calificar: " + e.message);
+    } finally {
+      setQualifyingId(null);
+    }
+  };
+
+  const handleRunAllPending = async () => {
+    if (!hasToken || batchQualifying) return;
+    const pending = allRows.filter(r => r.isReal && r.aiState === "PENDIENTE_OPPORTUNITY" && r.estado === "INVESTIGADO");
+    if (pending.length === 0) return;
+    setBatchQualifying(true);
+    let ok = 0;
+    for (const row of pending) {
+      try {
+        await validationsApi.runAgent(row.id);
+        ok++;
+      } catch { /* skip already-validated or state mismatch */ }
+    }
+    qc.invalidateQueries({ queryKey: ["validations"] });
+    qc.invalidateQueries({ queryKey: ["prospects"] });
+    setBatchQualifying(false);
+    if (ok > 0) alert(`Opportunity Agent calificó ${ok} prospectos.`);
   };
 
   // ── KPIs (real with mock fallback) ────────────────────────────────────────
@@ -2727,6 +2761,22 @@ function Prospects({ onNav }) {
         </div>
       )}
 
+      {/* Batch qualify button — appears when there are pending prospects */}
+      {hasToken && aiCounts.PENDIENTE_OPPORTUNITY > 0 && (
+        <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ fontSize: 12, color: "var(--ink-500)" }}>
+            {aiCounts.PENDIENTE_OPPORTUNITY} prospecto{aiCounts.PENDIENTE_OPPORTUNITY !== 1 ? "s" : ""} sin calificar por el Opportunity Agent
+          </div>
+          <button
+            onClick={handleRunAllPending}
+            disabled={batchQualifying}
+            style={{ fontSize: 12, padding: "5px 14px", borderRadius: 12, border: "1px solid #6366F1", background: batchQualifying ? "var(--bg-2)" : "#EEF2FF", color: "#4338CA", cursor: batchQualifying ? "not-allowed" : "pointer", fontWeight: 600 }}
+          >
+            {batchQualifying ? "Calificando…" : `Calificar todos (${aiCounts.PENDIENTE_OPPORTUNITY})`}
+          </button>
+        </div>
+      )}
+
       {/* AI State Filter Tabs */}
       <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
         {([
@@ -2875,10 +2925,20 @@ function Prospects({ onNav }) {
                       <span className="cell-muted" style={{ fontSize: 11 }}>—</span>
                     )}
                   </td>
-                  <td>
+                  <td onClick={e => e.stopPropagation()}>
                     {p.validation
                       ? <Badge tone={VAL_TONE[p.validation.status]} dot>{VAL_LABEL[p.validation.status]}</Badge>
-                      : <span className="cell-muted" style={{ fontSize: 11 }}>—</span>}
+                      : p.isReal && p.estado === "INVESTIGADO"
+                        ? (
+                          <button
+                            onClick={() => handleRunAgent(p.id)}
+                            disabled={qualifyingId === p.id}
+                            style={{ fontSize: 11, padding: "3px 9px", borderRadius: 12, border: "1px solid #6366F1", background: "transparent", color: "#4338CA", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}
+                          >
+                            {qualifyingId === p.id ? "…" : "Calificar"}
+                          </button>
+                        )
+                        : <span className="cell-muted" style={{ fontSize: 11 }}>—</span>}
                   </td>
                   <td className="cell-muted col-num">{p.last}</td>
                   <td className="col-num" style={{ color: /Hoy|Mañana/.test(p.next) ? "var(--warning-ink)" : "var(--ink-800)", fontWeight: p.next.includes("Hoy") ? 600 : 400 }}>{p.next}</td>

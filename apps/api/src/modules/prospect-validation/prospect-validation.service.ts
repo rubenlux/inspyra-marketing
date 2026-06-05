@@ -1,11 +1,33 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { ServiceIntelligenceService } from '../service-intelligence/service-intelligence.service';
+import { PricingService } from '../pricing/pricing.service';
 import { CreateValidationDto } from './dto/create-validation.dto';
 import { ReviewValidationDto } from './dto/review-validation.dto';
 
+const PRIORITY_WEIGHT: Record<string, number> = { CRITICA: 4, ALTA: 3, MEDIA: 2, BAJA: 1 };
+
+function calcOpportunityScore(
+  problems: string[],
+  analysis: { prioridad: string }[],
+  estimatedTicket: number,
+  serviceFit: number,
+): number {
+  const problemScore = problems.length >= 5 ? 25 : problems.length >= 3 ? 15 : 10;
+  const maxPriority = Math.max(...analysis.map((r) => PRIORITY_WEIGHT[r.prioridad] ?? 0), 0);
+  const priorityScore = Math.round((maxPriority / 4) * 25);
+  const fitScore = serviceFit > 0.75 ? 25 : serviceFit > 0.5 ? 15 : serviceFit > 0.25 ? 8 : 0;
+  const ticketScore = estimatedTicket > 3000 ? 25 : estimatedTicket > 2000 ? 20 : estimatedTicket > 1000 ? 12 : estimatedTicket > 500 ? 5 : 0;
+  return Math.min(problemScore + priorityScore + fitScore + ticketScore, 100);
+}
+
 @Injectable()
 export class ProspectValidationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly intel: ServiceIntelligenceService,
+    private readonly pricing: PricingService,
+  ) {}
 
   async create(tenantId: string, dto: CreateValidationDto) {
     const prospect = await this.prisma.prospect.findFirst({
@@ -209,5 +231,73 @@ export class ProspectValidationService {
       topRecommendedService,
       topRejectionReason,
     };
+  }
+
+  async runAgent(prospectId: string, tenantId: string) {
+    const prospect = await this.prisma.prospect.findFirst({
+      where: { id: prospectId, tenantId, deletedAt: null },
+    });
+    if (!prospect) throw new NotFoundException(`Prospect ${prospectId} not found`);
+    if (prospect.estado !== 'INVESTIGADO') {
+      throw new BadRequestException(
+        `Prospect must be in INVESTIGADO state to run Opportunity Agent (current: ${prospect.estado})`,
+      );
+    }
+
+    const existing = await this.prisma.prospectValidation.findUnique({ where: { prospectId } });
+    if (existing) throw new ConflictException('Opportunity Agent already ran for this prospect');
+
+    const problems: string[] = prospect.problemasEncontrados ?? [];
+    if (problems.length === 0) {
+      throw new BadRequestException('No problems detected — Research Agent must run first');
+    }
+
+    // Step 1: Service Intelligence — map problems to services
+    const analysis = await this.intel.analyze(tenantId, problems);
+
+    // Step 2: Find catalog items by recommended service names
+    const recommendedNames = [...new Set(analysis.flatMap((r) => r.serviciosRecomendados))];
+    const catalogItems = await this.prisma.serviceCatalogItem.findMany({
+      where: { tenantId, activo: true, nombre: { in: recommendedNames } },
+      select: { id: true, nombre: true },
+    });
+
+    // Step 3: Pricing
+    let estimatedTicketUsd = 0;
+    if (catalogItems.length > 0) {
+      const pricingResult = await this.pricing.calculate(tenantId, {
+        items: catalogItems.map((i) => ({ catalogItemId: i.id, cantidad: 1 })),
+      }) as unknown as Record<string, number>;
+      estimatedTicketUsd = pricingResult['total'] ?? 0;
+    }
+
+    // Step 4: Score
+    const serviceFit = recommendedNames.length > 0 ? catalogItems.length / recommendedNames.length : 0;
+    const agentScore = calcOpportunityScore(problems, analysis, estimatedTicketUsd, serviceFit);
+
+    const topPrioridad = analysis.reduce((best, r) => {
+      return (PRIORITY_WEIGHT[r.prioridad] ?? 0) > (PRIORITY_WEIGHT[best] ?? 0) ? r.prioridad : best;
+    }, 'BAJA');
+
+    const prioridadMap: Record<string, 'BAJA' | 'MEDIA' | 'ALTA'> = {
+      BAJA: 'BAJA', MEDIA: 'MEDIA', ALTA: 'ALTA', CRITICA: 'ALTA',
+    };
+
+    return this.create(tenantId, {
+      prospectId,
+      agentScore,
+      servicesRecommended: recommendedNames,
+      estimatedTicketUsd,
+      prioridad: prioridadMap[topPrioridad] ?? 'MEDIA',
+      reasoning: `Opportunity Agent: ${problems.length} problemas detectados, score ${agentScore}/100.`,
+      decisionFactors: {
+        problemScore: problems.length >= 5 ? 25 : problems.length >= 3 ? 15 : 10,
+        priorityScore: Math.round(
+          (Math.max(...analysis.map((r) => PRIORITY_WEIGHT[r.prioridad] ?? 0), 0) / 4) * 25,
+        ),
+        fitScore: serviceFit > 0.75 ? 25 : serviceFit > 0.5 ? 15 : serviceFit > 0.25 ? 8 : 0,
+        ticketScore: estimatedTicketUsd > 3000 ? 25 : estimatedTicketUsd > 2000 ? 20 : estimatedTicketUsd > 1000 ? 12 : estimatedTicketUsd > 500 ? 5 : 0,
+      },
+    });
   }
 }

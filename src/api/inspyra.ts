@@ -191,6 +191,9 @@ export const validationsApi = {
 
   review: (id: string, data: ReviewDto) =>
     req<ProspectValidation>('PATCH', `/prospect-validations/${id}/review`, data),
+
+  runAgent: (prospectId: string) =>
+    req<ProspectValidation>('POST', `/prospect-validations/run/${prospectId}`),
 }
 
 // ─── Research Jobs ────────────────────────────────────────────────────────────

@@ -55,4 +55,10 @@ export class ProspectValidationController {
   ) {
     return this.service.review(id, user.tenantId, user.sub, dto);
   }
+
+  @Post('run/:prospectId')
+  @ApiOperation({ summary: 'Run Opportunity Agent inline — scores prospect using Service Intelligence + Pricing Engine' })
+  runAgent(@Param('prospectId') prospectId: string, @CurrentUser() user: JwtPayload) {
+    return this.service.runAgent(prospectId, user.tenantId);
+  }
 }
