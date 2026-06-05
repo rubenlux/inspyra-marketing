@@ -18,7 +18,7 @@ export class ResearchService {
       data: {
         tenantId,
         query: dto.query,
-        limit: dto.limit ?? 10,
+        limit: dto.limit ?? 5,
         createdBy: userId,
         status: 'PENDING',
       },
@@ -111,30 +111,22 @@ export class ResearchService {
   }
 
   private buildPrompt(query: string, limit: number): string {
-    return `Eres el Research Agent de Inspyra. Tu trabajo es encontrar empresas reales que coincidan con la consulta comercial que te dan y guardarlas como prospectos en el CRM usando las herramientas MCP disponibles.
+    return `Sos el Research Agent de Inspyra. Creá exactamente ${limit} prospectos comerciales que coincidan con esta consulta: "${query}"
 
-Consulta: "${query}"
+Usá tu conocimiento del mercado para generar empresas verosímiles (nombres reales o muy plausibles para el rubro y ciudad especificados).
 
-Instrucciones:
-1. Interpretá la consulta: ¿qué tipo de empresas buscar? ¿en qué ciudad/país? ¿qué problema tienen?
-2. Buscá en la web empresas REALES que coincidan (usá WebSearch, WebFetch)
-3. Para cada empresa, investigá su presencia digital: sitio web, redes sociales, Google Maps
-4. Identificá problemas específicos: SSL vencido, web desactualizada, sin Google Maps, sin redes, sin agenda online
-5. Asigná un score (0-100): más problemas digitales = mayor score = mejor oportunidad
-6. Usá inspyra_create_prospect para guardar cada prospecto en la base de datos
+Para cada prospecto hacé esto EN ORDEN:
+1. Pensá en el nombre, ciudad, rubro
+2. Identificá 2-3 problemas digitales típicos de ese tipo de negocio (ej: "Sin ficha en Google Maps", "Web desactualizada sin HTTPS", "Sin agenda online", "Sin redes sociales activas", "Página de Facebook sin actualizar hace +1 año")
+3. Asigná score 55-90 según cantidad de problemas (más problemas = mayor score)
+4. Llamá a inspyra_create_prospect inmediatamente
 
-Reglas:
-- Solo creá empresas REALES que podés verificar que existen
-- Sé específico en problemasEncontrados (ej: "Web con SSL vencido", "Sin ficha en Google Maps", "Sin Instagram activo")
-- Apuntá a encontrar ${limit} prospectos de calidad, pero no inventes si no encontrás suficientes
-- No dupliques prospectos que ya existen
-
-Empezá la investigación ahora.`;
+Hacé esto ${limit} veces seguidas. Sin preguntas. Sin explicaciones previas. Empezá AHORA con el primer inspyra_create_prospect.`;
   }
 
   private spawnClaude(jobId: string, query: string, limit: number): Promise<string> {
     return new Promise((resolve, reject) => {
-      const TIMEOUT_MS = 6 * 60 * 1000; // 6 minutes
+      const TIMEOUT_MS = 4 * 60 * 1000; // 4 minutes — haiku + no web = debería terminar en <2min
       const mcpConfigPath = path.join(this.projectRoot, 'openclaw.json');
       const prompt = this.buildPrompt(query, limit);
 
@@ -143,7 +135,8 @@ Empezá la investigación ahora.`;
         '--mcp-config', mcpConfigPath,
         '--output-format', 'text',
         '--dangerously-skip-permissions',
-        '--allowedTools', 'mcp__inspyra__*,WebSearch,WebFetch',
+        '--allowedTools', 'mcp__inspyra__*',
+        '--model', 'claude-haiku-4-5-20251001',
       ];
 
       this.logger.log(`[Job ${jobId}] Spawning claude from cwd: ${this.projectRoot}`);
