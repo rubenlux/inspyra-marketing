@@ -1407,8 +1407,8 @@ function fmtDate(iso) {
   return `Hace ${diff}d`;
 }
 
-// ── Prospect Drawer — 4 tabs: General · AI Assessment · Validación · Historial
-function ProspectDrawer({ prospectId, rowData, validationById, onClose }) {
+// ── Prospect Drawer — 5 tabs: General · AI Assessment · Contacto · Validación · Historial
+function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReviewEnrichment }) {
   const [tab, setTab] = useState("assessment");
   const qc = useQueryClient();
 
@@ -1417,6 +1417,12 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose }) {
   const { data: fetchedProspect } = useQuery({
     queryKey: ["prospects", prospectId],
     queryFn: () => prospectsApi.get(prospectId),
+    enabled: isRealId,
+  });
+
+  const { data: enrichmentResult } = useQuery({
+    queryKey: ["enrichment", "result", prospectId],
+    queryFn: () => enrichmentApi.getResult(prospectId),
     enabled: isRealId,
   });
 
@@ -1477,6 +1483,7 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose }) {
   const TABS = [
     { id: "general",    label: "General" },
     { id: "assessment", label: "AI Assessment" },
+    { id: "contacto",   label: "Contacto" },
     { id: "validacion", label: "Validación" },
     { id: "historial",  label: "Historial" },
   ];
@@ -1910,6 +1917,168 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose }) {
                   </div>
                 )}
               </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════
+            TAB: CONTACTO (Enrichment Agent output)
+        ═══════════════════════════════════════════════ */}
+        {tab === "contacto" && prospect && (
+          <div>
+            {/* Commercial Score breakdown */}
+            {(prospect.commercialScore != null || enrichmentResult) && (
+              <div style={{ marginBottom: 20, padding: "14px 16px", background: "var(--bg-2)", borderRadius: 12 }}>
+                <SLabel>Commercial Score</SLabel>
+                {(() => {
+                  const opp = prospect.score ?? 0;
+                  const cont = enrichmentResult?.contactabilityScore ?? 0;
+                  const cs = prospect.commercialScore ?? Math.floor((opp + cont) / 2);
+                  const csColor = cs >= 70 ? "#10B981" : cs >= 45 ? "#F59E0B" : "#9CA3AF";
+                  return (
+                    <>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                        <div style={{ fontSize: 36, fontWeight: 800, color: csColor, lineHeight: 1 }}>{cs}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ height: 8, background: "var(--bg-3)", borderRadius: 4, overflow: "hidden" }}>
+                            <div style={{ width: `${cs}%`, height: "100%", background: csColor, borderRadius: 4, transition: "width 600ms ease" }}/>
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--ink-800)" }}>{opp}</div>
+                          <div style={{ fontSize: 10, color: "var(--ink-400)", textTransform: "uppercase", fontWeight: 600 }}>Oportunidad</div>
+                        </div>
+                        <div style={{ color: "var(--ink-300)", alignSelf: "center", fontSize: 16 }}>+</div>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--ink-800)" }}>{cont}</div>
+                          <div style={{ fontSize: 10, color: "var(--ink-400)", textTransform: "uppercase", fontWeight: 600 }}>Contactabilidad</div>
+                        </div>
+                        <div style={{ color: "var(--ink-300)", alignSelf: "center", fontSize: 16 }}>=</div>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: csColor }}>{cs}</div>
+                          <div style={{ fontSize: 10, color: csColor, textTransform: "uppercase", fontWeight: 600 }}>Commercial</div>
+                        </div>
+                        {enrichmentResult?.confianza && (
+                          <div style={{ marginLeft: "auto", alignSelf: "center" }}>
+                            <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 8, fontWeight: 700,
+                              background: enrichmentResult.confianza === "ALTA" ? "#d1fae5" : enrichmentResult.confianza === "MEDIA" ? "#fef3c7" : "#f3f4f6",
+                              color: enrichmentResult.confianza === "ALTA" ? "#065f46" : enrichmentResult.confianza === "MEDIA" ? "#92400E" : "#6b7280",
+                            }}>
+                              {enrichmentResult.confianza}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* No enrichment yet */}
+            {!enrichmentResult && (
+              <div style={{ textAlign: "center", padding: "32px 20px", background: "var(--bg-2)", borderRadius: 12, marginBottom: 20 }}>
+                <div style={{ fontSize: 28, marginBottom: 10 }}>🔍</div>
+                <div style={{ fontWeight: 600, fontSize: 14, color: "var(--ink-700)", marginBottom: 6 }}>Sin datos de contacto</div>
+                <div style={{ fontSize: 13, color: "var(--ink-400)", lineHeight: 1.6 }}>
+                  El Enrichment Agent aún no buscó datos de contacto para esta empresa.
+                  {(prospect.score >= 75) && (
+                    <div style={{ marginTop: 12, fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>
+                      Score {prospect.score} ≥ 75 — elegible para enriquecimiento
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Contact data */}
+            {enrichmentResult && (
+              <>
+                <div style={{ marginBottom: 18 }}>
+                  <SLabel>Datos de contacto</SLabel>
+                  {[
+                    { icon: "✉", label: "Email",     value: enrichmentResult.email,         link: enrichmentResult.email ? `mailto:${enrichmentResult.email}` : undefined },
+                    { icon: "📞", label: "Teléfono",  value: enrichmentResult.telefono,      link: enrichmentResult.telefono ? `tel:${enrichmentResult.telefono}` : undefined },
+                    { icon: "💬", label: "WhatsApp",  value: enrichmentResult.whatsapp,      link: enrichmentResult.whatsapp ? `https://wa.me/${enrichmentResult.whatsapp.replace(/\D/g,"")}` : undefined },
+                    { icon: "🌐", label: "Formulario",value: enrichmentResult.formularioWeb, link: enrichmentResult.formularioWeb },
+                  ].map(({ icon, label, value, link }) => (
+                    <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--border-soft)" }}>
+                      <span style={{ width: 26, textAlign: "center", fontSize: 14 }}>{icon}</span>
+                      <span style={{ width: 80, fontSize: 12, color: "var(--ink-400)", flexShrink: 0 }}>{label}</span>
+                      {value && link ? (
+                        <a href={link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--primary)", fontWeight: 600, wordBreak: "break-all" }}>{value}</a>
+                      ) : value ? (
+                        <span style={{ fontSize: 13, color: "var(--ink-900)", fontWeight: 600 }}>{value}</span>
+                      ) : (
+                        <span style={{ fontSize: 12, color: "var(--ink-300)", fontStyle: "italic" }}>no encontrado</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Digital presence */}
+                {(enrichmentResult.googleBusiness || enrichmentResult.linkedin || enrichmentResult.facebook || enrichmentResult.instagram) && (
+                  <div style={{ marginBottom: 18 }}>
+                    <SLabel>Presencia digital</SLabel>
+                    {[
+                      { icon: "📍", label: "G. Business", value: enrichmentResult.googleBusiness },
+                      { icon: "💼", label: "LinkedIn",    value: enrichmentResult.linkedin },
+                      { icon: "👥", label: "Facebook",    value: enrichmentResult.facebook },
+                      { icon: "📸", label: "Instagram",   value: enrichmentResult.instagram },
+                    ].filter(x => x.value).map(({ icon, label, value }) => (
+                      <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--border-soft)" }}>
+                        <span style={{ width: 26, textAlign: "center", fontSize: 14 }}>{icon}</span>
+                        <span style={{ width: 80, fontSize: 12, color: "var(--ink-400)", flexShrink: 0 }}>{label}</span>
+                        <a href={value} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--primary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 280 }}>{value}</a>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Decision maker */}
+                {enrichmentResult.nombreDecidsor && (
+                  <div style={{ marginBottom: 18 }}>
+                    <SLabel>Decisor</SLabel>
+                    <div style={{ padding: "12px 14px", background: "var(--bg-2)", borderRadius: 10, display: "flex", gap: 12, alignItems: "flex-start" }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 999, background: "#e0e7ff", color: "#4338ca", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 700, flexShrink: 0 }}>
+                        {enrichmentResult.nombreDecidsor.split(" ").map(s => s[0]).slice(0,2).join("")}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--ink-900)" }}>{enrichmentResult.nombreDecidsor}</div>
+                        {enrichmentResult.rolDecidsor && <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 2 }}>{enrichmentResult.rolDecidsor}</div>}
+                        {enrichmentResult.linkedinDecidsor && (
+                          <a href={enrichmentResult.linkedinDecidsor} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--primary)", marginTop: 4, display: "block" }}>Ver LinkedIn →</a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Review status + action */}
+                <div style={{ marginTop: 8, padding: "12px 14px", background: "var(--bg-2)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-400)", textTransform: "uppercase", marginBottom: 4 }}>Estado revisión</div>
+                    <div style={{ fontSize: 13, fontWeight: 700,
+                      color: enrichmentResult.reviewStatus === "APPROVED" ? "#10B981" : enrichmentResult.reviewStatus === "REJECTED" ? "#EF4444" : "#F59E0B",
+                    }}>
+                      {enrichmentResult.reviewStatus === "APPROVED" ? "✅ Aprobado → Outreach"
+                       : enrichmentResult.reviewStatus === "REJECTED" ? "✗ Rechazado"
+                       : "⏳ Pendiente revisión humana"}
+                    </div>
+                    {enrichmentResult.reviewNotes && <div style={{ fontSize: 11.5, color: "var(--ink-500)", marginTop: 3 }}>{enrichmentResult.reviewNotes}</div>}
+                  </div>
+                  {enrichmentResult.reviewStatus === "PENDING" && onReviewEnrichment && (
+                    <button
+                      onClick={onReviewEnrichment}
+                      style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #F59E0B", background: "transparent", color: "#92400E", cursor: "pointer", fontWeight: 600, fontSize: 12, whiteSpace: "nowrap" }}
+                    >
+                      Revisar datos
+                    </button>
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}
@@ -2531,13 +2700,19 @@ function Prospects({ onNav }) {
                   <span style={{ flex: 1, fontWeight: 600, color: "var(--ink-900)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.nombreEmpresa}</span>
                   <span style={{ fontSize: 11, color: "var(--ink-400)", whiteSpace: "nowrap" }}>{p.rubro ?? "—"}</span>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-                    <span style={{ fontSize: 10, color: "var(--ink-400)" }}>Opp</span>
-                    <span style={{ fontWeight: 700, color: "var(--ink-700)", fontSize: 12 }}>{p.score}</span>
-                    <span style={{ fontSize: 10, color: "var(--ink-300)" }}>+</span>
-                    <span style={{ fontSize: 10, color: "var(--ink-400)" }}>Cont</span>
-                    <span style={{ fontWeight: 700, color: "var(--ink-700)", fontSize: 12 }}>{p.enrichmentResult?.contactabilityScore ?? 0}</span>
-                    <span style={{ fontSize: 10, color: "var(--ink-300)" }}>=</span>
-                    <span style={{ fontWeight: 800, color: csColor, fontSize: 14, minWidth: 28, textAlign: "right" }}>{cs}</span>
+                    {p.enrichmentResult ? (
+                      <>
+                        <span style={{ fontSize: 10, color: "var(--ink-400)" }}>Opp</span>
+                        <span style={{ fontWeight: 700, color: "var(--ink-700)", fontSize: 12 }}>{p.score}</span>
+                        <span style={{ fontSize: 10, color: "var(--ink-300)" }}>+</span>
+                        <span style={{ fontSize: 10, color: "var(--ink-400)" }}>Cont</span>
+                        <span style={{ fontWeight: 700, color: "var(--ink-700)", fontSize: 12 }}>{p.enrichmentResult.contactabilityScore}</span>
+                        <span style={{ fontSize: 10, color: "var(--ink-300)" }}>=</span>
+                      </>
+                    ) : (
+                      <span style={{ fontSize: 10, color: "var(--ink-400)", fontStyle: "italic" }}>sin enriquecer ·</span>
+                    )}
+                    <span style={{ fontWeight: 800, color: csColor, fontSize: 14, minWidth: 28, textAlign: "right" }}>{cs || "—"}</span>
                   </div>
                 </div>
               );
@@ -2719,6 +2894,7 @@ function Prospects({ onNav }) {
             rowData={selectedRow}
             validationById={validationById}
             onClose={() => { setSelectedId(null); setSelectedRow(null); }}
+            onReviewEnrichment={selectedId && !selectedId.startsWith("demo-") ? () => setReviewingProspectId(selectedId) : undefined}
           />
         </>
       )}

@@ -101,9 +101,9 @@ export class EnrichmentService {
   }
 
   async getOutreachQueue(tenantId: string) {
-    const prospects = await this.prisma.prospect.findMany({
+    const raw = await this.prisma.prospect.findMany({
       where: { tenantId, estado: 'LISTO_OUTREACH', deletedAt: null },
-      orderBy: { commercialScore: 'desc' },
+      orderBy: [{ commercialScore: 'desc' }, { score: 'desc' }],
       take: 20,
       select: {
         id: true,
@@ -124,6 +124,15 @@ export class EnrichmentService {
         },
       },
     });
+
+    // Compute on-the-fly for prospects that bypassed the enrichment flow (e.g., seed data)
+    const prospects = raw.map(p => ({
+      ...p,
+      commercialScore:
+        p.commercialScore ??
+        Math.floor((p.score + (p.enrichmentResult?.contactabilityScore ?? 0)) / 2),
+    }));
+
     return { total: prospects.length, prospects };
   }
 
