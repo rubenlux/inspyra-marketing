@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -64,6 +65,18 @@ export class EnrichmentService {
       throw new BadRequestException(
         `Opportunity Score ${prospect.validation.agentScore} por debajo del umbral (${SCORE_THRESHOLD}). ` +
         `Solo APROBADO_IA o PRIORIDAD_MAXIMA pueden ser enriquecidos.`,
+      );
+    }
+
+    // Gate 4: Idempotency — prevent duplicate enrichment agents running in parallel.
+    const activeJob = await this.prisma.enrichmentJob.findFirst({
+      where: { prospectId: dto.prospectId, tenantId, status: { in: ['PENDING', 'RUNNING'] } },
+      select: { id: true, status: true },
+    });
+    if (activeJob) {
+      throw new ConflictException(
+        `Ya existe un enriquecimiento en curso para este prospecto (job ${activeJob.id}, estado: ${activeJob.status}). ` +
+        `Esperá a que finalice antes de iniciar uno nuevo.`,
       );
     }
 

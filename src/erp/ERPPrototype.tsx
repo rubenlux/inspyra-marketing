@@ -1439,10 +1439,20 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
     enabled: isRealId,
   });
 
+  const { data: enrichmentJobs } = useQuery({
+    queryKey: ["enrichment", "jobs", prospectId],
+    queryFn: () => enrichmentApi.listJobs(prospectId),
+    enabled: isRealId,
+    refetchInterval: (data: any) =>
+      data?.some((j: any) => j.status === 'PENDING' || j.status === 'RUNNING') ? 5000 : false,
+  });
+  const isEnriching = (enrichmentJobs ?? []).some(j => j.status === 'PENDING' || j.status === 'RUNNING');
+
   const { data: enrichmentResult } = useQuery({
     queryKey: ["enrichment", "result", prospectId],
     queryFn: () => enrichmentApi.getResult(prospectId),
     enabled: isRealId,
+    refetchInterval: isEnriching ? 5000 : false,
   });
 
   // For demo rows, build a basic prospect shape from rowData
@@ -1534,7 +1544,11 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
             {[prospect?.rubro, prospect?.ciudad].filter(Boolean).join(" · ")}
           </div>
         </div>
-        {prospect && <Badge tone={ESTADO_TONE[prospect.estado] ?? "default"} dot>{ESTADO_LABEL[prospect.estado] ?? prospect.estado}</Badge>}
+        {prospect && (
+          isEnriching
+            ? <Badge tone="warning" dot>Enriqueciendo…</Badge>
+            : <Badge tone={ESTADO_TONE[prospect.estado] ?? "default"} dot>{ESTADO_LABEL[prospect.estado] ?? prospect.estado}</Badge>
+        )}
         <button onClick={onClose} style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ink-400)", padding: 6, borderRadius: 6, display: "flex" }}>
           <Icon.x size={16}/>
         </button>
@@ -1856,16 +1870,23 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                       <>
                         <button
                           onClick={handleEnrichFromDrawer}
-                          disabled={enrichingFromDrawer || rowData?.estado === "ENRIQUECIDO"}
+                          disabled={enrichingFromDrawer || isEnriching || rowData?.estado === "ENRIQUECIDO"}
                           style={{
                             width: "100%", padding: "14px 0", borderRadius: 10,
-                            border: "1px solid #5B5BF7", background: "#5B5BF7",
-                            color: "#fff", fontSize: 13.5, fontWeight: 600,
-                            cursor: (enrichingFromDrawer || rowData?.estado === "ENRIQUECIDO") ? "not-allowed" : "pointer",
-                            display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: rowData?.estado === "ENRIQUECIDO" ? 0.5 : 1,
+                            border: "1px solid #5B5BF7",
+                            background: (isEnriching || rowData?.estado === "ENRIQUECIDO") ? "var(--bg-2)" : "#5B5BF7",
+                            color: (isEnriching || rowData?.estado === "ENRIQUECIDO") ? "#5B5BF7" : "#fff",
+                            fontSize: 13.5, fontWeight: 600,
+                            cursor: (enrichingFromDrawer || isEnriching || rowData?.estado === "ENRIQUECIDO") ? "not-allowed" : "pointer",
+                            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                            opacity: (isEnriching || rowData?.estado === "ENRIQUECIDO") ? 0.7 : 1,
                           }}>
                           <Icon.sparkles size={15}/>
-                          {enrichingFromDrawer ? "Iniciando…" : rowData?.estado === "ENRIQUECIDO" ? "Enriquecimiento en curso" : "Iniciar enriquecimiento"}
+                          {enrichingFromDrawer
+                            ? "Iniciando…"
+                            : (isEnriching || rowData?.estado === "ENRIQUECIDO")
+                            ? "⏳ Enriquecimiento en curso"
+                            : "Iniciar enriquecimiento"}
                         </button>
                         <div style={{ fontSize: 11.5, color: "var(--ink-400)", textAlign: "center", marginTop: 8 }}>
                           El Agente de Enriquecimiento buscará contactos y datos de la empresa
