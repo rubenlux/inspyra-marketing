@@ -3183,6 +3183,8 @@ function Prospects({ onNav }) {
                     {p.isReal && (p.aiState === "APROBADO_IA" || p.aiState === "PRIORIDAD_MAXIMA") ? (
                       p.estado === "LISTO_OUTREACH" ? (
                         <span style={{ fontSize: 11, color: "#10B981", fontWeight: 700 }}>🚀 Listo</span>
+                      ) : p.estado === "LISTO_PROPUESTA" ? (
+                        <span style={{ fontSize: 11, color: "#7C3AED", fontWeight: 600 }}>📋 Propuesta</span>
                       ) : p.estado === "ENRIQUECIDO" ? (
                         <button
                           onClick={() => setReviewingProspectId(p.id)}
@@ -3190,7 +3192,7 @@ function Prospects({ onNav }) {
                         >
                           Revisar datos
                         </button>
-                      ) : p.validation?.status === "VALIDATED" ? (
+                      ) : p.estado === "INVESTIGADO" && p.validation?.status === "VALIDATED" ? (
                         <button
                           onClick={() => handleEnrich(p.id)}
                           disabled={enrichingId === p.id}
