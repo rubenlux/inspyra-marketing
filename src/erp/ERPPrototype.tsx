@@ -3330,9 +3330,14 @@ function EnrichmentReviewModal({ prospectId, onClose }: { prospectId: string; on
   );
 
   return (
-    <>
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, top: 56, background: "rgba(0,0,0,0.45)", zIndex: 110 }}/>
-      <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: 480, maxHeight: "82vh", overflowY: "auto", background: "var(--bg-1)", borderRadius: 14, boxShadow: "0 20px 60px rgba(0,0,0,0.25)", zIndex: 111, padding: 24 }}>
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 110, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", background: "var(--bg-1)", borderRadius: 14, boxShadow: "0 20px 60px rgba(0,0,0,0.3)", padding: 24 }}
+      >
 
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
@@ -3488,7 +3493,7 @@ function EnrichmentReviewModal({ prospectId, onClose }: { prospectId: string; on
           </>
         )}
       </div>
-    </>
+    </div>
   );
 }
 
