@@ -1392,14 +1392,14 @@ const VAL_TONE = { PENDING: "warning", VALIDATED: "success", REJECTED: "danger" 
 const VAL_LABEL = { PENDING: "Pendiente", VALIDATED: "Aprobado", REJECTED: "Rechazado" };
 
 const aiStateFromScore = (s: number | null | undefined) =>
-  s == null ? "SIN_CALIFICAR" :
+  s == null ? "PENDIENTE_OPPORTUNITY" :
   s >= 90 ? "PRIORIDAD_MAXIMA" :
   s >= 75 ? "APROBADO_IA" :
   s >= 60 ? "REVISAR" :
   "DESCARTADO_IA";
-const AI_STATE_LABEL = { SIN_CALIFICAR: "Sin calificar", PRIORIDAD_MAXIMA: "Prioridad máxima", APROBADO_IA: "Aprobado IA", REVISAR: "Revisar", DESCARTADO_IA: "Descartado IA" };
-const AI_STATE_TONE  = { SIN_CALIFICAR: "default", PRIORIDAD_MAXIMA: "success", APROBADO_IA: "brand", REVISAR: "warning", DESCARTADO_IA: "danger" };
-const AI_STATE_COLOR = { SIN_CALIFICAR: "#D1D5DB", PRIORIDAD_MAXIMA: "#10B981", APROBADO_IA: "#5B5BF7", REVISAR: "#F59E0B", DESCARTADO_IA: "#9CA3AF" };
+const AI_STATE_LABEL = { PENDIENTE_OPPORTUNITY: "Pendiente Opp.", PRIORIDAD_MAXIMA: "Prioridad máxima", APROBADO_IA: "Aprobado IA", REVISAR: "Revisar", DESCARTADO_IA: "Descartado IA" };
+const AI_STATE_TONE  = { PENDIENTE_OPPORTUNITY: "default", PRIORIDAD_MAXIMA: "success", APROBADO_IA: "brand", REVISAR: "warning", DESCARTADO_IA: "danger" };
+const AI_STATE_COLOR = { PENDIENTE_OPPORTUNITY: "#D1D5DB", PRIORIDAD_MAXIMA: "#10B981", APROBADO_IA: "#5B5BF7", REVISAR: "#F59E0B", DESCARTADO_IA: "#9CA3AF" };
 
 function fmtDate(iso) {
   if (!iso) return "—";
@@ -2518,7 +2518,7 @@ function Prospects({ onNav }) {
   }, [prospectsData, validationById, hasToken]);
 
   const aiCounts = React.useMemo(() => {
-    const c = { SIN_CALIFICAR: 0, PRIORIDAD_MAXIMA: 0, APROBADO_IA: 0, REVISAR: 0, DESCARTADO_IA: 0 };
+    const c = { PENDIENTE_OPPORTUNITY: 0, PRIORIDAD_MAXIMA: 0, APROBADO_IA: 0, REVISAR: 0, DESCARTADO_IA: 0 };
     for (const r of allRows) c[r.aiState] = (c[r.aiState] ?? 0) + 1;
     return c;
   }, [allRows]);
@@ -2660,7 +2660,7 @@ function Prospects({ onNav }) {
         <MiniStatP label="Resultados" value={String(total)} sub={`+${nuevosEstaSemana} esta semana`} c="var(--primary)"/>
         <MiniStatP label="Prioridad máxima" value={String(aiCounts.PRIORIDAD_MAXIMA)} sub="Opp. Agent ≥ 90 · asignar ya" c="#10B981"/>
         <MiniStatP label="Aprobados IA" value={String(aiCounts.APROBADO_IA)} sub="Opp. Agent 75–89 · ready outreach" c="#5B5BF7"/>
-        <MiniStatP label="Sin calificar" value={String(aiCounts.SIN_CALIFICAR)} sub="Opportunity Agent no procesó" c="#9CA3AF"/>
+        <MiniStatP label="Pendiente Opp." value={String(aiCounts.PENDIENTE_OPPORTUNITY)} sub="Opportunity Agent no procesó" c="#9CA3AF"/>
       </div>
 
       {/* Enrichment Queue Panel */}
@@ -2733,7 +2733,7 @@ function Prospects({ onNav }) {
           { id: "PRIORIDAD_MAXIMA",label: "Prioridad máxima", count: aiCounts.PRIORIDAD_MAXIMA, color: "#10B981" },
           { id: "APROBADO_IA",     label: "Aprobado IA",      count: aiCounts.APROBADO_IA,      color: "#5B5BF7" },
           { id: "REVISAR",         label: "Revisar",          count: aiCounts.REVISAR,          color: "#F59E0B" },
-          { id: "SIN_CALIFICAR",   label: "Sin calificar",    count: aiCounts.SIN_CALIFICAR,    color: "#D1D5DB" },
+          { id: "PENDIENTE_OPPORTUNITY", label: "Pendiente Opp.", count: aiCounts.PENDIENTE_OPPORTUNITY, color: "#D1D5DB" },
           { id: "DESCARTADO_IA",   label: "Descartado IA",    count: aiCounts.DESCARTADO_IA,    color: "#9CA3AF" },
           { id: "TODOS",           label: "Todos",            count: allRows.length,            color: "var(--ink-400)" },
         ] as const).map(f => {

@@ -41,12 +41,21 @@ export class EnrichmentService {
   async createJob(dto: CreateEnrichmentJobDto, tenantId: string, userId: string) {
     const prospect = await this.prisma.prospect.findFirst({
       where: { id: dto.prospectId, tenantId, deletedAt: null },
+      include: { validation: true },
     });
     if (!prospect) throw new NotFoundException(`Prospecto ${dto.prospectId} no encontrado`);
-    if (prospect.score < SCORE_THRESHOLD) {
+
+    // Gate: Opportunity Agent must have run. Research Score alone is not sufficient.
+    if (!prospect.validation) {
       throw new BadRequestException(
-        `Score ${prospect.score} por debajo del umbral de enriquecimiento (${SCORE_THRESHOLD}). ` +
-        `Solo se enriquecen prospectos APROBADO_IA o PRIORIDAD_MAXIMA.`,
+        `El Opportunity Agent no procesó este prospecto. ` +
+        `Solo se pueden enriquecer prospectos con APROBADO_IA (≥${SCORE_THRESHOLD}) o PRIORIDAD_MAXIMA (≥90).`,
+      );
+    }
+    if (prospect.validation.agentScore < SCORE_THRESHOLD) {
+      throw new BadRequestException(
+        `Opportunity Score ${prospect.validation.agentScore} por debajo del umbral (${SCORE_THRESHOLD}). ` +
+        `Solo APROBADO_IA o PRIORIDAD_MAXIMA pueden ser enriquecidos.`,
       );
     }
 
@@ -145,7 +154,7 @@ export class EnrichmentService {
   ) {
     const result = await this.prisma.enrichmentResult.findFirst({
       where: { id: resultId, tenantId },
-      include: { prospect: true },
+      include: { prospect: { include: { validation: true } } },
     });
     if (!result) throw new NotFoundException(`Enrichment result ${resultId} no encontrado`);
 
@@ -161,8 +170,10 @@ export class EnrichmentService {
 
     if (status === 'APPROVED' && result.contactable) {
       // Commercial Score = floor((opportunityScore + contactabilityScore) / 2)
+      // opportunityScore comes exclusively from the Opportunity Agent (validation.agentScore).
+      const opportunityScore = result.prospect.validation?.agentScore ?? result.prospect.score;
       const commercialScore = Math.floor(
-        (result.prospect.score + (result.contactabilityScore ?? 0)) / 2,
+        (opportunityScore + (result.contactabilityScore ?? 0)) / 2,
       );
       await this.prisma.prospect.updateMany({
         where: { id: result.prospectId, tenantId, estado: 'ENRIQUECIDO' },

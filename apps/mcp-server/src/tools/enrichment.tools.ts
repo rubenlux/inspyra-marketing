@@ -9,7 +9,9 @@ export function registerEnrichmentTools(server: McpServer, client: InspyraClient
     {
       title: 'Enrich Prospect',
       description: `Trigger the Enrichment Agent for a prospect.
-IMPORTANT: Only works for prospects with score >= 75 (APROBADO_IA or PRIORIDAD_MAXIMA).
+IMPORTANT: Only works for prospects classified APROBADO_IA (Opportunity Score ≥ 75) or PRIORIDAD_MAXIMA (≥ 90).
+The Opportunity Agent must have processed the prospect first — Research Score alone is NOT sufficient.
+Prospects without a ProspectValidation (PENDIENTE_OPPORTUNITY) will be rejected.
 The agent will find: email, phone, WhatsApp, contact form, Google Business, LinkedIn, decision maker.
 Results are stored in enrichment_results (separate from prospect record for trazability).
 Returns the enrichment job with its ID for polling.`,
