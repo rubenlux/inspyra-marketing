@@ -3,7 +3,7 @@ import * as React from 'react'
 import { useEffect, useState, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { authApi, prospectsApi, validationsApi, researchApi, enrichmentApi, getStoredToken, setStoredToken, clearStoredToken } from '../api/inspyra'
+import { authApi, prospectsApi, validationsApi, researchApi, enrichmentApi, proposalsApi, getStoredToken, setStoredToken, clearStoredToken } from '../api/inspyra'
 import DashboardV2 from './DashboardV2'
 import './erp.css'
 
@@ -1378,13 +1378,15 @@ const PROSPECTS_DATA = [
 // ── Estado labels y tones ─────────────────────────────────────────────────────
 const ESTADO_LABEL = {
   NUEVO: "Nuevo", INVESTIGADO: "Investigado", ENRIQUECIDO: "Enriquecido",
-  LISTO_OUTREACH: "Listo", CONTACTADO: "Contactado", RESPONDIO: "Respondió",
+  LISTO_PROPUESTA: "Listo propuesta", LISTO_OUTREACH: "Listo outreach",
+  CONTACTADO: "Contactado", RESPONDIO: "Respondió",
   REUNION_AGENDADA: "Reunión", PASO_A_PIPELINE: "Pipeline",
   CONVERTIDO: "Ganado", DESCARTADO: "Descartado", ARCHIVADO: "Archivado",
 };
 const ESTADO_TONE = {
   NUEVO: "default", INVESTIGADO: "info", ENRIQUECIDO: "info",
-  LISTO_OUTREACH: "brand", CONTACTADO: "info", RESPONDIO: "warning",
+  LISTO_PROPUESTA: "brand", LISTO_OUTREACH: "success",
+  CONTACTADO: "info", RESPONDIO: "warning",
   REUNION_AGENDADA: "brand", PASO_A_PIPELINE: "warning",
   CONVERTIDO: "success", DESCARTADO: "danger", ARCHIVADO: "default",
 };
@@ -1412,7 +1414,40 @@ function fmtDate(iso) {
   return `Hace ${diff}d`;
 }
 
-// ── Prospect Drawer — 5 tabs: General · AI Assessment · Contacto · Validación · Historial
+function ProposalNextStep({ prospectId, latestProposal, isGenerating, onGenerate, onGoToTab }) {
+  const [loading, setLoading] = React.useState(false);
+  const hasActiveDraft = latestProposal && latestProposal.status === "DRAFT";
+
+  return (
+    <>
+      <button
+        onClick={async () => {
+          if (hasActiveDraft) { onGoToTab(); return; }
+          setLoading(true);
+          try { await onGenerate(); } finally { setLoading(false); }
+        }}
+        disabled={loading || isGenerating}
+        style={{
+          width: "100%", padding: "14px 0", borderRadius: 10,
+          border: "1px solid #5B5BF7",
+          background: (loading || isGenerating) ? "var(--bg-2)" : "#5B5BF7",
+          color: (loading || isGenerating) ? "#5B5BF7" : "#fff",
+          fontSize: 13.5, fontWeight: 600,
+          cursor: (loading || isGenerating) ? "not-allowed" : "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          opacity: (loading || isGenerating) ? 0.7 : 1,
+        }}>
+        <Icon.doc size={15}/>
+        {loading ? "Iniciando…" : isGenerating ? "⏳ Generando propuesta…" : hasActiveDraft ? "Ver propuesta generada" : "Generar propuesta"}
+      </button>
+      <div style={{ fontSize: 11.5, color: "var(--ink-400)", textAlign: "center", marginTop: 8 }}>
+        {isGenerating ? "El agente está construyendo la propuesta" : hasActiveDraft ? "Revisá la propuesta en la pestaña Propuesta" : "El Proposal Agent construirá una propuesta personalizada"}
+      </div>
+    </>
+  );
+}
+
+// ── Prospect Drawer — 6 tabs: General · AI Assessment · Contacto · Validación · Propuesta · Historial
 function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReviewEnrichment }) {
   const [tab, setTab] = useState("assessment");
   const [enrichingFromDrawer, setEnrichingFromDrawer] = useState(false);
@@ -1454,6 +1489,16 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
     enabled: isRealId,
     refetchInterval: isEnriching ? 5000 : false,
   });
+
+  const { data: proposals } = useQuery({
+    queryKey: ["proposals", prospectId],
+    queryFn: () => proposalsApi.findByProspect(prospectId),
+    enabled: isRealId,
+    refetchInterval: (data: any) =>
+      data?.some((p: any) => p.jobStatus === 'PENDING' || p.jobStatus === 'RUNNING') ? 5000 : false,
+  });
+  const latestProposal = proposals?.[0] ?? null;
+  const isGeneratingProposal = latestProposal?.jobStatus === 'PENDING' || latestProposal?.jobStatus === 'RUNNING';
 
   // For demo rows, build a basic prospect shape from rowData
   const prospect = fetchedProspect ?? (rowData && !isRealId ? {
@@ -1513,6 +1558,7 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
     { id: "assessment", label: "AI Assessment" },
     { id: "contacto",   label: "Contacto" },
     { id: "validacion", label: "Validación" },
+    { id: "propuesta",  label: "Propuesta" },
     { id: "historial",  label: "Historial" },
   ];
 
@@ -1547,6 +1593,8 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
         {prospect && (
           isEnriching
             ? <Badge tone="warning" dot>Enriqueciendo…</Badge>
+            : isGeneratingProposal
+            ? <Badge tone="warning" dot>Generando propuesta…</Badge>
             : <Badge tone={ESTADO_TONE[prospect.estado] ?? "default"} dot>{ESTADO_LABEL[prospect.estado] ?? prospect.estado}</Badge>
         )}
         <button onClick={onClose} style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ink-400)", padding: 6, borderRadius: 6, display: "flex" }}>
@@ -1852,19 +1900,28 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                     <div style={{ height: 1, background: "var(--border-soft)", marginBottom: 20 }}/>
                     <SLabel>Siguiente paso</SLabel>
                     {rowData?.estado === "LISTO_OUTREACH" ? (
-                      <>
-                        <button style={{
-                          width: "100%", padding: "14px 0", borderRadius: 10, border: "1px dashed var(--border-soft)",
-                          background: "var(--bg-2)", color: "var(--ink-400)", fontSize: 13.5, fontWeight: 600,
-                          cursor: "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                        }} disabled>
-                          <Icon.doc size={15}/>
-                          Generar propuesta
-                          <span style={{ fontSize: 10.5, background: "var(--border-soft)", borderRadius: 4, padding: "2px 6px" }}>Próximamente</span>
-                        </button>
-                        <div style={{ fontSize: 11.5, color: "var(--ink-400)", textAlign: "center", marginTop: 8 }}>
-                          El Proposal Agent generará una propuesta para revisión
+                      <div style={{ padding: "14px 16px", borderRadius: 10, background: "#ecfdf5", border: "1px solid var(--success)", display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: 18 }}>🚀</span>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 13.5, color: "#065f46" }}>Propuesta aprobada</div>
+                          <div style={{ fontSize: 12, color: "#047857", marginTop: 2 }}>Listo para contactar al prospecto</div>
                         </div>
+                      </div>
+                    ) : rowData?.estado === "LISTO_PROPUESTA" ? (
+                      <>
+                        <ProposalNextStep
+                          prospectId={prospectId}
+                          latestProposal={latestProposal}
+                          isGenerating={isGeneratingProposal}
+                          onGenerate={async () => {
+                            try {
+                              await proposalsApi.generate(prospectId);
+                              qc.invalidateQueries({ queryKey: ["proposals", prospectId] });
+                              qc.invalidateQueries({ queryKey: ["prospects"] });
+                            } catch (e: any) { alert("Error al generar propuesta: " + e.message); }
+                          }}
+                          onGoToTab={() => setTab("propuesta")}
+                        />
                       </>
                     ) : (
                       <>
@@ -2146,6 +2203,131 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                     </button>
                   )}
                 </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════
+            TAB: PROPUESTA
+        ═══════════════════════════════════════════════ */}
+        {tab === "propuesta" && (
+          <div>
+            {!latestProposal && (
+              <div style={{ textAlign: "center", padding: "40px 20px", background: "var(--bg-2)", borderRadius: 12 }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>📄</div>
+                <div style={{ fontWeight: 600, fontSize: 14, color: "var(--ink-700)", marginBottom: 6 }}>Sin propuesta generada</div>
+                <div style={{ fontSize: 13, color: "var(--ink-400)", lineHeight: 1.6 }}>
+                  {rowData?.estado === "LISTO_PROPUESTA"
+                    ? 'Hacé clic en "Siguiente paso" en la pestaña Validación para generar la propuesta.'
+                    : "El prospecto debe estar en estado Listo propuesta para generar una propuesta."}
+                </div>
+              </div>
+            )}
+
+            {latestProposal && (
+              <>
+                {/* Proposal header */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, padding: "12px 14px", background: "var(--bg-2)", borderRadius: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-400)", textTransform: "uppercase", marginBottom: 2 }}>Versión {latestProposal.version}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color:
+                      latestProposal.status === "APPROVED" ? "var(--success)" :
+                      latestProposal.status === "REJECTED" ? "var(--danger)" : "var(--warning)" }}>
+                      {latestProposal.jobStatus === "PENDING" ? "⏳ En cola…"
+                        : latestProposal.jobStatus === "RUNNING" ? "⚙ Generando propuesta…"
+                        : latestProposal.jobStatus === "FAILED" ? "✗ Error al generar"
+                        : latestProposal.status === "APPROVED" ? "✓ Propuesta aprobada"
+                        : latestProposal.status === "REJECTED" ? "✗ Rechazada"
+                        : "📄 Borrador listo para revisión"}
+                    </div>
+                  </div>
+                  {latestProposal.version > 1 && (
+                    <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, background: "var(--bg-3)", color: "var(--ink-500)" }}>
+                      v{latestProposal.version} de {proposals?.length}
+                    </span>
+                  )}
+                </div>
+
+                {/* In progress state */}
+                {(latestProposal.jobStatus === "PENDING" || latestProposal.jobStatus === "RUNNING") && (
+                  <div style={{ textAlign: "center", padding: "32px 20px", background: "var(--bg-2)", borderRadius: 12, marginBottom: 16 }}>
+                    <div style={{ fontSize: 28, marginBottom: 10 }}>⚙️</div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: "var(--ink-700)", marginBottom: 6 }}>
+                      El Proposal Agent está generando la propuesta…
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--ink-400)" }}>Actualizando automáticamente cada 5 segundos</div>
+                  </div>
+                )}
+
+                {/* Failed state */}
+                {latestProposal.jobStatus === "FAILED" && (
+                  <div style={{ padding: "14px 16px", borderRadius: 10, background: "#fff5f5", border: "1px solid var(--danger)", marginBottom: 16 }}>
+                    <div style={{ fontWeight: 700, color: "var(--danger)", marginBottom: 4 }}>Error al generar</div>
+                    <div style={{ fontSize: 12, color: "var(--ink-600)" }}>{latestProposal.errorMessage ?? "Error desconocido"}</div>
+                  </div>
+                )}
+
+                {/* Proposal content — COMPLETED */}
+                {latestProposal.jobStatus === "COMPLETED" && latestProposal.proposalMarkdown && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ background: "var(--bg-2)", borderRadius: 10, padding: "16px", fontSize: 13, lineHeight: 1.7, color: "var(--ink-800)", whiteSpace: "pre-wrap", fontFamily: "inherit", maxHeight: 400, overflowY: "auto" }}>
+                      {latestProposal.proposalMarkdown}
+                    </div>
+                  </div>
+                )}
+
+                {/* Action buttons — only for DRAFT + COMPLETED */}
+                {latestProposal.status === "DRAFT" && latestProposal.jobStatus === "COMPLETED" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await proposalsApi.approve(latestProposal.id);
+                          qc.invalidateQueries({ queryKey: ["proposals", prospectId] });
+                          qc.invalidateQueries({ queryKey: ["prospects"] });
+                        } catch (e: any) { alert("Error al aprobar: " + e.message); }
+                      }}
+                      style={{ width: "100%", padding: "12px 0", borderRadius: 10, border: "1px solid var(--success)", background: "var(--success)", color: "#fff", fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+                      ✓ Aprobar propuesta → LISTO OUTREACH
+                    </button>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await proposalsApi.regenerate(latestProposal.id);
+                            qc.invalidateQueries({ queryKey: ["proposals", prospectId] });
+                          } catch (e: any) { alert("Error: " + e.message); }
+                        }}
+                        style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid var(--border-soft)", background: "var(--bg-2)", color: "var(--ink-700)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                        🔄 Regenerar
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const reason = prompt("Motivo de rechazo:");
+                          if (!reason) return;
+                          try {
+                            await proposalsApi.reject(latestProposal.id, reason);
+                            qc.invalidateQueries({ queryKey: ["proposals", prospectId] });
+                          } catch (e: any) { alert("Error: " + e.message); }
+                        }}
+                        style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid var(--danger)", background: "transparent", color: "var(--danger)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                        ✗ Rechazar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Approved state */}
+                {latestProposal.status === "APPROVED" && (
+                  <div style={{ padding: "14px 16px", borderRadius: 10, background: "#ecfdf5", border: "1px solid var(--success)", display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 20 }}>✓</span>
+                    <div>
+                      <div style={{ fontWeight: 700, color: "#065f46" }}>Propuesta aprobada</div>
+                      <div style={{ fontSize: 12, color: "#047857", marginTop: 2 }}>Prospecto avanzó a LISTO OUTREACH</div>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -2627,14 +2809,18 @@ function Prospects({ onNav }) {
   }, [prospectsData, validationById, hasToken]);
 
   const aiCounts = React.useMemo(() => {
-    const c = { PENDIENTE_OPPORTUNITY: 0, PRIORIDAD_MAXIMA: 0, APROBADO_IA: 0, REVISAR: 0, DESCARTADO_IA: 0 };
-    for (const r of allRows) c[r.aiState] = (c[r.aiState] ?? 0) + 1;
+    const c: Record<string, number> = { PENDIENTE_OPPORTUNITY: 0, PRIORIDAD_MAXIMA: 0, APROBADO_IA: 0, REVISAR: 0, DESCARTADO_IA: 0, LISTO_PROPUESTA: 0 };
+    for (const r of allRows) {
+      c[r.aiState] = (c[r.aiState] ?? 0) + 1;
+      if (r.estado === "LISTO_PROPUESTA") c.LISTO_PROPUESTA = (c.LISTO_PROPUESTA ?? 0) + 1;
+    }
     return c;
   }, [allRows]);
 
   const tableRows = React.useMemo(() => {
     if (aiFilter === "TODOS") return allRows;
     if (aiFilter === "ACTIVOS") return allRows.filter(r => r.aiState !== "DESCARTADO_IA");
+    if (aiFilter === "LISTO_PROPUESTA") return allRows.filter(r => r.estado === "LISTO_PROPUESTA");
     return allRows.filter(r => r.aiState === aiFilter);
   }, [allRows, aiFilter]);
 
@@ -2857,6 +3043,7 @@ function Prospects({ onNav }) {
           { id: "ACTIVOS",         label: "Activos",          count: allRows.length - aiCounts.DESCARTADO_IA, color: "var(--primary)" },
           { id: "PRIORIDAD_MAXIMA",label: "Prioridad máxima", count: aiCounts.PRIORIDAD_MAXIMA, color: "#10B981" },
           { id: "APROBADO_IA",     label: "Aprobado IA",      count: aiCounts.APROBADO_IA,      color: "#5B5BF7" },
+          { id: "LISTO_PROPUESTA", label: "Listo propuesta",  count: aiCounts.LISTO_PROPUESTA,  color: "#7C3AED" },
           { id: "REVISAR",         label: "Revisar",          count: aiCounts.REVISAR,          color: "#F59E0B" },
           { id: "PENDIENTE_OPPORTUNITY", label: "Pendiente Opp.", count: aiCounts.PENDIENTE_OPPORTUNITY, color: "#D1D5DB" },
           { id: "DESCARTADO_IA",   label: "Descartado IA",    count: aiCounts.DESCARTADO_IA,    color: "#9CA3AF" },

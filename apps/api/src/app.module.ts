@@ -17,6 +17,7 @@ import { ProspectValidationModule } from './modules/prospect-validation/prospect
 import { AgentRoiModule } from './modules/agent-roi/agent-roi.module';
 import { ResearchModule } from './modules/research/research.module';
 import { EnrichmentModule } from './modules/enrichment/enrichment.module';
+import { ProposalsModule } from './modules/proposals/proposals.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -43,6 +44,7 @@ import configuration from './config/configuration';
     AgentRoiModule,
     ResearchModule,
     EnrichmentModule,
+    ProposalsModule,
   ],
 })
 export class AppModule {}

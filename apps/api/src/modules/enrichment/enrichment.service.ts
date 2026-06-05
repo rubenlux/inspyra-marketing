@@ -193,12 +193,14 @@ export class EnrichmentService {
       const commercialScore = Math.floor(
         (opportunityScore + (result.contactabilityScore ?? 0)) / 2,
       );
+      // Advance to LISTO_PROPUESTA — not LISTO_OUTREACH.
+      // LISTO_OUTREACH only happens after the Proposal Engine produces an APPROVED proposal.
       await this.prisma.prospect.updateMany({
         where: { id: result.prospectId, tenantId, estado: 'ENRIQUECIDO' },
-        data: { estado: 'LISTO_OUTREACH', commercialScore },
+        data: { estado: 'LISTO_PROPUESTA', commercialScore },
       });
       this.logger.log(
-        `[EnrichReview] Prospect ${result.prospectId} → LISTO_OUTREACH | commercial: ${commercialScore}`,
+        `[EnrichReview] Prospect ${result.prospectId} → LISTO_PROPUESTA | commercial: ${commercialScore}`,
       );
     } else if (status === 'APPROVED' && !result.contactable) {
       this.logger.warn(`[EnrichReview] Approved but not contactable — prospect stays ENRIQUECIDO`);

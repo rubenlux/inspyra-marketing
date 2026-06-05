@@ -432,6 +432,77 @@ export const enrichmentApi = {
     req<OutreachQueue>('GET', '/enrichment/outreach-queue'),
 }
 
+// ─── Proposals ───────────────────────────────────────────────────────────────
+
+export interface ProposalServiceItem {
+  nombre: string
+  descripcion: string
+  precio: number
+  billingModel: string
+  prioridad: string
+}
+
+export interface ProposalPricing {
+  setup: number
+  mensual: number
+  total12Meses: number
+  nota: string
+}
+
+export interface ProposalData {
+  resumenEjecutivo?: string
+  diagnostico?: string
+  problemasDetectados?: Array<{ problema: string; impacto: string }>
+  objetivos?: string[]
+  serviciosRecomendados?: ProposalServiceItem[]
+  pricing?: ProposalPricing
+  cronograma?: Array<{ semana: number; entregable: string }>
+  justificacion?: string
+  cta?: string
+}
+
+export interface Proposal {
+  id: string
+  tenantId: string
+  prospectId: string
+  version: number
+  parentProposalId: string | null
+  status: 'DRAFT' | 'APPROVED' | 'REJECTED'
+  jobStatus: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED'
+  generatedBy: string
+  proposalData: ProposalData | null
+  proposalMarkdown: string | null
+  proposalHtml: string | null
+  approvedBy: string | null
+  approvedAt: string | null
+  rejectionReason: string | null
+  errorMessage: string | null
+  startedAt: string | null
+  completedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export const proposalsApi = {
+  generate: (prospectId: string) =>
+    req<Proposal>('POST', `/proposals/generate/${prospectId}`),
+
+  findByProspect: (prospectId: string) =>
+    req<Proposal[]>('GET', `/proposals/prospect/${prospectId}`),
+
+  findLatest: (prospectId: string) =>
+    req<Proposal | null>('GET', `/proposals/prospect/${prospectId}/latest`),
+
+  approve: (id: string) =>
+    req<Proposal>('POST', `/proposals/${id}/approve`),
+
+  reject: (id: string, rejectionReason: string) =>
+    req<Proposal>('POST', `/proposals/${id}/reject`, { rejectionReason }),
+
+  regenerate: (id: string) =>
+    req<Proposal>('POST', `/proposals/${id}/regenerate`),
+}
+
 // ─── Agent ROI ────────────────────────────────────────────────────────────────
 
 export interface AgentRoiRow {

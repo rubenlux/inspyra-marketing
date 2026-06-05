@@ -31,6 +31,7 @@ model Tenant {
   serviceAccounts  ServiceAccount[]
   researchJobs     ResearchJob[]
   enrichmentJobs   EnrichmentJob[]
+  proposals        Proposal[]
 
   @@map("tenants")
 }
@@ -62,6 +63,7 @@ model User {
   auditLogs           AuditLog[]
   prospectValidations ProspectValidation[] @relation("ValidationReviewer")
   feedbackReviews     ValidationFeedback[] @relation("FeedbackReviewer")
+  approvedProposals   Proposal[]           @relation("ProposalApprover")
 
   @@unique([tenantId, email])
   @@map("users")
@@ -175,10 +177,11 @@ model Prospect {
   deletedAt     DateTime?
 
   // Relaciones
-  deals           Deal[]
-  validation      ProspectValidation?
-  enrichmentJobs  EnrichmentJob[]
+  deals            Deal[]
+  validation       ProspectValidation?
+  enrichmentJobs   EnrichmentJob[]
   enrichmentResult EnrichmentResult?
+  proposals        Proposal[]
 
   @@index([tenantId, estado])
   @@index([tenantId, score])
@@ -211,6 +214,7 @@ enum ProspectEstado {
   NUEVO
   INVESTIGADO
   ENRIQUECIDO
+  LISTO_PROPUESTA
   LISTO_OUTREACH
   CONTACTADO
   RESPONDIO
@@ -1092,4 +1096,63 @@ model EnrichmentResult {
   @@index([tenantId, reviewStatus])
   @@index([tenantId, recommendedStatus])
   @@map("enrichment_results")
+}
+
+// ─────────────────────────────────────────────
+// PROPOSAL ENGINE (ERP-026)
+// ─────────────────────────────────────────────
+
+enum ProposalStatus {
+  DRAFT
+  APPROVED
+  REJECTED
+}
+
+enum ProposalJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model Proposal {
+  id         String            @id @default(uuid())
+  tenantId   String
+  tenant     Tenant            @relation(fields: [tenantId], references: [id])
+  prospectId String
+  prospect   Prospect          @relation(fields: [prospectId], references: [id])
+
+  // Versioning — never overwrite; always create new version
+  version          Int     @default(1)
+  parentProposalId String?
+  parentProposal   Proposal?  @relation("ProposalVersions", fields: [parentProposalId], references: [id])
+  childProposals   Proposal[] @relation("ProposalVersions")
+
+  // Lifecycle
+  status       ProposalStatus    @default(DRAFT)
+  generatedBy  String            @default("proposal-agent")
+  jobStatus    ProposalJobStatus @default(PENDING)
+  startedAt    DateTime?
+  completedAt  DateTime?
+  errorMessage String?
+
+  // Content — JSON + Markdown both stored; JSON is canonical for future use
+  proposalData     Json?    // Structured output: diagnosis, services[], pricing{}, timeline[], etc.
+  proposalMarkdown String?  @db.Text
+  proposalHtml     String?  @db.Text
+  agentOutput      String?  @db.Text
+
+  // Human review — agents NEVER set status=APPROVED
+  approvedBy      String?
+  approvedAt      DateTime?
+  approver        User?     @relation("ProposalApprover", fields: [approvedBy], references: [id])
+  rejectionReason String?   @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, prospectId])
+  @@index([tenantId, status])
+  @@index([prospectId, version])
+  @@map("proposals")
 }
