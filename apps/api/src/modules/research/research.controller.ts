@@ -26,4 +26,9 @@ export class ResearchController {
   getJob(@Param('id') id: string, @Request() req: AuthRequest) {
     return this.researchService.getJob(id, req.user.tenantId);
   }
+
+  @Get('jobs/:id/candidates')
+  getCandidates(@Param('id') id: string, @Request() req: AuthRequest) {
+    return this.researchService.getCandidates(id, req.user.tenantId);
+  }
 }

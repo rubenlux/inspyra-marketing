@@ -918,22 +918,74 @@ enum ResearchJobStatus {
 }
 
 model ResearchJob {
-  id             String            @id @default(uuid())
-  tenantId       String
-  tenant         Tenant            @relation(fields: [tenantId], references: [id])
-  query          String
-  limit          Int               @default(10)
-  status         ResearchJobStatus @default(PENDING)
-  prospectsFound Int               @default(0)
-  errorMessage   String?           @db.Text
-  agentOutput    String?           @db.Text
-  createdBy      String?
-  startedAt      DateTime?
-  completedAt    DateTime?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  id              String              @id @default(uuid())
+  tenantId        String
+  tenant          Tenant              @relation(fields: [tenantId], references: [id])
+  query           String
+  limit           Int                 @default(10)
+  status          ResearchJobStatus   @default(PENDING)
+  candidatesFound Int                 @default(0)
+  prospectsFound  Int                 @default(0)
+  errorMessage    String?             @db.Text
+  agentOutput     String?             @db.Text
+  createdBy       String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  candidates      ResearchCandidate[]
 
   @@index([tenantId, status])
   @@index([tenantId, createdAt(sort: Desc)])
   @@map("research_jobs")
+}
+
+enum ResearchCandidateStatus {
+  DISCOVERED
+  DISCARDED
+  PROMOTED
+}
+
+model ResearchCandidate {
+  id              String                  @id @default(uuid())
+  jobId           String
+  job             ResearchJob             @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  tenantId        String
+  candidateIndex  Int
+
+  // Haiku raw data
+  nombreEmpresa       String
+  ciudad              String?
+  pais                String?
+  rubro               String?
+  website             String?
+  instagram           String?
+  linkedin            String?
+  descripcion         String?             @db.Text
+  empleadosEstimado   Int?
+  anosFundacion       String?
+  presenciaDigital    Json?
+  facturacionEstimada String?
+
+  // Sonnet evaluation
+  status              ResearchCandidateStatus @default(DISCOVERED)
+  score               Int?
+  scoreBreakdown      Json?
+  reasoning           String?             @db.Text
+  discardReason       String?
+  problemasDetectados String[]
+  oportunidadDetectada String?            @db.Text
+  servicioSugerido    String?
+  estimatedTicketUsd  Int?
+
+  // Prospect link (if promoted)
+  prospectId          String?
+
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@index([jobId])
+  @@index([tenantId, status])
+  @@map("research_candidates")
 }

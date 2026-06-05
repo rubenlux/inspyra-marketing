@@ -209,8 +209,47 @@ export interface ResearchJob {
   completedAt?: string | null
 }
 
+export interface ResearchCandidate {
+  id: string
+  jobId: string
+  tenantId: string
+  candidateIndex: number
+  // Haiku data
+  nombreEmpresa: string
+  ciudad?: string
+  pais?: string
+  rubro?: string
+  website?: string
+  instagram?: string
+  linkedin?: string
+  descripcion?: string
+  empleadosEstimado?: number
+  anosFundacion?: string
+  presenciaDigital?: {
+    tieneWeb?: boolean
+    tieneSeo?: boolean
+    tieneRedes?: boolean
+    tieneEcommerce?: boolean
+    tieneAgendaOnline?: boolean
+  }
+  facturacionEstimada?: string
+  // Sonnet evaluation
+  status: 'DISCOVERED' | 'DISCARDED' | 'PROMOTED'
+  score?: number
+  scoreBreakdown?: Record<string, number>
+  reasoning?: string
+  discardReason?: string
+  problemasDetectados?: string[]
+  oportunidadDetectada?: string
+  servicioSugerido?: string
+  estimatedTicketUsd?: number
+  // Prospect link
+  prospectId?: string
+  createdAt: string
+}
+
 export const researchApi = {
-  createJob: (query: string, limit = 10) =>
+  createJob: (query: string, limit = 50) =>
     req<ResearchJob>('POST', '/research/jobs', { query, limit }),
 
   getJob: (id: string) =>
@@ -218,6 +257,9 @@ export const researchApi = {
 
   listJobs: () =>
     req<ResearchJob[]>('GET', '/research/jobs'),
+
+  getCandidates: (jobId: string) =>
+    req<ResearchCandidate[]>('GET', `/research/jobs/${jobId}/candidates`),
 }
 
 // ─── Agent ROI ────────────────────────────────────────────────────────────────

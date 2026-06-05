@@ -4,12 +4,14 @@ import { CreateResearchJobDto } from './dto/create-research-job.dto';
 import { spawn } from 'child_process';
 import * as path from 'path';
 
+// ── Types ──────────────────────────────────────────────────────────────────────
+
 interface RawCompany {
   nombreEmpresa: string;
-  ciudad: string;
-  pais: string;
+  ciudad?: string;
+  pais?: string;
   provincia?: string;
-  rubro: string;
+  rubro?: string;
   website?: string;
   instagram?: string;
   linkedin?: string;
@@ -26,6 +28,22 @@ interface RawCompany {
   facturacionEstimada?: string;
 }
 
+interface SonnetEvaluation {
+  index: number;
+  nombreEmpresa: string;
+  action: 'PROMOTE' | 'DISCARD';
+  score: number;
+  scoreBreakdown?: Record<string, number>;
+  reasoning?: string;
+  discardReason?: string;
+  problemasDetectados?: string[];
+  oportunidadDetectada?: string;
+  servicioSugerido?: string;
+  estimatedTicketUsd?: number;
+}
+
+// ── Service ────────────────────────────────────────────────────────────────────
+
 @Injectable()
 export class ResearchService {
   private readonly logger = new Logger(ResearchService.name);
@@ -33,7 +51,7 @@ export class ResearchService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  // ── Public API ──────────────────────────────────────────────────────────────
+  // ── Public API ───────────────────────────────────────────────────────────────
 
   async createJob(dto: CreateResearchJobDto, tenantId: string, userId: string) {
     const job = await this.prisma.researchJob.create({
@@ -46,19 +64,17 @@ export class ResearchService {
       },
     });
 
-    setImmediate(() => {
+    setImmediate(() =>
       this.runPipeline(job.id, tenantId, dto.query, dto.limit ?? 50).catch(err =>
         this.logger.error(`[Job ${job.id}] Unhandled: ${err.message}`),
-      );
-    });
+      ),
+    );
 
     return job;
   }
 
   async getJob(jobId: string, tenantId: string) {
-    const job = await this.prisma.researchJob.findFirst({
-      where: { id: jobId, tenantId },
-    });
+    const job = await this.prisma.researchJob.findFirst({ where: { id: jobId, tenantId } });
     if (!job) throw new NotFoundException(`Research job ${jobId} not found`);
     return job;
   }
@@ -69,9 +85,20 @@ export class ResearchService {
       orderBy: { createdAt: 'desc' },
       take: 20,
       select: {
-        id: true, query: true, status: true, prospectsFound: true,
+        id: true, query: true, status: true,
+        candidatesFound: true, prospectsFound: true,
         errorMessage: true, createdAt: true, startedAt: true, completedAt: true, limit: true,
       },
+    });
+  }
+
+  async getCandidates(jobId: string, tenantId: string) {
+    const job = await this.prisma.researchJob.findFirst({ where: { id: jobId, tenantId } });
+    if (!job) throw new NotFoundException(`Research job ${jobId} not found`);
+
+    return this.prisma.researchCandidate.findMany({
+      where: { jobId },
+      orderBy: [{ status: 'asc' }, { score: 'desc' }],
     });
   }
 
@@ -83,37 +110,71 @@ export class ResearchService {
       data: { status: 'RUNNING', startedAt: new Date() },
     });
 
-    this.logger.log(`[Job ${jobId}] Starting pipeline | query: "${query}" | discovery: ${limit}`);
+    this.logger.log(`[Job ${jobId}] Pipeline start | "${query}" | limit: ${limit}`);
 
     try {
-      // ── Phase 1: Haiku discovers companies ───────────────────────────────
-      this.logger.log(`[Job ${jobId}] Phase 1 — Haiku discovery (${limit} companies)`);
-
-      await this.prisma.researchJob.update({
-        where: { id: jobId },
-        data: { agentOutput: `[Fase 1] Haiku descubriendo ${limit} empresas…` },
-      });
+      // ── Phase 1: Haiku discovers companies ──────────────────────────────────
+      await this.updateJobOutput(jobId, `[Fase 1/3] Haiku descubriendo ${limit} empresas…`);
 
       const rawCompanies = await this.discoverWithHaiku(query, limit);
+      this.logger.log(`[Job ${jobId}] Phase 1 done — ${rawCompanies.length} companies`);
 
-      this.logger.log(`[Job ${jobId}] Phase 1 complete — ${rawCompanies.length} companies discovered`);
+      // ── Save all candidates as DISCOVERED ───────────────────────────────────
+      await this.updateJobOutput(jobId, `[Fase 2/3] Guardando ${rawCompanies.length} candidatos…`);
 
+      const savedCandidates = await this.saveCandidates(jobId, tenantId, rawCompanies);
       await this.prisma.researchJob.update({
         where: { id: jobId },
-        data: { agentOutput: `[Fase 1 OK] ${rawCompanies.length} empresas descubiertas\n[Fase 2] Sonnet calificando y creando prospectos…` },
+        data: { candidatesFound: rawCompanies.length },
       });
 
-      // ── Phase 2: Sonnet qualifies and creates prospects ──────────────────
-      this.logger.log(`[Job ${jobId}] Phase 2 — Sonnet qualification & CRM creation`);
+      // ── Phase 2: Sonnet evaluates (JSON, no MCP) ────────────────────────────
+      await this.updateJobOutput(jobId,
+        `[Fase 2/3] Haiku trajo ${rawCompanies.length} empresas. Sonnet evaluando…`,
+      );
 
-      const beforeCount = await this.prisma.prospect.count({ where: { tenantId } });
+      const evaluations = await this.evaluateWithSonnet(rawCompanies);
+      this.logger.log(`[Job ${jobId}] Phase 2 done — ${evaluations.length} evaluations`);
 
-      await this.qualifyWithSonnet(jobId, rawCompanies);
+      // ── Phase 3: Create prospects for qualified candidates ──────────────────
+      await this.updateJobOutput(jobId,
+        `[Fase 3/3] Creando prospectos para los que califican…`,
+      );
 
-      const afterCount = await this.prisma.prospect.count({ where: { tenantId } });
-      const prospectsFound = Math.max(0, afterCount - beforeCount);
+      let prospectsFound = 0;
+      for (const evaluation of evaluations) {
+        const candidate = savedCandidates[evaluation.index];
+        if (!candidate) continue;
 
-      this.logger.log(`[Job ${jobId}] Pipeline done — ${prospectsFound} prospects created from ${rawCompanies.length} evaluated`);
+        const commonUpdate = {
+          score: evaluation.score,
+          scoreBreakdown: evaluation.scoreBreakdown ?? {},
+          reasoning: evaluation.reasoning,
+          discardReason: evaluation.discardReason,
+          problemasDetectados: evaluation.problemasDetectados ?? [],
+          oportunidadDetectada: evaluation.oportunidadDetectada,
+          servicioSugerido: evaluation.servicioSugerido,
+          estimatedTicketUsd: evaluation.estimatedTicketUsd,
+        };
+
+        if (evaluation.action === 'PROMOTE' && evaluation.score >= 60) {
+          const prospect = await this.createProspectFromEvaluation(
+            tenantId, rawCompanies[evaluation.index], evaluation,
+          );
+          await this.prisma.researchCandidate.update({
+            where: { id: candidate.id },
+            data: { ...commonUpdate, status: 'PROMOTED', prospectId: prospect.id },
+          });
+          prospectsFound++;
+        } else {
+          await this.prisma.researchCandidate.update({
+            where: { id: candidate.id },
+            data: { ...commonUpdate, status: 'DISCARDED' },
+          });
+        }
+      }
+
+      this.logger.log(`[Job ${jobId}] Pipeline done — ${prospectsFound}/${rawCompanies.length} promoted`);
 
       await this.prisma.researchJob.update({
         where: { id: jobId },
@@ -121,7 +182,7 @@ export class ResearchService {
           status: 'COMPLETED',
           completedAt: new Date(),
           prospectsFound,
-          agentOutput: `[Fase 1] ${rawCompanies.length} empresas descubiertas por Haiku\n[Fase 2] ${prospectsFound} prospectos creados por Sonnet (de ${rawCompanies.length} evaluados)`,
+          agentOutput: `Haiku: ${rawCompanies.length} empresas descubiertas | Sonnet: ${prospectsFound} promovidas a prospecto, ${rawCompanies.length - prospectsFound} descartadas`,
         },
       });
     } catch (err) {
@@ -134,161 +195,194 @@ export class ResearchService {
     }
   }
 
-  // ── Phase 1: Haiku Discovery ─────────────────────────────────────────────────
+  // ── Phase 1: Haiku Discovery ──────────────────────────────────────────────────
 
   private async discoverWithHaiku(query: string, limit: number): Promise<RawCompany[]> {
     const prompt = `Generá un JSON array con ${limit} empresas que coincidan con: "${query}"
 
-Incluí datos ricos y realistas para cada empresa. Formato exacto (SOLO JSON, sin texto adicional):
+Datos ricos y realistas para cada empresa. SOLO JSON, sin texto adicional:
 [
   {
     "nombreEmpresa": "Bodega Clos de los Siete",
-    "ciudad": "Mendoza",
-    "provincia": "Mendoza",
-    "pais": "Argentina",
+    "ciudad": "Mendoza", "provincia": "Mendoza", "pais": "Argentina",
     "rubro": "Bodega / Vino de alta gama",
-    "website": "closdelossiete.com",
-    "instagram": "@closdelossiete",
-    "linkedin": "linkedin.com/company/clos-de-los-siete",
-    "descripcion": "Bodega boutique fundada en 2002, produce Malbec y Cabernet. Exporta a Europa y EEUU. Venta directa al consumidor poco desarrollada. Sus vinos se venden principalmente a través de distribuidores.",
-    "empleadosEstimado": 25,
-    "añosFundacion": "2002",
-    "presenciaDigital": {
-      "tieneWeb": true,
-      "tieneSeo": false,
-      "tieneRedes": true,
-      "tieneEcommerce": false,
-      "tieneAgendaOnline": false
-    },
+    "website": "closdelossiete.com", "instagram": "@closdelossiete", "linkedin": "linkedin.com/company/clos-de-los-siete",
+    "descripcion": "Bodega boutique fundada en 2002, produce Malbec y Cabernet. Exporta a Europa y EEUU. Venta directa al consumidor poco desarrollada.",
+    "empleadosEstimado": 25, "añosFundacion": "2002",
+    "presenciaDigital": { "tieneWeb": true, "tieneSeo": false, "tieneRedes": true, "tieneEcommerce": false, "tieneAgendaOnline": false },
     "facturacionEstimada": "mediana"
   }
 ]
 
-Generá los ${limit} registros. Variá los tipos de empresas, tamaños y situaciones digitales. SOLO JSON.`;
+Generá los ${limit} registros con variedad de tamaños y situaciones digitales. SOLO JSON.`;
 
     const output = await this.spawnClaudeText(prompt, 'claude-haiku-4-5-20251001', 3 * 60 * 1000);
 
-    // Extract JSON array from output
+    const match = output.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error(`Haiku no devolvió JSON válido. Output: ${output.slice(0, 300)}`);
+
+    const parsed = JSON.parse(match[0]) as RawCompany[];
+    if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('Haiku devolvió JSON vacío');
+    return parsed;
+  }
+
+  // ── Save candidates (Phase 1 → DB) ───────────────────────────────────────────
+
+  private async saveCandidates(jobId: string, tenantId: string, companies: RawCompany[]) {
+    const created = await Promise.all(
+      companies.map((c, i) =>
+        this.prisma.researchCandidate.create({
+          data: {
+            jobId,
+            tenantId,
+            candidateIndex: i,
+            nombreEmpresa: c.nombreEmpresa,
+            ciudad: c.ciudad,
+            pais: c.pais,
+            rubro: c.rubro,
+            website: c.website,
+            instagram: c.instagram,
+            linkedin: c.linkedin,
+            descripcion: c.descripcion,
+            empleadosEstimado: c.empleadosEstimado,
+            anosFundacion: c.añosFundacion,
+            presenciaDigital: c.presenciaDigital as object,
+            facturacionEstimada: c.facturacionEstimada,
+            status: 'DISCOVERED',
+          },
+        }),
+      ),
+    );
+    return created; // indexed by position = candidateIndex
+  }
+
+  // ── Phase 2: Sonnet Evaluation (JSON output, no MCP) ──────────────────────────
+
+  private async evaluateWithSonnet(companies: RawCompany[]): Promise<SonnetEvaluation[]> {
+    const prompt = `Sos el Senior Analyst de Inspyra Digital, agencia de marketing digital para pymes latinoamericanas (web, SEO local, redes sociales, publicidad digital, ecommerce, agendas online).
+
+Tu ÚNICA tarea: evaluar estas ${companies.length} empresas y devolver un JSON array. NO uses herramientas. SOLO JSON como respuesta.
+
+CRITERIOS DE SCORE (0-100):
+  +35 — Sin ecommerce/tienda online (necesitan plataforma de venta)
+  +25 — Sin SEO (oportunidad de posicionamiento local/orgánico)
+  +20 — Sin agenda online (restaurantes, clínicas, estudios, peluquerías)
+  +15 — Sin web propia o web muy desactualizada
+  +15 — Sin redes activas o presencia social muy débil
+  +10 — Rubro con alta demanda Inspyra (gastronomía, salud, legal, inmobiliaria, turismo)
+  -20 — Empresa grande con equipo de marketing interno
+  -15 — Microempresa familiar sin presupuesto probable (menos de 3 empleados, facturación pequeña)
+  -10 — Ya bien posicionada digitalmente (tiene todo)
+
+PROMOTE si score >= 60 — crear prospecto en CRM
+DISCARD si score < 60 — descartar
+
+EMPRESAS:
+${JSON.stringify(companies, null, 2)}
+
+FORMATO DE RESPUESTA (SOLO este JSON array, sin ningún texto adicional antes o después):
+[
+  {
+    "index": 0,
+    "nombreEmpresa": "nombre exacto de la empresa",
+    "action": "PROMOTE",
+    "score": 75,
+    "scoreBreakdown": {"sinEcommerce": 35, "sinSeo": 25, "sinAgenda": 0, "sinWeb": 15, "sinRedes": 0, "bonusRubro": 10, "penalizaciones": 0},
+    "reasoning": "Análisis de 2-3 oraciones explicando por qué es o no buen prospecto.",
+    "problemasDetectados": ["Sin canal de venta directa online", "Nulo SEO local"],
+    "oportunidadDetectada": "Descripción concreta de qué puede hacer Inspyra por esta empresa.",
+    "servicioSugerido": "Web + Ecommerce",
+    "estimatedTicketUsd": 800
+  },
+  {
+    "index": 1,
+    "nombreEmpresa": "nombre exacto",
+    "action": "DISCARD",
+    "score": 20,
+    "scoreBreakdown": {"sinEcommerce": 0, "sinSeo": 0, "penalizaciones": -20},
+    "reasoning": "Por qué no es buen prospecto.",
+    "discardReason": "Empresa grande con marketing interno"
+  }
+]
+
+Evaluá las ${companies.length} empresas. SOLO el JSON array como respuesta.`;
+
+    const output = await this.spawnClaudeText(prompt, 'claude-sonnet-4-6', 5 * 60 * 1000);
+
     const match = output.match(/\[[\s\S]*\]/);
     if (!match) {
-      this.logger.warn(`Haiku output (first 500): ${output.slice(0, 500)}`);
-      throw new Error(`Haiku no devolvió JSON válido. Respuesta: ${output.slice(0, 200)}`);
+      this.logger.warn(`Sonnet output (first 500): ${output.slice(0, 500)}`);
+      throw new Error(`Sonnet no devolvió JSON válido`);
     }
 
     try {
-      const parsed = JSON.parse(match[0]) as RawCompany[];
-      if (!Array.isArray(parsed) || parsed.length === 0) {
-        throw new Error('JSON vacío o no es array');
-      }
+      const parsed = JSON.parse(match[0]) as SonnetEvaluation[];
+      if (!Array.isArray(parsed)) throw new Error('Sonnet devolvió JSON no-array');
       return parsed;
     } catch (e) {
-      throw new Error(`Error parseando JSON de Haiku: ${e.message}`);
+      throw new Error(`Error parseando evaluaciones de Sonnet: ${e.message}`);
     }
   }
 
-  // ── Phase 2: Sonnet Qualification ────────────────────────────────────────────
+  // ── Phase 3: Create prospect via Prisma ──────────────────────────────────────
 
-  private async qualifyWithSonnet(jobId: string, companies: RawCompany[]): Promise<void> {
-    const companiesJson = JSON.stringify(companies, null, 2);
+  private async createProspectFromEvaluation(
+    tenantId: string,
+    company: RawCompany,
+    evaluation: SonnetEvaluation,
+  ) {
+    const nivel = this.scoreToNivel(evaluation.score);
+    const prioridad = this.scoreToPrioridad(evaluation.score);
 
-    const prompt = `Sos el Senior Analyst de Inspyra Digital, una agencia de marketing digital especializada en pymes latinoamericanas. Servicios: web, SEO local, redes sociales, publicidad digital, plataformas de agenda/ecommerce.
-
-El Research Agent te trae ${companies.length} fichas de empresas para que evalúes cuáles son prospectos reales para Inspyra.
-
-══════════ DATOS CRUDOS DEL RESEARCH AGENT ══════════
-${companiesJson}
-══════════════════════════════════════════════════════
-
-TU TAREA: Evaluá cada empresa y creá prospectos SOLO para las que califiquen.
-
-CRITERIOS DE CALIFICACIÓN (score 0-100):
-  +35 — Sin ecommerce/tienda online (necesitan plataforma)
-  +25 — Sin SEO (oportunidad de posicionamiento)
-  +20 — Sin agenda online (restaurantes, clínicas, estudios)
-  +15 — Web desactualizada o sin web propia
-  +15 — Sin redes activas o presencia muy débil
-  -20 — Empresa grande con departamento de marketing propio
-  -15 — Microempresa familiar sin presupuesto probable
-  -10 — Ya bien posicionada digitalmente
-
-CREAR prospecto si: score >= 60
-DESCARTAR si: score < 60 (no llamar inspyra_create_prospect)
-
-Para cada empresa que califique, llamá inspyra_create_prospect con:
-  - problemasEncontrados: lista específica de 3-5 problemas reales basados en los datos
-  - oportunidadDetectada: descripción concreta de qué puede hacer Inspyra (1-2 oraciones)
-  - servicioSugerido: el servicio principal (ej: "SEO Local", "Web + Ecommerce", "Redes Sociales", "Plataforma de Turnos")
-  - score: el número que calculaste
-  - nivelOportunidad: BAJA/MEDIA/ALTA/CRITICA según el score
-  - prioridad: BAJA/MEDIA/ALTA
-
-Evaluá las ${companies.length} empresas. Sé crítico — solo creá las que realmente necesiten y puedan pagar los servicios de Inspyra. Empezá ahora.`;
-
-    await this.spawnClaudeWithMcp(jobId, prompt, 'claude-sonnet-4-6', 5 * 60 * 1000);
-  }
-
-  // ── Spawn helpers ─────────────────────────────────────────────────────────────
-
-  // Spawn claude without MCP — returns raw text output
-  private spawnClaudeText(prompt: string, model: string, timeoutMs: number): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const args = [
-        '-p', prompt,
-        '--output-format', 'text',
-        '--dangerously-skip-permissions',
-        '--model', model,
-      ];
-
-      this.logger.log(`Spawning claude text | model: ${model} | cwd: ${this.projectRoot}`);
-
-      const child = spawn('claude', args, {
-        cwd: this.projectRoot,
-        env: { ...process.env },
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-
-      let stdout = '';
-      let stderr = '';
-      let settled = false;
-
-      const done = (err?: Error) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        if (err) reject(err);
-        else resolve(stdout);
-      };
-
-      const timer = setTimeout(() => {
-        child.kill('SIGTERM');
-        done(new Error(`Haiku timeout after ${timeoutMs / 60000} minutes`));
-      }, timeoutMs);
-
-      child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
-      child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
-      child.on('close', (code) => {
-        if (code === 0) done();
-        else done(new Error(`claude exited ${code}. stderr: ${stderr.slice(-500)}`));
-      });
-      child.on('error', (err) => done(err));
+    return this.prisma.prospect.create({
+      data: {
+        tenantId,
+        nombreEmpresa: company.nombreEmpresa,
+        ciudad: company.ciudad,
+        pais: company.pais,
+        rubro: company.rubro,
+        website: company.website,
+        instagram: company.instagram,
+        linkedin: company.linkedin,
+        empleadosEstimado: company.empleadosEstimado,
+        oportunidadDetectada: evaluation.oportunidadDetectada,
+        problemasEncontrados: evaluation.problemasDetectados ?? [],
+        nivelOportunidad: nivel,
+        servicioSugerido: evaluation.servicioSugerido,
+        score: evaluation.score,
+        prioridad,
+        fuente: 'MANUAL',
+        detectadoPor: 'IA',
+        estado: 'NUEVO',
+      },
     });
   }
 
-  // Spawn claude with MCP — Sonnet creates prospects
-  private spawnClaudeWithMcp(jobId: string, prompt: string, model: string, timeoutMs: number): Promise<string> {
+  // ── Helpers ───────────────────────────────────────────────────────────────────
+
+  private scoreToNivel(score: number): 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA' {
+    if (score >= 90) return 'CRITICA';
+    if (score >= 75) return 'ALTA';
+    if (score >= 60) return 'MEDIA';
+    return 'BAJA';
+  }
+
+  private scoreToPrioridad(score: number): 'BAJA' | 'MEDIA' | 'ALTA' {
+    if (score >= 80) return 'ALTA';
+    if (score >= 65) return 'MEDIA';
+    return 'BAJA';
+  }
+
+  private async updateJobOutput(jobId: string, msg: string) {
+    await this.prisma.researchJob.update({ where: { id: jobId }, data: { agentOutput: msg } });
+  }
+
+  // ── Claude spawn (text only, no MCP) ─────────────────────────────────────────
+
+  private spawnClaudeText(prompt: string, model: string, timeoutMs: number): Promise<string> {
     return new Promise((resolve, reject) => {
-      const mcpConfigPath = path.join(this.projectRoot, 'openclaw.json');
-
-      const args = [
-        '-p', prompt,
-        '--mcp-config', mcpConfigPath,
-        '--output-format', 'text',
-        '--dangerously-skip-permissions',
-        '--allowedTools', 'mcp__inspyra__*',
-        '--model', model,
-      ];
-
-      this.logger.log(`[Job ${jobId}] Spawning claude+MCP | model: ${model}`);
+      const args = ['-p', prompt, '--output-format', 'text', '--dangerously-skip-permissions', '--model', model];
+      this.logger.log(`Spawning claude | model: ${model}`);
 
       const child = spawn('claude', args, {
         cwd: this.projectRoot,
@@ -310,16 +404,16 @@ Evaluá las ${companies.length} empresas. Sé crítico — solo creá las que re
 
       const timer = setTimeout(() => {
         child.kill('SIGTERM');
-        done(new Error(`Sonnet timeout after ${timeoutMs / 60000} minutes`));
+        done(new Error(`Timeout ${model} after ${timeoutMs / 60000}min`));
       }, timeoutMs);
 
-      child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
-      child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
-      child.on('close', (code) => {
+      child.stdout.on('data', (c: Buffer) => { stdout += c.toString(); });
+      child.stderr.on('data', (c: Buffer) => { stderr += c.toString(); });
+      child.on('close', code => {
         if (code === 0) done();
-        else done(new Error(`claude exited ${code}. stderr: ${stderr.slice(-500)}`));
+        else done(new Error(`claude exited ${code}. stderr: ${stderr.slice(-400)}`));
       });
-      child.on('error', (err) => done(err));
+      child.on('error', done);
     });
   }
 }

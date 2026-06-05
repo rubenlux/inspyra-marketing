@@ -3,7 +3,7 @@ import * as React from 'react'
 import { useEffect, useState, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { authApi, prospectsApi, validationsApi, researchApi, getStoredToken, setStoredToken, clearStoredToken } from '../api/inspyra'
+import { authApi, prospectsApi, validationsApi, researchApi, getStoredToken, setStoredToken, clearStoredToken, ResearchCandidate } from '../api/inspyra'
 import DashboardV2 from './DashboardV2'
 import './erp.css'
 
@@ -1978,12 +1978,194 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose }) {
   );
 }
 
+// ── Research Job Detail Drawer ────────────────────────────────────────────────
+
+function ResearchJobDetailDrawer({ jobId, onClose }: { jobId: string; onClose: () => void }) {
+  const [tab, setTab] = useState<'discovered' | 'evaluated' | 'promoted'>('discovered');
+
+  const { data: candidates, isLoading } = useQuery({
+    queryKey: ['research-candidates', jobId],
+    queryFn: () => researchApi.getCandidates(jobId),
+    enabled: Boolean(jobId),
+    staleTime: 60000,
+  });
+
+  const discovered = candidates ?? [];
+  const promoted = discovered.filter(c => c.status === 'PROMOTED');
+  const discarded = discovered.filter(c => c.status === 'DISCARDED');
+  const pending = discovered.filter(c => c.status === 'DISCOVERED');
+
+  const ScoreBar = ({ score }: { score?: number }) => {
+    if (!score) return <span style={{ color: "var(--ink-400)", fontSize: 12 }}>—</span>;
+    const color = score >= 80 ? "#059669" : score >= 60 ? "#d97706" : "#dc2626";
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ flex: 1, height: 4, background: "var(--border-soft)", borderRadius: 2 }}>
+          <div style={{ width: `${score}%`, height: "100%", background: color, borderRadius: 2 }}/>
+        </div>
+        <span style={{ fontSize: 12, fontWeight: 700, color, minWidth: 28 }}>{score}</span>
+      </div>
+    );
+  };
+
+  const CandidateCard = ({ c }: { c: ResearchCandidate }) => {
+    const [open, setOpen] = useState(false);
+    const statusColor = c.status === 'PROMOTED' ? "#059669" : c.status === 'DISCARDED' ? "#dc2626" : "#6b7280";
+    const statusLabel = c.status === 'PROMOTED' ? "Promovido" : c.status === 'DISCARDED' ? "Descartado" : "Descubierto";
+
+    return (
+      <div style={{ border: "1px solid var(--border-soft)", borderRadius: 8, marginBottom: 8, overflow: "hidden" }}>
+        <div
+          onClick={() => setOpen(o => !o)}
+          style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", background: "var(--bg-1)" }}
+        >
+          <div style={{ flex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontWeight: 700, fontSize: 13 }}>{c.nombreEmpresa}</span>
+              <span style={{ fontSize: 10, fontWeight: 600, color: statusColor, background: `${statusColor}18`, padding: "2px 7px", borderRadius: 10 }}>{statusLabel}</span>
+            </div>
+            <div style={{ fontSize: 11, color: "var(--ink-500)", marginTop: 2 }}>
+              {[c.rubro, c.ciudad, c.pais].filter(Boolean).join(" · ")}
+            </div>
+          </div>
+          {c.score !== undefined && <ScoreBar score={c.score}/>}
+          <span style={{ fontSize: 12, color: "var(--ink-400)" }}>{open ? "▲" : "▼"}</span>
+        </div>
+        {open && (
+          <div style={{ padding: "12px 14px", background: "var(--bg-0)", borderTop: "1px solid var(--border-soft)" }}>
+            {/* Digital presence */}
+            {c.presenciaDigital && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                {[
+                  { k: "tieneWeb", label: "Web" }, { k: "tieneSeo", label: "SEO" },
+                  { k: "tieneRedes", label: "Redes" }, { k: "tieneEcommerce", label: "Ecommerce" },
+                  { k: "tieneAgendaOnline", label: "Agenda" },
+                ].map(({ k, label }) => {
+                  const has = c.presenciaDigital?.[k as keyof typeof c.presenciaDigital];
+                  return (
+                    <span key={k} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, fontWeight: 600,
+                      background: has ? "#d1fae5" : "#fee2e2", color: has ? "#065f46" : "#991b1b" }}>
+                      {has ? "✓" : "✗"} {label}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            {c.descripcion && <p style={{ fontSize: 12, color: "var(--ink-700)", margin: "0 0 8px", lineHeight: 1.5 }}>{c.descripcion}</p>}
+            {/* Sonnet evaluation */}
+            {c.reasoning && (
+              <div style={{ background: "var(--bg-2)", borderRadius: 6, padding: "8px 10px", marginBottom: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--ink-500)", marginBottom: 4 }}>EVALUACIÓN SONNET</div>
+                <p style={{ fontSize: 12, color: "var(--ink-800)", margin: 0, lineHeight: 1.5 }}>{c.reasoning}</p>
+              </div>
+            )}
+            {c.discardReason && (
+              <div style={{ fontSize: 11, color: "#dc2626", fontWeight: 600 }}>Motivo descarte: {c.discardReason}</div>
+            )}
+            {c.oportunidadDetectada && (
+              <div style={{ fontSize: 12, color: "var(--ink-700)", marginTop: 6 }}>
+                <strong>Oportunidad:</strong> {c.oportunidadDetectada}
+              </div>
+            )}
+            {c.servicioSugerido && (
+              <div style={{ marginTop: 6 }}>
+                <span style={{ fontSize: 11, background: "var(--primary-soft)", color: "var(--primary)", padding: "2px 8px", borderRadius: 10, fontWeight: 600 }}>{c.servicioSugerido}</span>
+                {c.estimatedTicketUsd && <span style={{ fontSize: 11, color: "var(--ink-500)", marginLeft: 8 }}>~USD {c.estimatedTicketUsd}/mes</span>}
+              </div>
+            )}
+            {c.problemasDetectados && c.problemasDetectados.length > 0 && (
+              <ul style={{ margin: "8px 0 0", paddingLeft: 16, fontSize: 12, color: "var(--ink-600)" }}>
+                {c.problemasDetectados.map((p, i) => <li key={i}>{p}</li>)}
+              </ul>
+            )}
+            {/* Score breakdown */}
+            {c.scoreBreakdown && Object.keys(c.scoreBreakdown).length > 0 && (
+              <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {Object.entries(c.scoreBreakdown).filter(([, v]) => v !== 0).map(([k, v]) => (
+                  <span key={k} style={{ fontSize: 10, padding: "2px 7px", borderRadius: 8, background: Number(v) > 0 ? "#d1fae5" : "#fee2e2", color: Number(v) > 0 ? "#065f46" : "#991b1b", fontWeight: 600 }}>
+                    {k}: {Number(v) > 0 ? "+" : ""}{v}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const tabItems: { id: typeof tab; label: string; count: number }[] = [
+    { id: 'discovered', label: 'Descubiertos por Haiku', count: discovered.length },
+    { id: 'evaluated', label: 'Evaluados por Sonnet', count: promoted.length + discarded.length },
+    { id: 'promoted', label: 'Promovidos a CRM', count: promoted.length },
+  ];
+
+  const tabContent = tab === 'discovered' ? discovered
+    : tab === 'evaluated' ? [...promoted, ...discarded]
+    : promoted;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, top: 56, background: "rgba(0,0,0,0.35)", zIndex: 98 }}/>
+      {/* Drawer */}
+      <div style={{ position: "fixed", top: 56, right: 0, bottom: 0, width: 560, background: "#ffffff", zIndex: 99, display: "flex", flexDirection: "column", boxShadow: "-4px 0 20px rgba(0,0,0,0.12)" }}>
+        {/* Header */}
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border-soft)", display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>Research Job Detail</div>
+            <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 2 }}>Pipeline Haiku → Sonnet → CRM</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink-400)", fontSize: 20, lineHeight: 1, padding: 4 }}>×</button>
+        </div>
+        {/* Stats */}
+        <div style={{ padding: "12px 20px", background: "var(--bg-2)", borderBottom: "1px solid var(--border-soft)", display: "flex", gap: 24 }}>
+          {[
+            { label: "Descubiertos", value: discovered.length, color: "#6b7280" },
+            { label: "Descartados", value: discarded.length, color: "#dc2626" },
+            { label: "Promovidos", value: promoted.length, color: "#059669" },
+            { label: "Tasa", value: discovered.length ? `${Math.round(promoted.length / discovered.length * 100)}%` : "—", color: "#7c3aed" },
+          ].map(s => (
+            <div key={s.label} style={{ textAlign: "center" }}>
+              <div style={{ fontWeight: 800, fontSize: 20, color: s.color }}>{s.value}</div>
+              <div style={{ fontSize: 11, color: "var(--ink-500)" }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+        {/* Tabs */}
+        <div style={{ display: "flex", borderBottom: "1px solid var(--border-soft)", padding: "0 20px" }}>
+          {tabItems.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              style={{ padding: "10px 12px", border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: tab === t.id ? 700 : 400,
+                color: tab === t.id ? "var(--primary)" : "var(--ink-500)", borderBottom: tab === t.id ? "2px solid var(--primary)" : "2px solid transparent", whiteSpace: "nowrap" }}>
+              {t.label} {t.count > 0 && <span style={{ marginLeft: 4, background: tab === t.id ? "var(--primary-soft)" : "var(--bg-2)", color: tab === t.id ? "var(--primary)" : "var(--ink-500)", borderRadius: 10, padding: "0 6px", fontSize: 10, fontWeight: 700 }}>{t.count}</span>}
+            </button>
+          ))}
+        </div>
+        {/* Content */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
+          {isLoading && <div style={{ textAlign: "center", padding: 40, color: "var(--ink-400)", fontSize: 13 }}>Cargando candidatos…</div>}
+          {!isLoading && tabContent.length === 0 && (
+            <div style={{ textAlign: "center", padding: 40, color: "var(--ink-400)", fontSize: 13 }}>
+              {tab === 'promoted' ? "Ningún candidato promovido a CRM" : "Sin datos aún"}
+            </div>
+          )}
+          {!isLoading && tabContent.map(c => <CandidateCard key={c.id} c={c}/>)}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Prospects ─────────────────────────────────────────────────────────────────
+
 function Prospects({ onNav }) {
   const [query, setQuery] = useStateProsp("inmobiliarias en Buenos Aires con web desactualizada y sin SEO local");
   const [selectedId, setSelectedId] = useState(null);
   const [selectedRow, setSelectedRow] = useState(null);
   const [page, setPage] = useState(1);
-  const [sortBy, setSortBy] = useState('score');
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [jobDetailId, setJobDetailId] = useState(null);
   const hasToken = Boolean(getStoredToken());
 
   // ── Research job state ──
@@ -2065,17 +2247,21 @@ function Prospects({ onNav }) {
   }, [validationsRaw]);
 
   // ── KPIs (real with mock fallback) ────────────────────────────────────────
-  const total = kpisData?.total ?? 248;
-  const sinWeb = kpisData?.sinWeb ?? 86;
-  const scoreAlto = kpisData?.oportunidadAlta ?? 64;
-  const listosOutreach = kpisData?.listosOutreach ?? 38;
+  const total = kpisData?.total ?? (hasToken ? 0 : 248);
+  const sinWeb = kpisData?.sinWeb ?? (hasToken ? 0 : 86);
+  const scoreAlto = kpisData?.oportunidadAlta ?? (hasToken ? 0 : 64);
+  const listosOutreach = kpisData?.listosOutreach ?? (hasToken ? 0 : 38);
   const nuevosEstaSemana = kpisData?.nuevosEstaSemana ?? 12;
 
-  // ── Table data: real rows or mock fallback ────────────────────────────────
+  const NOW = Date.now();
+  const H24 = 24 * 60 * 60 * 1000;
+
+  // ── Table data ────────────────────────────────────────────────────────────────
   const tableRows = React.useMemo(() => {
-    if (!hasToken || isLoading || !prospectsData?.data) {
-      return PROSPECTS_DATA.map((p, i) => ({ ...p, id: `demo-${i}`, isReal: false }));
+    if (!hasToken) {
+      return PROSPECTS_DATA.map((p, i) => ({ ...p, id: `demo-${i}`, isReal: false, isNew: false }));
     }
+    if (!prospectsData?.data) return [];
     return prospectsData.data.map(p => ({
       id: p.id,
       co: p.nombreEmpresa,
@@ -2093,8 +2279,9 @@ function Prospects({ onNav }) {
       who: p.owner ? `${p.owner.firstName} ${p.owner.lastName}` : "Sin asignar",
       validation: validationById[p.id] ?? null,
       isReal: true,
+      isNew: NOW - new Date(p.createdAt).getTime() < H24,
     }));
-  }, [prospectsData, validationById, hasToken, isLoading]);
+  }, [prospectsData, validationById, hasToken]);
 
   const meta = prospectsData?.meta;
 
@@ -2165,10 +2352,16 @@ function Prospects({ onNav }) {
             <span style={{ flex: 1, color: activeJob.status === 'FAILED' ? "var(--danger)" : "var(--ink-800)" }}>
               {activeJob.status === 'PENDING' && 'Iniciando Research Agent…'}
               {activeJob.status === 'RUNNING' && `Research Agent investigando: "${activeJob.query}"`}
-              {activeJob.status === 'COMPLETED' && `Investigación completa — ${activeJob.prospectsFound} prospectos nuevos encontrados`}
+              {activeJob.status === 'COMPLETED' && `Investigación completa — ${activeJob.candidatesFound ?? activeJob.limit} empresas analizadas, ${activeJob.prospectsFound} promovidos a prospecto`}
               {activeJob.status === 'FAILED' && `Error: ${activeJob.errorMessage ?? 'Investigación fallida'}`}
             </span>
-            {(activeJob.status === 'COMPLETED' || activeJob.status === 'FAILED') && (
+            {activeJob.status === 'COMPLETED' && (
+              <button
+                onClick={() => setJobDetailId(activeJob.id)}
+                style={{ background: "none", border: "1px solid var(--success)", borderRadius: 6, cursor: "pointer", color: "var(--success-ink, #166534)", fontSize: 12, padding: "3px 10px", fontWeight: 600 }}
+              >Ver detalle</button>
+            )}
+          {(activeJob.status === 'COMPLETED' || activeJob.status === 'FAILED') && (
               <button onClick={() => { setActiveJob(null); setActiveJobId(null); }}
                 style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink-400)", fontSize: 16, lineHeight: 1 }}>×</button>
             )}
@@ -2268,17 +2461,26 @@ function Prospects({ onNav }) {
               </tr>
             </thead>
             <tbody>
+              {isLoading && (
+                <tr><td colSpan={13} style={{ textAlign: "center", padding: 32, color: "var(--ink-400)", fontSize: 13 }}>Cargando prospectos…</td></tr>
+              )}
+              {!isLoading && tableRows.length === 0 && hasToken && (
+                <tr><td colSpan={13} style={{ textAlign: "center", padding: 32, color: "var(--ink-400)", fontSize: 13 }}>Sin prospectos aún — usá el Research Engine para descubrir empresas</td></tr>
+              )}
               {tableRows.map((p, i) => (
                 <tr key={p.id ?? i}
                   onClick={() => { const next = selectedId === p.id ? null : p.id; setSelectedId(next); setSelectedRow(next ? p : null); }}
-                  style={{ cursor: "pointer", background: selectedId === p.id ? "var(--primary-soft)" : undefined }}>
+                  style={{ cursor: "pointer", background: selectedId === p.id ? "var(--primary-soft)" : p.isNew ? "rgba(16,185,129,0.04)" : undefined }}>
                   <td onClick={e => e.stopPropagation()}><input type="checkbox"/></td>
                   <td>
                     <div className="row gap-sm">
                       <span className="avatar sm" style={{ background: "var(--bg-2)", color: "var(--ink-700)", fontSize: 10 }}>
                         {p.co.split(" ").slice(0, 2).map(s => s[0]).join("").toUpperCase()}
                       </span>
-                      <div className="cell-strong">{p.co}</div>
+                      <div>
+                        <div className="cell-strong">{p.co}</div>
+                        {p.isNew && <span style={{ fontSize: 9, fontWeight: 700, color: "#059669", background: "#d1fae5", padding: "1px 5px", borderRadius: 4 }}>NUEVO</span>}
+                      </div>
                     </div>
                   </td>
                   <td className="cell-muted">{p.rubro}</td>
@@ -2319,17 +2521,11 @@ function Prospects({ onNav }) {
         </div>
       </div>
 
-      {/* AI Assessment panel */}
-      {selectedId && (
+      {/* Prospect detail drawer */}
+      {selectedId && !jobDetailId && (
         <>
-          {/* Backdrop — tapa la página, clic cierra el drawer */}
-          <div
-            onClick={() => { setSelectedId(null); setSelectedRow(null); }}
-            style={{
-              position: "fixed", inset: 0, top: 56,
-              background: "rgba(0,0,0,0.35)",
-              zIndex: 98,
-            }}
+          <div onClick={() => { setSelectedId(null); setSelectedRow(null); }}
+            style={{ position: "fixed", inset: 0, top: 56, background: "rgba(0,0,0,0.35)", zIndex: 98 }}
           />
           <ProspectDrawer
             prospectId={selectedId}
@@ -2338,6 +2534,14 @@ function Prospects({ onNav }) {
             onClose={() => { setSelectedId(null); setSelectedRow(null); }}
           />
         </>
+      )}
+
+      {/* Research Job Detail drawer */}
+      {jobDetailId && (
+        <ResearchJobDetailDrawer
+          jobId={jobDetailId}
+          onClose={() => setJobDetailId(null)}
+        />
       )}
     </div>
   );
