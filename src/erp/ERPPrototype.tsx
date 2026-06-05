@@ -1483,6 +1483,15 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
   });
   const isEnriching = (enrichmentJobs ?? []).some(j => j.status === 'PENDING' || j.status === 'RUNNING');
 
+  const prevIsEnriching = React.useRef(false);
+  React.useEffect(() => {
+    if (prevIsEnriching.current && !isEnriching && enrichmentJobs && enrichmentJobs.length > 0) {
+      qc.invalidateQueries({ queryKey: ["prospects"] });
+      qc.invalidateQueries({ queryKey: ["enrichment", "result", prospectId] });
+    }
+    prevIsEnriching.current = isEnriching;
+  }, [isEnriching]);
+
   const { data: enrichmentResult } = useQuery({
     queryKey: ["enrichment", "result", prospectId],
     queryFn: () => enrichmentApi.getResult(prospectId),
@@ -1499,6 +1508,14 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
   });
   const latestProposal = proposals?.[0] ?? null;
   const isGeneratingProposal = latestProposal?.jobStatus === 'PENDING' || latestProposal?.jobStatus === 'RUNNING';
+
+  const prevIsGenerating = React.useRef(false);
+  React.useEffect(() => {
+    if (prevIsGenerating.current && !isGeneratingProposal && proposals && proposals.length > 0) {
+      qc.invalidateQueries({ queryKey: ["prospects"] });
+    }
+    prevIsGenerating.current = isGeneratingProposal;
+  }, [isGeneratingProposal]);
 
   // For demo rows, build a basic prospect shape from rowData
   const prospect = fetchedProspect ?? (rowData && !isRealId ? {
