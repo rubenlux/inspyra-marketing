@@ -62,7 +62,16 @@ export class ProspectsService {
         orderBy: sortBy === 'createdAt'
           ? [{ createdAt: 'desc' }]
           : [{ score: 'desc' }, { createdAt: 'desc' }],
-        include: { owner: { select: { id: true, firstName: true, lastName: true, email: true } } },
+        include: {
+          owner: { select: { id: true, firstName: true, lastName: true, email: true } },
+          validation: {
+            select: {
+              id: true, agentScore: true, status: true, prioridad: true,
+              estimatedTicketUsd: true, servicesRecommended: true,
+              decisionFactors: true, validationVersion: true, reasoning: true,
+            },
+          },
+        },
       }),
       this.prisma.prospect.count({ where }),
     ]);

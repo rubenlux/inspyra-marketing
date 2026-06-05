@@ -180,7 +180,7 @@ async function main() {
       oportunidadDetectada: 'Web desactualizada, sin SEO local, sin Google Ads',
       problemasEncontrados: ['Sin SSL', 'Web 2015', 'Sin SEO local', 'Sin campañas pagas'],
       servicioSugerido: 'Web + SEO + Google Ads',
-      estado: 'LISTO_OUTREACH',
+      estado: 'INVESTIGADO',
       fuente: 'MANUAL',
       detectadoPor: 'MANUAL',
       ownerId: admin.id,

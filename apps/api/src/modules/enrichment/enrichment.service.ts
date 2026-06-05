@@ -45,13 +45,21 @@ export class EnrichmentService {
     });
     if (!prospect) throw new NotFoundException(`Prospecto ${dto.prospectId} no encontrado`);
 
-    // Gate: Opportunity Agent must have run. Research Score alone is not sufficient.
+    // Gate 1: Opportunity Evaluator must have run first.
     if (!prospect.validation) {
       throw new BadRequestException(
-        `El Opportunity Agent no procesó este prospecto. ` +
+        `El Evaluador de oportunidad no procesó este prospecto. ` +
         `Solo se pueden enriquecer prospectos con APROBADO_IA (≥${SCORE_THRESHOLD}) o PRIORIDAD_MAXIMA (≥90).`,
       );
     }
+    // Gate 2: A human must have approved the analysis before enrichment can start.
+    if (prospect.validation.status !== 'VALIDATED') {
+      throw new BadRequestException(
+        `El análisis de oportunidad no fue aprobado por un humano (estado: ${prospect.validation.status}). ` +
+        `Revisá y aprobá el análisis en la pestaña Validación antes de iniciar el enriquecimiento.`,
+      );
+    }
+    // Gate 3: Score threshold — only APROBADO_IA or PRIORIDAD_MAXIMA.
     if (prospect.validation.agentScore < SCORE_THRESHOLD) {
       throw new BadRequestException(
         `Opportunity Score ${prospect.validation.agentScore} por debajo del umbral (${SCORE_THRESHOLD}). ` +
@@ -111,7 +119,12 @@ export class EnrichmentService {
 
   async getOutreachQueue(tenantId: string) {
     const raw = await this.prisma.prospect.findMany({
-      where: { tenantId, estado: 'LISTO_OUTREACH', deletedAt: null },
+      where: {
+        tenantId,
+        estado: 'LISTO_OUTREACH',
+        deletedAt: null,
+        enrichmentResult: { reviewStatus: 'APPROVED' },
+      },
       orderBy: [{ commercialScore: 'desc' }, { score: 'desc' }],
       take: 20,
       select: {
@@ -134,15 +147,7 @@ export class EnrichmentService {
       },
     });
 
-    // Compute on-the-fly for prospects that bypassed the enrichment flow (e.g., seed data)
-    const prospects = raw.map(p => ({
-      ...p,
-      commercialScore:
-        p.commercialScore ??
-        Math.floor((p.score + (p.enrichmentResult?.contactabilityScore ?? 0)) / 2),
-    }));
-
-    return { total: prospects.length, prospects };
+    return { total: raw.length, prospects: raw };
   }
 
   async reviewEnrichment(

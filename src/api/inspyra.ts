@@ -17,6 +17,27 @@ export function clearStoredToken(): void {
   localStorage.removeItem('inspyra_refresh_token')
 }
 
+// Deduplicates concurrent refresh attempts — only one in-flight at a time
+let refreshPromise: Promise<boolean> | null = null
+
+async function silentRefresh(): Promise<boolean> {
+  const rt = localStorage.getItem('inspyra_refresh_token')
+  if (!rt) return false
+  try {
+    const res = await fetch(`${BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: rt }),
+    })
+    const json = await res.json()
+    if (!res.ok || !json.success) return false
+    setStoredToken(json.data.accessToken, json.data.refreshToken)
+    return true
+  } catch {
+    return false
+  }
+}
+
 async function req<T>(
   method: string,
   path: string,
@@ -30,24 +51,47 @@ async function req<T>(
     })
   }
 
-  const headers: Record<string, string> = {}
-  const t = getStoredToken()
-  if (t) headers.Authorization = `Bearer ${t}`
-  if (body) headers['Content-Type'] = 'application/json'
+  const buildHeaders = (): Record<string, string> => {
+    const h: Record<string, string> = {}
+    const t = getStoredToken()
+    if (t) h.Authorization = `Bearer ${t}`
+    if (body) h['Content-Type'] = 'application/json'
+    return h
+  }
+
+  const fetchBody = body ? JSON.stringify(body) : undefined
 
   const res = await fetch(url.toString(), {
     method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
+    headers: buildHeaders(),
+    body: fetchBody,
   })
 
-  const json = await res.json()
-
   if (res.status === 401) {
-    clearStoredToken()
-    window.location.reload()
-    throw new Error('Sesión expirada')
+    // Attempt silent refresh once — deduplicate concurrent 401s
+    if (!refreshPromise) {
+      refreshPromise = silentRefresh().finally(() => { refreshPromise = null })
+    }
+    const refreshed = await refreshPromise
+    if (!refreshed) {
+      clearStoredToken()
+      window.location.reload()
+      throw new Error('Sesión expirada')
+    }
+    // Retry original request with the new access token
+    const retryRes = await fetch(url.toString(), {
+      method,
+      headers: buildHeaders(),
+      body: fetchBody,
+    })
+    const retryJson = await retryRes.json()
+    if (!retryRes.ok || !retryJson.success) {
+      throw new Error(retryJson?.error?.message ?? `HTTP ${retryRes.status}`)
+    }
+    return retryJson.data as T
   }
+
+  const json = await res.json()
 
   if (!res.ok || !json.success) {
     throw new Error(json?.error?.message ?? `HTTP ${res.status}`)
@@ -97,6 +141,17 @@ export interface Prospect {
   createdAt: string
   updatedAt: string
   deletedAt?: string | null
+  validation?: {
+    id: string
+    agentScore: number
+    status: 'PENDING' | 'VALIDATED' | 'REJECTED'
+    prioridad: string
+    estimatedTicketUsd: string | null
+    servicesRecommended: string[]
+    decisionFactors: DecisionFactors | null
+    validationVersion: string
+    reasoning: string | null
+  } | null
 }
 
 export interface ProspectKpis {

@@ -91,14 +91,6 @@ export class ProspectValidationService {
 
     const v = await this.findOne(id, tenantId);
 
-    // Sync score back to prospect when human validates
-    if (dto.status === 'VALIDATED') {
-      await this.prisma.prospect.update({
-        where: { id: v.prospectId },
-        data: { score: dto.humanScore },
-      });
-    }
-
     const updated = await this.prisma.prospectValidation.update({
       where: { id },
       data: {

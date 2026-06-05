@@ -1415,7 +1415,21 @@ function fmtDate(iso) {
 // ── Prospect Drawer — 5 tabs: General · AI Assessment · Contacto · Validación · Historial
 function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReviewEnrichment }) {
   const [tab, setTab] = useState("assessment");
+  const [enrichingFromDrawer, setEnrichingFromDrawer] = useState(false);
   const qc = useQueryClient();
+
+  const handleEnrichFromDrawer = async () => {
+    setEnrichingFromDrawer(true);
+    try {
+      await enrichmentApi.createJob(prospectId);
+      qc.invalidateQueries({ queryKey: ["prospects"] });
+      qc.invalidateQueries({ queryKey: ["enrichment"] });
+    } catch (e) {
+      alert("Error al enriquecer: " + e.message);
+    } finally {
+      setEnrichingFromDrawer(false);
+    }
+  };
 
   const isRealId = Boolean(prospectId) && !String(prospectId).startsWith("demo-");
 
@@ -1476,7 +1490,6 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
         notes: notes || undefined,
         rejectionReason: status === "REJECTED" ? rejectionReason : undefined,
       });
-      qc.invalidateQueries({ queryKey: ["validations"] });
       qc.invalidateQueries({ queryKey: ["prospects"] });
     } catch (e) {
       setReviewError(e.message);
@@ -1814,23 +1827,45 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                   </div>
                 )}
 
-                {/* Next step: Generar propuesta */}
                 {validation.status === "VALIDATED" && (
                   <div style={{ marginTop: 8 }}>
                     <div style={{ height: 1, background: "var(--border-soft)", marginBottom: 20 }}/>
                     <SLabel>Siguiente paso</SLabel>
-                    <button style={{
-                      width: "100%", padding: "14px 0", borderRadius: 10, border: "1px dashed var(--border-soft)",
-                      background: "var(--bg-2)", color: "var(--ink-400)", fontSize: 13.5, fontWeight: 600,
-                      cursor: "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                    }} disabled title="Próximamente">
-                      <Icon.doc size={15}/>
-                      Generar propuesta
-                      <span style={{ fontSize: 10.5, background: "var(--border-soft)", borderRadius: 4, padding: "2px 6px" }}>Próximamente</span>
-                    </button>
-                    <div style={{ fontSize: 11.5, color: "var(--ink-400)", textAlign: "center", marginTop: 8 }}>
-                      El Proposal Agent generará una propuesta preliminar para revisión
-                    </div>
+                    {rowData?.estado === "LISTO_OUTREACH" ? (
+                      <>
+                        <button style={{
+                          width: "100%", padding: "14px 0", borderRadius: 10, border: "1px dashed var(--border-soft)",
+                          background: "var(--bg-2)", color: "var(--ink-400)", fontSize: 13.5, fontWeight: 600,
+                          cursor: "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                        }} disabled>
+                          <Icon.doc size={15}/>
+                          Generar propuesta
+                          <span style={{ fontSize: 10.5, background: "var(--border-soft)", borderRadius: 4, padding: "2px 6px" }}>Próximamente</span>
+                        </button>
+                        <div style={{ fontSize: 11.5, color: "var(--ink-400)", textAlign: "center", marginTop: 8 }}>
+                          El Proposal Agent generará una propuesta para revisión
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={handleEnrichFromDrawer}
+                          disabled={enrichingFromDrawer || rowData?.estado === "ENRIQUECIDO"}
+                          style={{
+                            width: "100%", padding: "14px 0", borderRadius: 10,
+                            border: "1px solid #5B5BF7", background: "#5B5BF7",
+                            color: "#fff", fontSize: 13.5, fontWeight: 600,
+                            cursor: (enrichingFromDrawer || rowData?.estado === "ENRIQUECIDO") ? "not-allowed" : "pointer",
+                            display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: rowData?.estado === "ENRIQUECIDO" ? 0.5 : 1,
+                          }}>
+                          <Icon.sparkles size={15}/>
+                          {enrichingFromDrawer ? "Iniciando…" : rowData?.estado === "ENRIQUECIDO" ? "Enriquecimiento en curso" : "Iniciar enriquecimiento"}
+                        </button>
+                        <div style={{ fontSize: 11.5, color: "var(--ink-400)", textAlign: "center", marginTop: 8 }}>
+                          El Agente de Enriquecimiento buscará contactos y datos de la empresa
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -2430,21 +2465,19 @@ function Prospects({ onNav }) {
     refetchOnWindowFocus: true,
   });
 
-  const { data: validationsRaw } = useQuery({
-    queryKey: ["validations"],
-    queryFn: () => validationsApi.list(),
-    enabled: hasToken,
-    staleTime: 30000,
-  });
-
-  // Map validationById for quick lookup
+  // Validation data is embedded in each prospect — no separate query needed.
+  // validationById built from prospectsData to eliminate the race condition where
+  // the table rendered with empty validations while the second query was in-flight.
   const validationById = React.useMemo(() => {
-    const m = {};
-    if (Array.isArray(validationsRaw)) {
-      for (const v of validationsRaw) m[v.prospectId] = v;
+    const m: Record<string, any> = {};
+    const items = Array.isArray(prospectsData) ? prospectsData : prospectsData?.data;
+    if (items) {
+      for (const p of items) {
+        if (p.validation) m[p.id] = p.validation;
+      }
     }
     return m;
-  }, [validationsRaw]);
+  }, [prospectsData]);
 
   // ── Enrichment queue ─────────────────────────────────────────────────────────
   const { data: enrichQueue } = useQuery({
@@ -2486,7 +2519,6 @@ function Prospects({ onNav }) {
     setQualifyingId(prospectId);
     try {
       await validationsApi.runAgent(prospectId);
-      qc.invalidateQueries({ queryKey: ["validations"] });
       qc.invalidateQueries({ queryKey: ["prospects"] });
     } catch (e) {
       alert("Error al calificar: " + e.message);
@@ -2500,7 +2532,6 @@ function Prospects({ onNav }) {
     setRecalculatingId(prospectId);
     try {
       await validationsApi.recalculate(prospectId);
-      qc.invalidateQueries({ queryKey: ["validations"] });
       qc.invalidateQueries({ queryKey: ["prospects"] });
     } catch (e) {
       alert("Error al recalcular: " + e.message);
@@ -2928,7 +2959,7 @@ function Prospects({ onNav }) {
                         >
                           Revisar datos
                         </button>
-                      ) : (
+                      ) : p.validation?.status === "VALIDATED" ? (
                         <button
                           onClick={() => handleEnrich(p.id)}
                           disabled={enrichingId === p.id}
@@ -2936,6 +2967,10 @@ function Prospects({ onNav }) {
                         >
                           {enrichingId === p.id ? "…" : "Enriquecer"}
                         </button>
+                      ) : (
+                        <span style={{ fontSize: 10.5, color: "var(--ink-400)" }}>
+                          {p.validation ? "Pendiente revisión" : "—"}
+                        </span>
                       )
                     ) : (
                       <span className="cell-muted" style={{ fontSize: 11 }}>—</span>
