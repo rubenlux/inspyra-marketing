@@ -2280,6 +2280,13 @@ function Prospects({ onNav }) {
     refetchInterval: 10000,
   });
 
+  const { data: outreachQueue } = useQuery({
+    queryKey: ["enrichment", "outreach-queue"],
+    queryFn: enrichmentApi.getOutreachQueue,
+    enabled: hasToken,
+    staleTime: 30000,
+  });
+
   const [enrichingId, setEnrichingId] = useState<string | null>(null);
   const [reviewingProspectId, setReviewingProspectId] = useState<string | null>(null);
 
@@ -2323,6 +2330,7 @@ function Prospects({ onNav }) {
       opp: p.oportunidadDetectada ?? p.problemasEncontrados?.slice(0, 2).join(" · ") ?? "—",
       svc: p.servicioSugerido ?? validationById[p.id]?.servicesRecommended?.[0] ?? "—",
       score: p.score,
+      commercialScore: p.commercialScore ?? null,
       aiState: aiStateFromScore(p.score),
       state: ESTADO_LABEL[p.estado] ?? p.estado,
       estado: p.estado,
@@ -2502,6 +2510,39 @@ function Prospects({ onNav }) {
           <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4, fontWeight: 700, color: (enrichQueue.approved ?? enrichQueue.contactable) > 0 ? "#10B981" : "var(--ink-400)" }}>
             <Icon.check size={12}/> {enrichQueue.approved ?? enrichQueue.contactable} aprobados
           </span>
+        </div>
+      )}
+
+      {/* Outreach Queue Panel — ranked by Commercial Score */}
+      {hasToken && outreachQueue && outreachQueue.total > 0 && (
+        <div style={{ marginBottom: 14, background: "var(--bg-1)", borderRadius: 12, border: "1px solid #10B98130", overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", background: "#d1fae510", borderBottom: "1px solid #10B98120", fontSize: 12 }}>
+            <span style={{ fontSize: 14 }}>🚀</span>
+            <span style={{ fontWeight: 700, color: "#065f46" }}>Cola Outreach · {outreachQueue.total} listos</span>
+            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--ink-400)" }}>ordenado por Commercial Score</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {outreachQueue.prospects.slice(0, 5).map((p, i) => {
+              const cs = p.commercialScore ?? 0;
+              const csColor = cs >= 70 ? "#10B981" : cs >= 45 ? "#F59E0B" : "#9CA3AF";
+              return (
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 14px", borderBottom: i < 4 ? "1px solid var(--border-soft)" : "none", fontSize: 12 }}>
+                  <span style={{ width: 18, height: 18, borderRadius: "50%", background: "var(--bg-2)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "var(--ink-500)", flexShrink: 0 }}>{i + 1}</span>
+                  <span style={{ flex: 1, fontWeight: 600, color: "var(--ink-900)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.nombreEmpresa}</span>
+                  <span style={{ fontSize: 11, color: "var(--ink-400)", whiteSpace: "nowrap" }}>{p.rubro ?? "—"}</span>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+                    <span style={{ fontSize: 10, color: "var(--ink-400)" }}>Opp</span>
+                    <span style={{ fontWeight: 700, color: "var(--ink-700)", fontSize: 12 }}>{p.score}</span>
+                    <span style={{ fontSize: 10, color: "var(--ink-300)" }}>+</span>
+                    <span style={{ fontSize: 10, color: "var(--ink-400)" }}>Cont</span>
+                    <span style={{ fontWeight: 700, color: "var(--ink-700)", fontSize: 12 }}>{p.enrichmentResult?.contactabilityScore ?? 0}</span>
+                    <span style={{ fontSize: 10, color: "var(--ink-300)" }}>=</span>
+                    <span style={{ fontWeight: 800, color: csColor, fontSize: 14, minWidth: 28, textAlign: "right" }}>{cs}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -2865,6 +2906,26 @@ function EnrichmentReviewModal({ prospectId, onClose }: { prospectId: string; on
                 style={{ width: "100%", height: 68, padding: "8px 10px", fontSize: 13, borderRadius: 8, border: "1px solid var(--border-soft)", background: "var(--bg-2)", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box", color: "var(--ink-900)" }}
               />
             </div>
+
+            {/* AI recommendation banner */}
+            {result.recommendedStatus && result.reviewStatus === "PENDING" && (
+              <div style={{
+                marginBottom: 14, padding: "10px 12px", borderRadius: 8, fontSize: 12,
+                background: result.recommendedStatus === "SUGGEST_APPROVE" ? "#d1fae5" : "#fef3c7",
+                borderLeft: `3px solid ${result.recommendedStatus === "SUGGEST_APPROVE" ? "#10B981" : "#F59E0B"}`,
+              }}>
+                <div style={{ fontWeight: 700, marginBottom: result.recommendNotes ? 4 : 0, color: result.recommendedStatus === "SUGGEST_APPROVE" ? "#065f46" : "#92400E" }}>
+                  Agente IA sugiere: {result.recommendedStatus === "SUGGEST_APPROVE" ? "✔ Aprobar" : "✗ Rechazar"}
+                </div>
+                {result.recommendNotes && <div style={{ color: "var(--ink-600)", fontSize: 12 }}>{result.recommendNotes}</div>}
+              </div>
+            )}
+
+            {result.reviewStatus !== "PENDING" && (
+              <div style={{ marginBottom: 12, padding: "8px 12px", background: result.reviewStatus === "APPROVED" ? "#d1fae5" : "#fee2e2", borderRadius: 8, fontSize: 12, fontWeight: 600, color: result.reviewStatus === "APPROVED" ? "#065f46" : "#991b1b" }}>
+                {result.reviewStatus === "APPROVED" ? "✅ Aprobado" : "✗ Rechazado"}{result.reviewNotes ? ` · ${result.reviewNotes}` : ""}
+              </div>
+            )}
 
             {submitError && (
               <div style={{ fontSize: 12, color: "#EF4444", marginBottom: 12, padding: "6px 10px", background: "#fee2e2", borderRadius: 6 }}>

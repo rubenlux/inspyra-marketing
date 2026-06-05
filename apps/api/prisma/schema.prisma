@@ -155,6 +155,8 @@ model Prospect {
   servicioSugerido String?
   score            Int       @default(0)
   prioridad        Prioridad @default(MEDIA)
+  // Commercial Score = floor((opportunityScore + contactabilityScore) / 2) — set on enrichment approval
+  commercialScore  Int?
   ownerId          String?
   owner            User?     @relation("ProspectOwner", fields: [ownerId], references: [id])
 
@@ -180,6 +182,7 @@ model Prospect {
 
   @@index([tenantId, estado])
   @@index([tenantId, score])
+  @@index([tenantId, commercialScore])
   @@index([tenantId, ownerId])
   @@map("prospects")
 }
@@ -1067,11 +1070,16 @@ model EnrichmentResult {
   rolDecidsor      String?
   linkedinDecidsor String?
 
-  // Validación humana (Fase B)
+  // Validación humana (Fase B) — APPROVED/REJECTED son solo acción humana
   reviewStatus EnrichmentReviewStatus @default(PENDING)
   reviewedBy   String?
   reviewedAt   DateTime?
   reviewNotes  String?
+
+  // Sugerencia de agente IA (Fase C) — agentes solo pueden SUGGEST, no aprobar
+  recommendedStatus String?  // SUGGEST_APPROVE | SUGGEST_REJECT
+  recommendNotes    String?
+  recommendedBy     String?  // agentId que hizo la sugerencia
 
   // Trazabilidad
   rawOutput String? @db.Text
@@ -1081,5 +1089,6 @@ model EnrichmentResult {
 
   @@index([tenantId, prospectId])
   @@index([tenantId, reviewStatus])
+  @@index([tenantId, recommendedStatus])
   @@map("enrichment_results")
 }

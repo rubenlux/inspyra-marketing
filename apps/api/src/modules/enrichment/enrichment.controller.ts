@@ -3,6 +3,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { EnrichmentService } from './enrichment.service';
 import { CreateEnrichmentJobDto } from './dto/create-enrichment-job.dto';
 import { ReviewEnrichmentDto } from './dto/review-enrichment.dto';
+import { SuggestEnrichmentDto } from './dto/suggest-enrichment.dto';
 
 interface AuthRequest {
   user: { id: string; tenantId: string };
@@ -51,5 +52,26 @@ export class EnrichmentController {
       dto.status,
       dto.notes,
     );
+  }
+
+  // Agents call this — only sets recommendedStatus, never changes reviewStatus
+  @Patch('results/:id/suggest')
+  suggestResult(
+    @Param('id') id: string,
+    @Body() dto: SuggestEnrichmentDto,
+    @Request() req: AuthRequest,
+  ) {
+    return this.enrichmentService.suggestReview(
+      id,
+      req.user.tenantId,
+      req.user.id,
+      dto.recommendedStatus,
+      dto.notes,
+    );
+  }
+
+  @Get('outreach-queue')
+  getOutreachQueue(@Request() req: AuthRequest) {
+    return this.enrichmentService.getOutreachQueue(req.user.tenantId);
   }
 }

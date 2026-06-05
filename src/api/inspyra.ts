@@ -86,6 +86,7 @@ export interface Prospect {
   servicioSugerido?: string
   nivelOportunidad?: string
   score: number
+  commercialScore?: number | null
   estado: string
   prioridad?: string
   detectadoPor?: string
@@ -300,8 +301,33 @@ export interface EnrichmentResult {
   reviewedBy?: string
   reviewedAt?: string
   reviewNotes?: string
+  recommendedStatus?: 'SUGGEST_APPROVE' | 'SUGGEST_REJECT'
+  recommendNotes?: string
+  recommendedBy?: string
   createdAt: string
   updatedAt: string
+}
+
+export interface OutreachProspect {
+  id: string
+  nombreEmpresa: string
+  rubro?: string
+  ciudad?: string
+  score: number
+  commercialScore?: number
+  enrichmentResult?: {
+    contactabilityScore: number
+    confianza?: string
+    email?: string
+    telefono?: string
+    whatsapp?: string
+    recommendedStatus?: string
+  } | null
+}
+
+export interface OutreachQueue {
+  total: number
+  prospects: OutreachProspect[]
 }
 
 export interface EnrichmentQueue {
@@ -332,6 +358,12 @@ export const enrichmentApi = {
 
   reviewResult: (id: string, status: 'APPROVED' | 'REJECTED', notes?: string) =>
     req<EnrichmentResult>('PATCH', `/enrichment/results/${id}/review`, { status, notes }),
+
+  suggestReview: (id: string, recommendedStatus: 'SUGGEST_APPROVE' | 'SUGGEST_REJECT', notes?: string) =>
+    req<EnrichmentResult>('PATCH', `/enrichment/results/${id}/suggest`, { recommendedStatus, notes }),
+
+  getOutreachQueue: () =>
+    req<OutreachQueue>('GET', '/enrichment/outreach-queue'),
 }
 
 // ─── Agent ROI ────────────────────────────────────────────────────────────────

@@ -100,6 +100,33 @@ export class EnrichmentService {
     return this.prisma.enrichmentResult.findFirst({ where: { prospectId, tenantId } });
   }
 
+  async getOutreachQueue(tenantId: string) {
+    const prospects = await this.prisma.prospect.findMany({
+      where: { tenantId, estado: 'LISTO_OUTREACH', deletedAt: null },
+      orderBy: { commercialScore: 'desc' },
+      take: 20,
+      select: {
+        id: true,
+        nombreEmpresa: true,
+        rubro: true,
+        ciudad: true,
+        score: true,
+        commercialScore: true,
+        enrichmentResult: {
+          select: {
+            contactabilityScore: true,
+            confianza: true,
+            email: true,
+            telefono: true,
+            whatsapp: true,
+            recommendedStatus: true,
+          },
+        },
+      },
+    });
+    return { total: prospects.length, prospects };
+  }
+
   async reviewEnrichment(
     resultId: string,
     tenantId: string,
@@ -124,24 +151,52 @@ export class EnrichmentService {
     });
 
     if (status === 'APPROVED' && result.contactable) {
-      // Gate passed: advance prospect to LISTO_OUTREACH
+      // Commercial Score = floor((opportunityScore + contactabilityScore) / 2)
+      const commercialScore = Math.floor(
+        (result.prospect.score + (result.contactabilityScore ?? 0)) / 2,
+      );
       await this.prisma.prospect.updateMany({
         where: { id: result.prospectId, tenantId, estado: 'ENRIQUECIDO' },
-        data: { estado: 'LISTO_OUTREACH' },
+        data: { estado: 'LISTO_OUTREACH', commercialScore },
       });
-      this.logger.log(`[EnrichReview] Prospect ${result.prospectId} → LISTO_OUTREACH`);
+      this.logger.log(
+        `[EnrichReview] Prospect ${result.prospectId} → LISTO_OUTREACH | commercial: ${commercialScore}`,
+      );
     } else if (status === 'APPROVED' && !result.contactable) {
       this.logger.warn(`[EnrichReview] Approved but not contactable — prospect stays ENRIQUECIDO`);
     } else if (status === 'REJECTED') {
       // Revert to INVESTIGADO for possible re-enrichment
       await this.prisma.prospect.updateMany({
         where: { id: result.prospectId, tenantId, estado: 'ENRIQUECIDO' },
-        data: { estado: 'INVESTIGADO' },
+        data: { estado: 'INVESTIGADO', commercialScore: null },
       });
       this.logger.log(`[EnrichReview] Rejected — prospect ${result.prospectId} → INVESTIGADO`);
     }
 
     return updated;
+  }
+
+  // Agents can only SUGGEST — not approve.  reviewStatus stays PENDING until a human acts.
+  async suggestReview(
+    resultId: string,
+    tenantId: string,
+    agentId: string,
+    recommendedStatus: 'SUGGEST_APPROVE' | 'SUGGEST_REJECT',
+    notes?: string,
+  ) {
+    const result = await this.prisma.enrichmentResult.findFirst({
+      where: { id: resultId, tenantId },
+    });
+    if (!result) throw new NotFoundException(`Enrichment result ${resultId} no encontrado`);
+
+    return this.prisma.enrichmentResult.update({
+      where: { id: resultId },
+      data: {
+        recommendedStatus,
+        recommendNotes: notes ?? null,
+        recommendedBy: agentId,
+      },
+    });
   }
 
   // ── Pipeline ──────────────────────────────────────────────────────────────────

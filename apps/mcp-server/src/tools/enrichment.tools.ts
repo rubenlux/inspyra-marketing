@@ -77,22 +77,51 @@ Returns null if the prospect has not been enriched yet.`,
   );
 
   server.registerTool(
-    'inspyra_review_enrichment',
+    'inspyra_suggest_enrichment',
     {
-      title: 'Review Enrichment Result',
-      description: `Human validation step for enrichment results.
-APPROVE: marks result as validated. If contactable=true, advances prospect to LISTO_OUTREACH automatically.
-REJECT: reverts prospect to INVESTIGADO for possible re-enrichment.
-IMPORTANT: Only APPROVED + contactable prospects can proceed to outreach.`,
+      title: 'Suggest Enrichment Review',
+      description: `Agents use this to SUGGEST an approval or rejection of an enrichment result.
+This does NOT approve or reject — it sets a recommendation that a human will review.
+The human sees your suggestion in the UI before making the final decision.
+
+Use SUGGEST_APPROVE when:
+- contactabilityScore >= 50
+- At least email OR telefono is present
+- confianza is ALTA or MEDIA
+- The decision maker was identified
+
+Use SUGGEST_REJECT when:
+- contactabilityScore < 30
+- No real contact channels found
+- confianza is BAJA and data looks inferred, not verified
+
+IMPORTANT: Only humans can call /review to actually APPROVE or REJECT.
+You can only call /suggest to set a recommendation.`,
       inputSchema: z.object({
-        resultId: z.string().uuid().describe('UUID of the EnrichmentResult (not the prospect)'),
-        status: z.enum(['APPROVED', 'REJECTED']).describe('Review decision'),
-        notes: z.string().optional().describe('Review notes or reason for rejection'),
+        resultId: z.string().uuid().describe('UUID of the EnrichmentResult'),
+        recommendedStatus: z.enum(['SUGGEST_APPROVE', 'SUGGEST_REJECT']).describe('Your recommendation'),
+        notes: z.string().optional().describe('Reasoning for your suggestion'),
       }).strict(),
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ resultId, status, notes }) => {
-      const data = await client.patch(`/enrichment/results/${resultId}/review`, { status, notes });
+    async ({ resultId, recommendedStatus, notes }) => {
+      const data = await client.patch(`/enrichment/results/${resultId}/suggest`, { recommendedStatus, notes });
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }], structuredContent: data };
+    },
+  );
+
+  server.registerTool(
+    'inspyra_get_outreach_queue',
+    {
+      title: 'Get Outreach Queue',
+      description: `Returns the LISTO_OUTREACH queue ordered by Commercial Score DESC.
+Commercial Score = floor((opportunityScore + contactabilityScore) / 2).
+This is the ranked priority list for outreach — high commercial score = strong opportunity + verified contact data.`,
+      inputSchema: z.object({}).strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async () => {
+      const data = await client.get('/enrichment/outreach-queue');
       return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }], structuredContent: data };
     },
   );
