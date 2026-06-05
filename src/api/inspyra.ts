@@ -262,6 +262,65 @@ export const researchApi = {
     req<ResearchCandidate[]>('GET', `/research/jobs/${jobId}/candidates`),
 }
 
+// ─── Enrichment ──────────────────────────────────────────────────────────────
+
+export interface EnrichmentJob {
+  id: string
+  prospectId: string
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED'
+  agentOutput?: string
+  errorMessage?: string
+  startedAt?: string
+  completedAt?: string
+  createdAt: string
+  result?: EnrichmentResult | null
+}
+
+export interface EnrichmentResult {
+  id: string
+  prospectId: string
+  contactable: boolean
+  email?: string
+  telefono?: string
+  whatsapp?: string
+  formularioWeb?: string
+  googleBusiness?: string
+  linkedin?: string
+  facebook?: string
+  instagram?: string
+  direccion?: string
+  anioFundacion?: number
+  empleadosReal?: number
+  nombreDecidsor?: string
+  rolDecidsor?: string
+  linkedinDecidsor?: string
+}
+
+export interface EnrichmentQueue {
+  pending: number
+  running: number
+  completed: number
+  failed: number
+  contactable: number
+}
+
+export const enrichmentApi = {
+  createJob: (prospectId: string) =>
+    req<EnrichmentJob>('POST', '/enrichment/jobs', { prospectId }),
+
+  getJob: (id: string) =>
+    req<EnrichmentJob>('GET', `/enrichment/jobs/${id}`),
+
+  listJobs: (prospectId?: string) =>
+    req<EnrichmentJob[]>('GET', '/enrichment/jobs', undefined, prospectId ? { prospectId } : undefined),
+
+  getQueue: () =>
+    req<EnrichmentQueue>('GET', '/enrichment/queue'),
+
+  getResult: (prospectId: string) =>
+    req<EnrichmentResult | null>('GET', `/enrichment/prospects/${prospectId}/result`),
+}
+
 // ─── Agent ROI ────────────────────────────────────────────────────────────────
 
 export interface AgentRoiRow {

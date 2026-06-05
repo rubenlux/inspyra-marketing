@@ -19,10 +19,11 @@ import { registerIntelTools } from './tools/intel.tools.js';
 import { registerPricingTools } from './tools/pricing.tools.js';
 import { registerDealTools } from './tools/deals.tools.js';
 import { registerOpportunityTools } from './tools/opportunity.tools.js';
+import { registerEnrichmentTools } from './tools/enrichment.tools.js';
 
 // ── Agent configuration ───────────────────────────────────────────────────────
 
-type AgentId = 'research' | 'opportunity' | 'proposal' | 'meeting' | 'followup';
+type AgentId = 'research' | 'opportunity' | 'enrichment' | 'proposal' | 'meeting' | 'followup';
 
 interface AgentConfig {
   tokenEnvVar: string;
@@ -40,6 +41,11 @@ const AGENT_CONFIGS: Record<AgentId, AgentConfig> = {
     tokenEnvVar: 'OPPORTUNITY_AGENT_TOKEN',
     tools: ['opportunity'],
     description: 'Opportunity Agent — analyzes prospects, scores them, recommends services',
+  },
+  enrichment: {
+    tokenEnvVar: 'ENRICHMENT_AGENT_TOKEN',
+    tools: ['enrichment'],
+    description: 'Enrichment Agent — finds contact data, digital presence and decision makers for APROBADO_IA/PRIORIDAD_MAXIMA prospects',
   },
   proposal: {
     tokenEnvVar: 'PROPOSAL_AGENT_TOKEN',
@@ -75,6 +81,12 @@ function registerToolsForAgent(agentId: AgentId, server: McpServer, client: Insp
       registerCatalogTools(server, client);
       registerIntelTools(server, client);
       registerOpportunityTools(server, client);
+      break;
+
+    case 'enrichment':
+      // Enrichment: find contact data + digital presence for score >= 75 prospects
+      registerProspectTools(server, client);
+      registerEnrichmentTools(server, client);
       break;
 
     case 'proposal':

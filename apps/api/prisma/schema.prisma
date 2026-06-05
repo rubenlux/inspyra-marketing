@@ -30,6 +30,7 @@ model Tenant {
   intelRules       ServiceIntelligenceRule[]
   serviceAccounts  ServiceAccount[]
   researchJobs     ResearchJob[]
+  enrichmentJobs   EnrichmentJob[]
 
   @@map("tenants")
 }
@@ -172,8 +173,10 @@ model Prospect {
   deletedAt     DateTime?
 
   // Relaciones
-  deals      Deal[]
-  validation ProspectValidation?
+  deals           Deal[]
+  validation      ProspectValidation?
+  enrichmentJobs  EnrichmentJob[]
+  enrichmentResult EnrichmentResult?
 
   @@index([tenantId, estado])
   @@index([tenantId, score])
@@ -988,4 +991,78 @@ model ResearchCandidate {
   @@index([jobId])
   @@index([tenantId, status])
   @@map("research_candidates")
+}
+
+// ─────────────────────────────────────────────
+// ENRICHMENT ENGINE (Fase A.5)
+// ─────────────────────────────────────────────
+
+enum EnrichmentJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model EnrichmentJob {
+  id           String              @id @default(uuid())
+  tenantId     String
+  tenant       Tenant              @relation(fields: [tenantId], references: [id])
+  prospectId   String
+  prospect     Prospect            @relation(fields: [prospectId], references: [id])
+  status       EnrichmentJobStatus @default(PENDING)
+  agentOutput  String?             @db.Text
+  errorMessage String?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdBy    String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  result EnrichmentResult?
+
+  @@index([tenantId, status])
+  @@index([tenantId, prospectId])
+  @@map("enrichment_jobs")
+}
+
+model EnrichmentResult {
+  id         String        @id @default(uuid())
+  tenantId   String
+  prospectId String        @unique
+  prospect   Prospect      @relation(fields: [prospectId], references: [id])
+  jobId      String        @unique
+  job        EnrichmentJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  // Datos de contacto
+  email         String?
+  telefono      String?
+  whatsapp      String?
+  formularioWeb String?
+  contactable   Boolean @default(false)
+
+  // Presencia digital verificada
+  googleBusiness   String?
+  linkedin         String?
+  facebook         String?
+  instagram        String?
+
+  // Info empresa
+  direccion      String?
+  anioFundacion  Int?
+  empleadosReal  Int?
+
+  // Decisor
+  nombreDecidsor   String?
+  rolDecidsor      String?
+  linkedinDecidsor String?
+
+  // Trazabilidad
+  rawOutput String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, prospectId])
+  @@map("enrichment_results")
 }

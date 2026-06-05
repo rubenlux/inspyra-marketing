@@ -3,7 +3,7 @@ import * as React from 'react'
 import { useEffect, useState, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { authApi, prospectsApi, validationsApi, researchApi, getStoredToken, setStoredToken, clearStoredToken } from '../api/inspyra'
+import { authApi, prospectsApi, validationsApi, researchApi, enrichmentApi, getStoredToken, setStoredToken, clearStoredToken } from '../api/inspyra'
 import DashboardV2 from './DashboardV2'
 import './erp.css'
 
@@ -2271,6 +2271,30 @@ function Prospects({ onNav }) {
     return m;
   }, [validationsRaw]);
 
+  // ── Enrichment queue ─────────────────────────────────────────────────────────
+  const { data: enrichQueue } = useQuery({
+    queryKey: ["enrichment", "queue"],
+    queryFn: enrichmentApi.getQueue,
+    enabled: hasToken,
+    staleTime: 15000,
+    refetchInterval: 10000,
+  });
+
+  const [enrichingId, setEnrichingId] = useState<string | null>(null);
+
+  const handleEnrich = async (prospectId: string) => {
+    if (!hasToken || enrichingId) return;
+    setEnrichingId(prospectId);
+    try {
+      await enrichmentApi.createJob(prospectId);
+      qc.invalidateQueries({ queryKey: ["enrichment"] });
+    } catch (e) {
+      alert("Error al enriquecer: " + e.message);
+    } finally {
+      setEnrichingId(null);
+    }
+  };
+
   // ── KPIs (real with mock fallback) ────────────────────────────────────────
   const total = kpisData?.total ?? (hasToken ? 0 : 248);
   const sinWeb = kpisData?.sinWeb ?? (hasToken ? 0 : 86);
@@ -2456,6 +2480,25 @@ function Prospects({ onNav }) {
         <MiniStatP label="Revisar" value={String(aiCounts.REVISAR)} sub="score 60–74 · necesita criterio humano" c="#F59E0B"/>
       </div>
 
+      {/* Enrichment Queue Panel */}
+      {hasToken && enrichQueue && (enrichQueue.pending > 0 || enrichQueue.running > 0 || enrichQueue.completed > 0) && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "9px 14px", background: "var(--bg-2)", borderRadius: 10, border: "1px solid var(--border-soft)", fontSize: 12 }}>
+          <Icon.sparkles size={13} color="var(--primary)"/>
+          <span style={{ fontWeight: 600, color: "var(--ink-800)" }}>Cola de enriquecimiento</span>
+          {enrichQueue.running > 0 && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "#5B5BF7" }}>
+              <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", border: "1.5px solid #5B5BF7", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }}/>
+              {enrichQueue.running} enriqueciendo
+            </span>
+          )}
+          {enrichQueue.pending > 0 && <span style={{ color: "var(--ink-500)" }}>{enrichQueue.pending} en cola</span>}
+          {enrichQueue.completed > 0 && <span style={{ color: "#10B981" }}>{enrichQueue.completed} completados</span>}
+          <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4, fontWeight: 700, color: enrichQueue.contactable > 0 ? "#10B981" : "var(--ink-400)" }}>
+            <Icon.check size={12}/> {enrichQueue.contactable} contactables
+          </span>
+        </div>
+      )}
+
       {/* AI State Filter Tabs */}
       <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
         {([
@@ -2520,7 +2563,9 @@ function Prospects({ onNav }) {
                 <th>Oportunidad detectada</th>
                 <th>Servicio sugerido</th>
                 <th style={{ width: 70 }}>Score</th>
+                <th style={{ width: 90 }}>Estado IA</th>
                 <th>Estado</th>
+                <th style={{ width: 80 }}>Contactable</th>
                 <th style={{ width: 90 }}>Validación IA</th>
                 <th>Últ. contacto</th>
                 <th>Próx. seguim.</th>
@@ -2530,10 +2575,10 @@ function Prospects({ onNav }) {
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={13} style={{ textAlign: "center", padding: 32, color: "var(--ink-400)", fontSize: 13 }}>Cargando prospectos…</td></tr>
+                <tr><td colSpan={15} style={{ textAlign: "center", padding: 32, color: "var(--ink-400)", fontSize: 13 }}>Cargando prospectos…</td></tr>
               )}
               {!isLoading && tableRows.length === 0 && hasToken && (
-                <tr><td colSpan={13} style={{ textAlign: "center", padding: 32, color: "var(--ink-400)", fontSize: 13 }}>Sin prospectos aún — usá el Research Engine para descubrir empresas</td></tr>
+                <tr><td colSpan={15} style={{ textAlign: "center", padding: 32, color: "var(--ink-400)", fontSize: 13 }}>Sin prospectos aún — usá el Research Engine para descubrir empresas</td></tr>
               )}
               {tableRows.map((p, i) => (
                 <tr key={p.id ?? i}
@@ -2561,9 +2606,29 @@ function Prospects({ onNav }) {
                   <td>{p.svc && p.svc !== "—" ? <Badge tone="brand">{p.svc}</Badge> : <span className="cell-muted">—</span>}</td>
                   <td><Score v={p.score}/></td>
                   <td>
+                    <Badge tone={AI_STATE_TONE[p.aiState]} dot>{AI_STATE_LABEL[p.aiState]}</Badge>
+                  </td>
+                  <td>
                     {p.isReal
                       ? <Badge tone={ESTADO_TONE[p.estado] ?? "default"} dot>{ESTADO_LABEL[p.estado] ?? p.state ?? p.estado}</Badge>
                       : <StateP s={p.state}/>}
+                  </td>
+                  <td onClick={e => e.stopPropagation()}>
+                    {p.isReal && (p.aiState === "APROBADO_IA" || p.aiState === "PRIORIDAD_MAXIMA") ? (
+                      p.estado === "ENRIQUECIDO" ? (
+                        <span style={{ fontSize: 12, color: "#10B981", fontWeight: 600 }}>✅ Sí</span>
+                      ) : (
+                        <button
+                          onClick={() => handleEnrich(p.id)}
+                          disabled={enrichingId === p.id}
+                          style={{ fontSize: 11, padding: "3px 9px", borderRadius: 12, border: "1px solid #5B5BF7", background: "transparent", color: "#5B5BF7", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}
+                        >
+                          {enrichingId === p.id ? "…" : "Enriquecer"}
+                        </button>
+                      )
+                    ) : (
+                      <span className="cell-muted" style={{ fontSize: 11 }}>—</span>
+                    )}
                   </td>
                   <td>
                     {p.validation
