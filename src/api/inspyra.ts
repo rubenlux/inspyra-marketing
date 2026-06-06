@@ -438,12 +438,15 @@ export const enrichmentApi = {
 
 export interface OutreachBriefData {
   proposalType: 'OUTREACH'
+  analysisType: 'OPPORTUNITY' | 'RISK' | 'MIXED'
+  industryProfile: string
+  diagnosticoResumen: string
   problemasDetectados: Array<{ problema: string; impacto: string }>
   oportunidades: Array<{ oportunidad: string; beneficio: string }>
   riesgos: string[]
   recomendacionesGenerales: string[]
-  diagnosticoResumen: string
   cta: string
+  outreachMessage: string
 }
 
 // ── Commercial Proposal (Stage 2 — tras interacción positiva) ────────────────

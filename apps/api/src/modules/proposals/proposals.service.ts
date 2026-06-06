@@ -14,12 +14,15 @@ import * as path from 'path';
 /** Stage 1: Conseguir respuesta. Sin precios, sin cierre. */
 interface OutreachBriefData {
   proposalType: 'OUTREACH';
+  analysisType: 'OPPORTUNITY' | 'RISK' | 'MIXED';
+  industryProfile: string;
+  diagnosticoResumen: string;
   problemasDetectados: Array<{ problema: string; impacto: string }>;
   oportunidades: Array<{ oportunidad: string; beneficio: string }>;
   riesgos: string[];
   recomendacionesGenerales: string[];
-  diagnosticoResumen: string;
-  cta: string; // Siempre "¿Te gustaría recibirlo?" o variante
+  cta: string;
+  outreachMessage: string; // 150-250 palabras para WhatsApp/Email/DM
 }
 
 /** Stage 2: Propuesta completa tras interacción positiva. */
@@ -96,6 +99,70 @@ const MARKET_CONFIG: Record<string, {
     avoidAnnualTotal: false,
   },
 };
+
+// ── Estrategias por industria ────────────────────────────────────────────────
+
+type IndustryKey = 'DENTAL' | 'WINERY' | 'REAL_ESTATE' | 'LEGAL' | 'RETAIL' | 'MEDICAL' | 'HOSPITALITY' | 'GENERIC';
+
+const INDUSTRY_CONFIG: Record<IndustryKey, {
+  focos: string[];
+  ctaFraming: string; // plantilla para el CTA de primer contacto
+  tone: string;
+}> = {
+  DENTAL: {
+    focos: ['confianza de pacientes', 'reputación online', 'visibilidad local', 'captación de nuevos pacientes'],
+    ctaFraming: 'Detectamos algunos puntos técnicos que podrían estar afectando la confianza de los pacientes. Si te interesa, podemos compartirte el detalle completo.',
+    tone: 'profesional y empático',
+  },
+  WINERY: {
+    focos: ['marca', 'enoturismo digital', 'ventas directas', 'posicionamiento premium'],
+    ctaFraming: 'Encontramos varias oportunidades relacionadas con visibilidad online y enoturismo digital. Si te interesa, podemos compartirte el análisis completo.',
+    tone: 'sofisticado y apasionado por el producto',
+  },
+  REAL_ESTATE: {
+    focos: ['captación de propietarios', 'consultas entrantes', 'formularios', 'WhatsApp y canales directos'],
+    ctaFraming: 'Detectamos oportunidades para aumentar la captación de consultas y propietarios desde canales digitales. Si te interesa, te compartimos el informe completo.',
+    tone: 'directo y orientado a resultados',
+  },
+  LEGAL: {
+    focos: ['credibilidad profesional', 'captación de clientes', 'reputación online', 'presencia digital'],
+    ctaFraming: 'Identificamos áreas de mejora en la presencia digital que podrían impactar la captación de nuevos clientes. Si te interesa, podemos compartirte el análisis.',
+    tone: 'formal y confiable',
+  },
+  RETAIL: {
+    focos: ['tráfico web', 'conversión', 'ventas online', 'visibilidad de marca'],
+    ctaFraming: 'Detectamos oportunidades para aumentar el tráfico y las ventas desde canales digitales. Si te interesa, podemos compartirte el informe.',
+    tone: 'dinámico y orientado a ventas',
+  },
+  MEDICAL: {
+    focos: ['confianza de pacientes', 'reputación', 'visibilidad local', 'captación'],
+    ctaFraming: 'Encontramos algunos aspectos que podrían estar afectando la confianza de los pacientes al buscarte online. Si te interesa, podemos compartirte el detalle.',
+    tone: 'profesional y empático',
+  },
+  HOSPITALITY: {
+    focos: ['reservas directas', 'experiencia digital', 'reputación', 'visibilidad en buscadores'],
+    ctaFraming: 'Identificamos oportunidades para aumentar las reservas y la visibilidad online. Si te interesa, te compartimos el análisis completo.',
+    tone: 'cálido y orientado a experiencia',
+  },
+  GENERIC: {
+    focos: ['presencia digital', 'visibilidad', 'captación de clientes', 'conversión'],
+    ctaFraming: 'Encontramos varias oportunidades de mejora en la presencia digital. Si te interesa, podemos compartirte el detalle completo de lo que encontramos.',
+    tone: 'consultivo y profesional',
+  },
+};
+
+function detectIndustryProfile(rubro?: string): IndustryKey {
+  if (!rubro) return 'GENERIC';
+  const r = rubro.toLowerCase();
+  if (/dental|odontolog|clinic.*sal|salud oral/.test(r)) return 'DENTAL';
+  if (/vino|bodega|winer|viñedo|enolog/.test(r)) return 'WINERY';
+  if (/inmobil|real.?estate|propied|bienes.?raíc/.test(r)) return 'REAL_ESTATE';
+  if (/legal|abogad|estudio.?juríd|notaría/.test(r)) return 'LEGAL';
+  if (/retail|indumentaria|moda|ropa|tienda|comercio.?minorist/.test(r)) return 'RETAIL';
+  if (/médic|medic|clínica|hospital|salud/.test(r)) return 'MEDICAL';
+  if (/hotel|restauran|gastro|hospit|turism|café|bar /.test(r)) return 'HOSPITALITY';
+  return 'GENERIC';
+}
 
 @Injectable()
 export class ProposalsService {
@@ -326,14 +393,18 @@ export class ProposalsService {
     const v = prospect.validation;
     const e = prospect.enrichmentResult;
     const market = MARKET_CONFIG[marketProfile] ?? MARKET_CONFIG['ARGENTINA'];
+    const industryKey = detectIndustryProfile(prospect.rubro);
+    const industry = INDUSTRY_CONFIG[industryKey];
 
     return `Sos un especialista en prospección B2B para agencias de marketing digital en ${marketProfile}.
 
 CONTEXTO ESTRATÉGICO:
-El objetivo de este mensaje NO es vender ni cerrar. Es conseguir UNA RESPUESTA del prospecto.
-No pedir reunión todavía. No mostrar precios. No listar servicios con costos.
-El CTA debe ser una pregunta simple sobre si le interesa recibir un diagnóstico gratuito.
+El objetivo NO es vender ni cerrar. Es conseguir UNA RESPUESTA del prospecto.
+EL ANÁLISIS YA FUE REALIZADO. No ofrecer "hacer un diagnóstico" — ya está hecho.
+El CTA debe asumir que el análisis existe e invitar a RECIBIRLO.
 Estrategia de mercado: ${market.strategy}
+Industria: ${industryKey} — Focos: ${industry.focos.join(', ')}
+Tono: ${industry.tone}
 
 DATOS DEL PROSPECTO:
 - Empresa: ${prospect.nombreEmpresa}
@@ -341,41 +412,58 @@ DATOS DEL PROSPECTO:
 - País/Ciudad: ${[prospect.ciudad, prospect.pais].filter(Boolean).join(', ') || 'No especificado'}
 - Website: ${prospect.website ?? 'Sin web'}
 
-OPORTUNIDAD DETECTADA POR RESEARCH AGENT:
+OPORTUNIDAD DETECTADA:
 ${prospect.oportunidadDetectada ?? 'No especificada'}
 
 PROBLEMAS IDENTIFICADOS:
 ${(prospect.problemasEncontrados ?? []).map((p: string) => `- ${p}`).join('\n') || '- No especificados'}
 
-EVALUACIÓN DE OPORTUNIDAD:
+EVALUACIÓN:
 - Score: ${v?.agentScore ?? 'N/A'} / 100
 - Servicios potenciales: ${v?.servicesRecommended?.join(', ') ?? prospect.servicioSugerido ?? 'N/A'}
-- Razonamiento: ${v?.reasoning ?? 'No disponible'}
+- Razonamiento del agente: ${v?.reasoning ?? 'No disponible'}
 
 DATOS DE CONTACTABILIDAD:
-- Score contactabilidad: ${e?.contactabilityScore ?? 'N/A'} / 100
-- Decisor identificado: ${e?.nombreDecidsor ?? 'No identificado'}${e?.rolDecidsor ? ` (${e.rolDecidsor})` : ''}
+- Score: ${e?.contactabilityScore ?? 'N/A'} / 100
+- Decisor: ${e?.nombreDecidsor ?? 'No identificado'}${e?.rolDecidsor ? ` (${e.rolDecidsor})` : ''}
 
 INSTRUCCIONES CRÍTICAS:
-1. NO mostrar precios ni inversiones en este brief
+1. NO mostrar precios ni inversiones
 2. NO pedir logo, manual de marca, historia corporativa ni material de branding
-3. NO proponer reunión directamente
-4. El CTA debe ser tipo: "¿Te gustaría recibirlo?" referido a un diagnóstico gratuito
-5. Máximo 1 página de contenido (breve y directo)
-6. Respondé SOLO con JSON válido
+3. NO proponer reunión en el primer mensaje
+4. CTA válido: "Si te interesa, podemos compartirte el detalle completo." / "¿Te gustaría recibir el informe?" / "Podemos enviarte el análisis completo."
+5. CTA INVÁLIDO: "Agendemos una llamada" / "¿Tenés 30 minutos?" / "¿Te gustaría que hagamos un diagnóstico?" (ya fue hecho)
+6. Referencia para el CTA de esta industria: ${industry.ctaFraming}
+
+analysisType — elegir uno:
+- OPPORTUNITY: los problemas son principalmente brechas de crecimiento (SEO, e-commerce, alcance)
+- RISK: hay problemas críticos de confianza/seguridad (SSL vencido, web caída, reputación dañada)
+- MIXED: combina ambos
+
+outreachMessage — mensaje corto (150-250 palabras) listo para enviar por WhatsApp/Email/DM:
+- Párrafo 1: qué encontramos (problema o oportunidad principal, específico a esta empresa)
+- Párrafo 2: impacto en el negocio
+- Párrafo 3: qué tenemos para compartir
+- CTA final (una línea)
+- Tono: consultor que ya analizó el negocio, NO vendedor de agencia
+
+Respondé SOLO con JSON válido:
 
 {
   "proposalType": "OUTREACH",
+  "analysisType": "OPPORTUNITY" | "RISK" | "MIXED",
+  "industryProfile": "${industryKey}",
+  "diagnosticoResumen": "string — 3-4 oraciones sobre la situación actual y potencial detectado. Tono consultivo.",
   "problemasDetectados": [
-    {"problema": "string — problema concreto de esta empresa", "impacto": "string — impacto real en el negocio"}
+    {"problema": "string — problema concreto", "impacto": "string — impacto en el negocio"}
   ],
   "oportunidades": [
-    {"oportunidad": "string — oportunidad específica detectada", "beneficio": "string — beneficio concreto que obtendría"}
+    {"oportunidad": "string — oportunidad específica", "beneficio": "string — beneficio concreto"}
   ],
-  "riesgos": ["string — riesgo de no actuar ahora"],
-  "recomendacionesGenerales": ["string — recomendación general sin mencionar precios ni servicios específicos"],
-  "diagnosticoResumen": "string — párrafo breve (3-4 oraciones) describiendo la situación actual de la empresa y el potencial detectado. Tono consultivo, no vendedor.",
-  "cta": "string — pregunta simple orientada a conseguir respuesta. Ejemplo: '¿Te gustaría recibir un diagnóstico breve y gratuito sobre la presencia digital de [empresa]?' NO 'Agendemos una llamada'."
+  "riesgos": ["string — riesgo de no actuar"],
+  "recomendacionesGenerales": ["string — sin precios ni servicios específicos"],
+  "cta": "string — invitación a recibir el análisis ya realizado. Usar como referencia: ${industry.ctaFraming.replace(/"/g, '\\"')}",
+  "outreachMessage": "string — 150-250 palabras. Listo para enviar por WhatsApp o email. Problema + Impacto + Oportunidad + CTA. Sin listas, sin asteriscos, prosa directa."
 }`;
   }
 
@@ -474,13 +562,15 @@ ${!isHighValueMarket ? '5. Incluir 2-3 preguntas de calificación para el siguie
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       this.logger.warn('ProposalAgent: no JSON found in output');
-      return { proposalType: 'OUTREACH', problemasDetectados: [], oportunidades: [], riesgos: [], recomendacionesGenerales: [], diagnosticoResumen: '', cta: '' };
+      const empty: OutreachBriefData = { proposalType: 'OUTREACH', analysisType: 'MIXED', industryProfile: 'GENERIC', diagnosticoResumen: '', problemasDetectados: [], oportunidades: [], riesgos: [], recomendacionesGenerales: [], cta: '', outreachMessage: '' };
+      return empty;
     }
     try {
       return JSON.parse(jsonMatch[0]) as ProposalData;
     } catch {
       this.logger.warn('ProposalAgent: JSON parse error');
-      return { proposalType: 'OUTREACH', problemasDetectados: [], oportunidades: [], riesgos: [], recomendacionesGenerales: [], diagnosticoResumen: '', cta: '' };
+      const empty: OutreachBriefData = { proposalType: 'OUTREACH', analysisType: 'MIXED', industryProfile: 'GENERIC', diagnosticoResumen: '', problemasDetectados: [], oportunidades: [], riesgos: [], recomendacionesGenerales: [], cta: '', outreachMessage: '' };
+      return empty;
     }
   }
 
@@ -488,11 +578,21 @@ ${!isHighValueMarket ? '5. Incluir 2-3 preguntas de calificación para el siguie
 
   private toOutreachMarkdown(data: OutreachBriefData, prospect: any): string {
     const lines: string[] = [];
-    lines.push(`# Outreach Brief — ${prospect.nombreEmpresa}`);
+    const typeLabel = data.analysisType === 'RISK' ? '⚠ RISK' : data.analysisType === 'OPPORTUNITY' ? '🚀 OPPORTUNITY' : '⚡ MIXED';
+    lines.push(`# Outreach Brief — ${prospect.nombreEmpresa} [${typeLabel}]`);
     lines.push('');
 
+    if (data.outreachMessage) {
+      lines.push('## Mensaje Outreach (WhatsApp / Email / DM)');
+      lines.push('');
+      lines.push(data.outreachMessage);
+      lines.push('');
+      lines.push('---');
+      lines.push('');
+    }
+
     if (data.diagnosticoResumen) {
-      lines.push('## Diagnóstico');
+      lines.push('## Diagnóstico Interno');
       lines.push(data.diagnosticoResumen);
       lines.push('');
     }
@@ -528,7 +628,7 @@ ${!isHighValueMarket ? '5. Incluir 2-3 preguntas de calificación para el siguie
     }
 
     if (data.cta) {
-      lines.push('## Próximo Paso');
+      lines.push('## CTA');
       lines.push(data.cta);
     }
 

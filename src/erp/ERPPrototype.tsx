@@ -2293,11 +2293,50 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                 {/* OUTREACH BRIEF — structured view */}
                 {latestProposal.jobStatus === "COMPLETED" && latestProposal.proposalData?.proposalType === "OUTREACH" && (() => {
                   const d = latestProposal.proposalData as any;
+                  const analysisColors = {
+                    OPPORTUNITY: { bg: "#ECFDF5", border: "#10B981", label: "#065F46", text: "🚀 Oportunidad" },
+                    RISK:        { bg: "#FFF7ED", border: "#F59E0B", label: "#92400E", text: "⚠ Riesgo" },
+                    MIXED:       { bg: "#EFF6FF", border: "#3B82F6", label: "#1D4ED8", text: "⚡ Mixto" },
+                  }[d.analysisType as string] ?? { bg: "#F5F3FF", border: "#7C3AED", label: "#6D28D9", text: d.analysisType };
                   return (
                     <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                      {/* analysisType badge */}
+                      {d.analysisType && (
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, background: analysisColors.bg, color: analysisColors.label, border: `1px solid ${analysisColors.border}` }}>
+                            {analysisColors.text}
+                          </span>
+                          {d.industryProfile && d.industryProfile !== "GENERIC" && (
+                            <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, background: "var(--bg-2)", color: "var(--ink-500)" }}>
+                              {d.industryProfile}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* outreachMessage — copyable send-ready block */}
+                      {d.outreachMessage && (
+                        <div style={{ background: "#1E1B4B", borderRadius: 12, padding: "14px 16px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: "#A5B4FC", textTransform: "uppercase", letterSpacing: "0.05em" }}>Mensaje Outreach</span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(d.outreachMessage).then(() => {
+                                  const btn = document.activeElement as HTMLElement;
+                                  if (btn) { btn.textContent = "✓ Copiado"; setTimeout(() => { btn.textContent = "Copiar"; }, 1800); }
+                                });
+                              }}
+                              style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid #4338CA", background: "transparent", color: "#A5B4FC", cursor: "pointer" }}>
+                              Copiar
+                            </button>
+                          </div>
+                          <div style={{ fontSize: 13, color: "#E0E7FF", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{d.outreachMessage}</div>
+                        </div>
+                      )}
+
                       {d.diagnosticoResumen && (
                         <div style={{ padding: "12px 14px", background: "#F5F3FF", borderRadius: 10, borderLeft: "3px solid #7C3AED" }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "#6D28D9", textTransform: "uppercase", marginBottom: 6 }}>Diagnóstico</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#6D28D9", textTransform: "uppercase", marginBottom: 6 }}>Diagnóstico interno</div>
                           <div style={{ fontSize: 13, color: "var(--ink-800)", lineHeight: 1.6 }}>{d.diagnosticoResumen}</div>
                         </div>
                       )}
@@ -2333,7 +2372,7 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                       )}
                       {d.cta && (
                         <div style={{ padding: "14px 16px", background: "#EDE9FE", borderRadius: 10, borderLeft: "3px solid #7C3AED" }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "#6D28D9", textTransform: "uppercase", marginBottom: 6 }}>CTA — Primer mensaje</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#6D28D9", textTransform: "uppercase", marginBottom: 6 }}>CTA</div>
                           <div style={{ fontSize: 13.5, color: "#4C1D95", fontWeight: 500, lineHeight: 1.6 }}>"{d.cta}"</div>
                         </div>
                       )}
