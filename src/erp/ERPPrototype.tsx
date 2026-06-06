@@ -2311,6 +2311,11 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                               {d.industryProfile}
                             </span>
                           )}
+                          {d.communicationLanguage && (
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 99, background: d.communicationLanguage === "EN" ? "#DBEAFE" : "#F0FDF4", color: d.communicationLanguage === "EN" ? "#1D4ED8" : "#166534" }}>
+                              {d.communicationLanguage}
+                            </span>
+                          )}
                         </div>
                       )}
 

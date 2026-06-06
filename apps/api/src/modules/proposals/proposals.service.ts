@@ -16,6 +16,7 @@ interface OutreachBriefData {
   proposalType: 'OUTREACH';
   analysisType: 'OPPORTUNITY' | 'RISK' | 'MIXED';
   industryProfile: string;
+  communicationLanguage: string;
   diagnosticoResumen: string;
   problemasDetectados: Array<{ problema: string; impacto: string }>;
   oportunidades: Array<{ oportunidad: string; beneficio: string }>;
@@ -164,6 +165,40 @@ function detectIndustryProfile(rubro?: string): IndustryKey {
   return 'GENERIC';
 }
 
+// ── Communication language detection ────────────────────────────────────────
+
+function detectCommunicationLanguage(prospect: any): string {
+  if (prospect.communicationLanguage) return prospect.communicationLanguage as string;
+
+  const website = (prospect.website ?? '').toLowerCase();
+  const location = `${prospect.pais ?? ''} ${prospect.ciudad ?? ''}`.toLowerCase();
+
+  // 1. Website TLD — strongest signal
+  if (/\.fr(\/|$)/.test(website)) return 'FR';
+  if (/\.de(\/|$)|\.at(\/|$)/.test(website)) return 'DE';
+  if (/\.com\.br(\/|$)|\.br(\/|$)/.test(website)) return 'PT';
+  if (/\.(ar|mx|co|cl|pe|es|uy|ec|py|bo|ve)(\/|$)/.test(website)) return 'ES';
+
+  // 2. Country / city
+  if (/\b(brazil|brasil)\b/.test(location)) return 'PT';
+  if (/\b(france|paris|lyon|marseille|bordeaux)\b/.test(location)) return 'FR';
+  if (/\b(germany|deutschland|austria|berlin|munich|münchen|wien|frankfurt)\b/.test(location)) return 'DE';
+  if (/\b(united states|usa|u\.s\.|florida|california|texas|new york|new jersey|illinois|georgia|ohio|michigan|pennsylvania|miami|los angeles|chicago|houston|dallas|phoenix|denver|seattle|boston|atlanta)\b/.test(location)) return 'EN';
+  if (/\b(canada|ontario|british columbia|alberta|québec|toronto|vancouver|calgary|ottawa|montreal)\b/.test(location)) return 'EN';
+  if (/\b(uk|united kingdom|england|ireland|australia|new zealand|london|sydney|melbourne)\b/.test(location)) return 'EN';
+  if (/\b(argentina|méxico|mexico|colombia|chile|perú|peru|españa|spain|uruguay|paraguay|bolivia|ecuador|venezuela|costa rica|panamá|panama|dominican|república dominicana)\b/.test(location)) return 'ES';
+
+  return 'ES'; // default
+}
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  EN: 'English',
+  ES: 'español',
+  PT: 'português',
+  FR: 'français',
+  DE: 'Deutsch',
+};
+
 @Injectable()
 export class ProposalsService {
   private readonly logger = new Logger(ProposalsService.name);
@@ -243,6 +278,15 @@ export class ProposalsService {
 
     const marketProfile = (tenant?.marketProfile ?? 'ARGENTINA') as string;
 
+    // Detect communication language; persist on prospect if not yet set
+    const communicationLanguage = detectCommunicationLanguage(prospect);
+    if (!prospect.communicationLanguage) {
+      await this.prisma.prospect.update({
+        where: { id: prospectId },
+        data: { communicationLanguage: communicationLanguage as any },
+      });
+    }
+
     // Load catalog only for COMMERCIAL proposals
     let catalog: any[] = [];
     if (proposalType === 'COMMERCIAL') {
@@ -253,7 +297,7 @@ export class ProposalsService {
     }
 
     setImmediate(() =>
-      this.runProposalAgent(proposal.id, tenantId, prospect, catalog, proposalType, marketProfile).catch(err =>
+      this.runProposalAgent(proposal.id, tenantId, prospect, catalog, proposalType, marketProfile, communicationLanguage).catch(err =>
         this.logger.error(`[ProposalJob ${proposal.id}] Unhandled: ${err.message}`),
       ),
     );
@@ -347,18 +391,19 @@ export class ProposalsService {
     catalog: any[],
     proposalType: 'OUTREACH' | 'COMMERCIAL',
     marketProfile: string,
+    communicationLanguage: string,
   ) {
     await this.prisma.proposal.update({
       where: { id: proposalId },
       data: { jobStatus: 'RUNNING', startedAt: new Date() },
     });
 
-    this.logger.log(`[ProposalJob ${proposalId}] Start — ${prospect.nombreEmpresa} | type:${proposalType} | market:${marketProfile}`);
+    this.logger.log(`[ProposalJob ${proposalId}] Start — ${prospect.nombreEmpresa} | type:${proposalType} | market:${marketProfile} | lang:${communicationLanguage}`);
 
     try {
       const prompt = proposalType === 'OUTREACH'
-        ? this.buildOutreachPrompt(prospect, marketProfile)
-        : this.buildCommercialPrompt(prospect, catalog, marketProfile);
+        ? this.buildOutreachPrompt(prospect, marketProfile, communicationLanguage)
+        : this.buildCommercialPrompt(prospect, catalog, marketProfile, communicationLanguage);
 
       const raw = await this.spawnClaude(prompt, 'claude-sonnet-4-6', 120_000);
       const data = this.parseAgentOutput(raw);
@@ -389,87 +434,104 @@ export class ProposalsService {
 
   // ── Outreach Brief Prompt ─────────────────────────────────────────────────────
 
-  private buildOutreachPrompt(prospect: any, marketProfile: string): string {
+  private buildOutreachPrompt(prospect: any, marketProfile: string, communicationLanguage: string): string {
     const v = prospect.validation;
     const e = prospect.enrichmentResult;
     const market = MARKET_CONFIG[marketProfile] ?? MARKET_CONFIG['ARGENTINA'];
     const industryKey = detectIndustryProfile(prospect.rubro);
     const industry = INDUSTRY_CONFIG[industryKey];
+    const langLabel = LANGUAGE_LABELS[communicationLanguage] ?? communicationLanguage;
+    const isEN = communicationLanguage === 'EN';
 
-    return `Sos un especialista en prospección B2B para agencias de marketing digital en ${marketProfile}.
+    return `You are a B2B outreach specialist for a digital marketing agency.
+Your task: generate an Outreach Brief for a cold prospect.
+GOAL: get ONE response. Not a sale. Not a meeting request.
 
-CONTEXTO ESTRATÉGICO:
-El objetivo NO es vender ni cerrar. Es conseguir UNA RESPUESTA del prospecto.
-EL ANÁLISIS YA FUE REALIZADO. No ofrecer "hacer un diagnóstico" — ya está hecho.
-El CTA debe asumir que el análisis existe e invitar a RECIBIRLO.
-Estrategia de mercado: ${market.strategy}
-Industria: ${industryKey} — Focos: ${industry.focos.join(', ')}
-Tono: ${industry.tone}
+MARKET: ${marketProfile} — ${market.strategy}
+INDUSTRY: ${industryKey} — focus on: ${industry.focos.join(', ')}
+TONE: ${industry.tone}
 
-DATOS DEL PROSPECTO:
-- Empresa: ${prospect.nombreEmpresa}
-- Rubro: ${prospect.rubro ?? 'No especificado'}
-- País/Ciudad: ${[prospect.ciudad, prospect.pais].filter(Boolean).join(', ') || 'No especificado'}
-- Website: ${prospect.website ?? 'Sin web'}
+PROSPECT:
+- Company: ${prospect.nombreEmpresa}
+- Industry: ${prospect.rubro ?? 'Not specified'}
+- Location: ${[prospect.ciudad, prospect.pais].filter(Boolean).join(', ') || 'Not specified'}
+- Website: ${prospect.website ?? 'No website'}
 
-OPORTUNIDAD DETECTADA:
-${prospect.oportunidadDetectada ?? 'No especificada'}
+DETECTED OPPORTUNITY:
+${prospect.oportunidadDetectada ?? 'Not specified'}
 
-PROBLEMAS IDENTIFICADOS:
-${(prospect.problemasEncontrados ?? []).map((p: string) => `- ${p}`).join('\n') || '- No especificados'}
+IDENTIFIED PROBLEMS:
+${(prospect.problemasEncontrados ?? []).map((p: string) => `- ${p}`).join('\n') || '- Not specified'}
 
-EVALUACIÓN:
-- Score: ${v?.agentScore ?? 'N/A'} / 100
-- Servicios potenciales: ${v?.servicesRecommended?.join(', ') ?? prospect.servicioSugerido ?? 'N/A'}
-- Razonamiento del agente: ${v?.reasoning ?? 'No disponible'}
+QUALITY SCORE: ${v?.agentScore ?? 'N/A'} / 100
+RECOMMENDED SERVICES: ${v?.servicesRecommended?.join(', ') ?? prospect.servicioSugerido ?? 'N/A'}
+AGENT REASONING: ${v?.reasoning ?? 'Not available'}
 
-DATOS DE CONTACTABILIDAD:
-- Score: ${e?.contactabilityScore ?? 'N/A'} / 100
-- Decisor: ${e?.nombreDecidsor ?? 'No identificado'}${e?.rolDecidsor ? ` (${e.rolDecidsor})` : ''}
+DECISION MAKER: ${e?.nombreDecidsor ?? 'Not identified'}${e?.rolDecidsor ? ` (${e.rolDecidsor})` : ''}
 
-INSTRUCCIONES CRÍTICAS:
-1. NO mostrar precios ni inversiones
-2. NO pedir logo, manual de marca, historia corporativa ni material de branding
-3. NO proponer reunión en el primer mensaje
-4. CTA válido: "Si te interesa, podemos compartirte el detalle completo." / "¿Te gustaría recibir el informe?" / "Podemos enviarte el análisis completo."
-5. CTA INVÁLIDO: "Agendemos una llamada" / "¿Tenés 30 minutos?" / "¿Te gustaría que hagamos un diagnóstico?" (ya fue hecho)
-6. Referencia para el CTA de esta industria: ${industry.ctaFraming}
+═══ CRITICAL RULES ═══
 
-analysisType — elegir uno:
-- OPPORTUNITY: los problemas son principalmente brechas de crecimiento (SEO, e-commerce, alcance)
-- RISK: hay problemas críticos de confianza/seguridad (SSL vencido, web caída, reputación dañada)
-- MIXED: combina ambos
+TONE — HOW TO DESCRIBE THE ANALYSIS:
+The analysis was performed using publicly available information (website, social media, Google).
+NEVER write phrases like "we visited", "we reviewed a few days ago", "our team checked" — those sound like a human was personally involved.
+CORRECT: "Reviewing publicly available information about [company]...", "Analyzing [company]'s digital presence...", "Based on publicly available data about [company]..."
+This is important for credibility. The message should sound like an informed observer, not a stalker.
 
-outreachMessage — mensaje corto (150-250 palabras) listo para enviar por WhatsApp/Email/DM:
-- Párrafo 1: qué encontramos (problema o oportunidad principal, específico a esta empresa)
-- Párrafo 2: impacto en el negocio
-- Párrafo 3: qué tenemos para compartir
-- CTA final (una línea)
-- Tono: consultor que ya analizó el negocio, NO vendedor de agencia
+CTA — CRITICAL:
+THE ANALYSIS IS ALREADY DONE. Never offer to "do a diagnosis" — it was already done.
+Invite the prospect to RECEIVE the existing analysis.
+VALID: "If you're interested, we can share the full details of what we found." / "Would you like to receive the complete report?" / "We can send you the full analysis."
+INVALID: "Let's schedule a call" / "Do you have 30 minutes?" / "Would you like us to do a diagnosis?" (already done)
+Industry reference for CTA: ${isEN ? industry.ctaFraming.replace(/podemos compartirte/g, 'we can share with you').replace(/encontramos/g, 'we found').replace(/te interesa/g, "you're interested") : industry.ctaFraming}
 
-Respondé SOLO con JSON válido:
+AVOID COPYWRITING LANGUAGE:
+Do not write promotional phrases like "traffic and leads lost in silence", "missed opportunities accumulating daily", "your competitors are already doing this".
+Stick to factual observations: "we found X", "this typically causes Y", "we can share more details".
+
+NO prices, NO budgets, NO service lists with costs.
+NO requests for logo, brand manual, corporate history.
+NO meeting requests in first contact.
+
+═══ OUTPUT FIELDS ═══
+
+analysisType:
+- OPPORTUNITY: mainly growth gaps (missing SEO, no e-commerce, unoptimized reach)
+- RISK: critical trust/security issues (expired SSL, site down, unanswered negative reviews)
+- MIXED: both
+
+outreachMessage — LANGUAGE: MUST be written entirely in ${langLabel.toUpperCase()} (${communicationLanguage})
+Format: short message (80-120 words MAX) ready to send via WhatsApp, email, or DM.
+Structure:
+- Line 1: greeting + company name
+- Paragraph 1 (2-3 sentences): what we found — specific to this company, no generic marketing speak
+- Paragraph 2 (1-2 sentences): why it matters for their business
+- CTA (1 sentence): invite to receive the complete analysis
+No bullet points. No asterisks. Plain prose.
+${isEN ? '' : `IMPORTANT: the outreachMessage must be written in ${langLabel}, NOT in Spanish, even though this prompt is in English.`}
+
+diagnosticoResumen (internal, can be in Spanish): 3-4 sentences about current situation and detected potential.
+
+Respond ONLY with valid JSON:
 
 {
   "proposalType": "OUTREACH",
   "analysisType": "OPPORTUNITY" | "RISK" | "MIXED",
   "industryProfile": "${industryKey}",
-  "diagnosticoResumen": "string — 3-4 oraciones sobre la situación actual y potencial detectado. Tono consultivo.",
-  "problemasDetectados": [
-    {"problema": "string — problema concreto", "impacto": "string — impacto en el negocio"}
-  ],
-  "oportunidades": [
-    {"oportunidad": "string — oportunidad específica", "beneficio": "string — beneficio concreto"}
-  ],
-  "riesgos": ["string — riesgo de no actuar"],
-  "recomendacionesGenerales": ["string — sin precios ni servicios específicos"],
-  "cta": "string — invitación a recibir el análisis ya realizado. Usar como referencia: ${industry.ctaFraming.replace(/"/g, '\\"')}",
-  "outreachMessage": "string — 150-250 palabras. Listo para enviar por WhatsApp o email. Problema + Impacto + Oportunidad + CTA. Sin listas, sin asteriscos, prosa directa."
+  "communicationLanguage": "${communicationLanguage}",
+  "diagnosticoResumen": "string — internal analysis summary in Spanish",
+  "problemasDetectados": [{"problema": "string", "impacto": "string"}],
+  "oportunidades": [{"oportunidad": "string", "beneficio": "string"}],
+  "riesgos": ["string"],
+  "recomendacionesGenerales": ["string — no prices, no specific services"],
+  "cta": "string — in ${langLabel}: invitation to receive the existing analysis",
+  "outreachMessage": "string — 80-120 words in ${langLabel}. Plain prose, no lists."
 }`;
   }
 
   // ── Commercial Proposal Prompt ────────────────────────────────────────────────
 
-  private buildCommercialPrompt(prospect: any, catalog: any[], marketProfile: string): string {
+  private buildCommercialPrompt(prospect: any, catalog: any[], marketProfile: string, communicationLanguage: string): string {
+    const langLabel = LANGUAGE_LABELS[communicationLanguage] ?? communicationLanguage;
     const v = prospect.validation;
     const e = prospect.enrichmentResult;
     const market = MARKET_CONFIG[marketProfile] ?? MARKET_CONFIG['ARGENTINA'];
@@ -486,6 +548,7 @@ Respondé SOLO con JSON válido:
     return `Sos un consultor estratégico digital especializado para el mercado ${marketProfile}. Tu tarea es generar una propuesta comercial estructurada.
 
 IMPORTANTE: Esta propuesta se genera DESPUÉS de que el prospecto mostró interés. Es el segundo contacto.
+IDIOMA: Todo el contenido visible al prospecto (cta, paquetes, descripciones) debe estar en ${langLabel} (${communicationLanguage}).
 Estrategia de mercado: ${market.strategy}
 
 DATOS DEL PROSPECTO:
@@ -562,14 +625,14 @@ ${!isHighValueMarket ? '5. Incluir 2-3 preguntas de calificación para el siguie
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       this.logger.warn('ProposalAgent: no JSON found in output');
-      const empty: OutreachBriefData = { proposalType: 'OUTREACH', analysisType: 'MIXED', industryProfile: 'GENERIC', diagnosticoResumen: '', problemasDetectados: [], oportunidades: [], riesgos: [], recomendacionesGenerales: [], cta: '', outreachMessage: '' };
+      const empty: OutreachBriefData = { proposalType: 'OUTREACH', analysisType: 'MIXED', industryProfile: 'GENERIC', communicationLanguage: 'ES', diagnosticoResumen: '', problemasDetectados: [], oportunidades: [], riesgos: [], recomendacionesGenerales: [], cta: '', outreachMessage: '' };
       return empty;
     }
     try {
       return JSON.parse(jsonMatch[0]) as ProposalData;
     } catch {
       this.logger.warn('ProposalAgent: JSON parse error');
-      const empty: OutreachBriefData = { proposalType: 'OUTREACH', analysisType: 'MIXED', industryProfile: 'GENERIC', diagnosticoResumen: '', problemasDetectados: [], oportunidades: [], riesgos: [], recomendacionesGenerales: [], cta: '', outreachMessage: '' };
+      const empty: OutreachBriefData = { proposalType: 'OUTREACH', analysisType: 'MIXED', industryProfile: 'GENERIC', communicationLanguage: 'ES', diagnosticoResumen: '', problemasDetectados: [], oportunidades: [], riesgos: [], recomendacionesGenerales: [], cta: '', outreachMessage: '' };
       return empty;
     }
   }

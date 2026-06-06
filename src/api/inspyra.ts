@@ -128,6 +128,7 @@ export interface Prospect {
   oportunidadDetectada?: string
   problemasEncontrados: string[]
   servicioSugerido?: string
+  communicationLanguage?: 'EN' | 'ES' | 'PT' | 'FR' | 'DE' | null
   nivelOportunidad?: string
   score: number
   commercialScore?: number | null
@@ -440,6 +441,7 @@ export interface OutreachBriefData {
   proposalType: 'OUTREACH'
   analysisType: 'OPPORTUNITY' | 'RISK' | 'MIXED'
   industryProfile: string
+  communicationLanguage: string
   diagnosticoResumen: string
   problemasDetectados: Array<{ problema: string; impacto: string }>
   oportunidades: Array<{ oportunidad: string; beneficio: string }>

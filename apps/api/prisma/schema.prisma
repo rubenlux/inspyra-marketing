@@ -168,6 +168,9 @@ model Prospect {
   proximoSeguimiento  DateTime?
   estado              ProspectEstado @default(NUEVO)
 
+  // Communication
+  communicationLanguage CommunicationLanguage?
+
   // Metadata
   fuente        ProspectFuente @default(MANUAL)
   detectadoPor  DetectadoPor   @default(MANUAL)
@@ -1109,6 +1112,14 @@ enum MarketProfile {
   USA
   CANADA
   EUROPE
+}
+
+enum CommunicationLanguage {
+  EN
+  ES
+  PT
+  FR
+  DE
 }
 
 enum ProposalType {
