@@ -1,0 +1,3228 @@
+{
+  "nodes": [
+    {
+      "id": "api_inspyra",
+      "label": "inspyra.ts",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L1",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_getstoredtoken",
+      "label": "getStoredToken()",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L6",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_setstoredtoken",
+      "label": "setStoredToken()",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L10",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_clearstoredtoken",
+      "label": "clearStoredToken()",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L15",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_silentrefresh",
+      "label": "silentRefresh()",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L23",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_req",
+      "label": "req()",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L41",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_authapi",
+      "label": "authApi",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L105",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_prospect",
+      "label": "Prospect",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L115",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_prospectkpis",
+      "label": "ProspectKpis",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L162",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_paginationmeta",
+      "label": "PaginationMeta",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L172",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_prospectsapi",
+      "label": "prospectsApi",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L179",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_decisionfactors",
+      "label": "DecisionFactors",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L192",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_validationfeedback",
+      "label": "ValidationFeedback",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L199",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_prospectvalidation",
+      "label": "ProspectValidation",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L204",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_validationkpis",
+      "label": "ValidationKpis",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L223",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_reviewdto",
+      "label": "ReviewDto",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L239",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_validationsapi",
+      "label": "validationsApi",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L247",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_researchjob",
+      "label": "ResearchJob",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L265",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_researchcandidate",
+      "label": "ResearchCandidate",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L280",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_researchapi",
+      "label": "researchApi",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L319",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_enrichmentjob",
+      "label": "EnrichmentJob",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L335",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_enrichmentresult",
+      "label": "EnrichmentResult",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L347",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_outreachprospect",
+      "label": "OutreachProspect",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L378",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_outreachqueue",
+      "label": "OutreachQueue",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L395",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_enrichmentqueue",
+      "label": "EnrichmentQueue",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L400",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_enrichmentapi",
+      "label": "enrichmentApi",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L410",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_outreachbriefdata",
+      "label": "OutreachBriefData",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L440",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_proposalpackage",
+      "label": "ProposalPackage",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L456",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_commercialproposaldata",
+      "label": "CommercialProposalData",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L465",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_proposaldata",
+      "label": "ProposalData",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L478",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_proposal",
+      "label": "Proposal",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L480",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_proposalsapi",
+      "label": "proposalsApi",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L503",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_agentroirow",
+      "label": "AgentRoiRow",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L528",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_agentroidashboard",
+      "label": "AgentRoiDashboard",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L540",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_contactchannel",
+      "label": "ContactChannel",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L555",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_outreachactivitytype",
+      "label": "OutreachActivityType",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L556",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_outreachactivity",
+      "label": "OutreachActivity",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L558",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_outreachfunnel",
+      "label": "OutreachFunnel",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L568",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_outreachapi",
+      "label": "outreachApi",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L576",
+      "_origin": "ast"
+    },
+    {
+      "id": "api_inspyra_agentroiapi",
+      "label": "agentRoiApi",
+      "file_type": "code",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L599",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype",
+      "label": "ERPPrototype.tsx",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_ic",
+      "label": "Ic()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L13",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_icon",
+      "label": "Icon",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L22",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_badge",
+      "label": "Badge()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L96",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_spark",
+      "label": "Spark()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L104",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_avatar",
+      "label": "Avatar()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L119",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_avatargroup",
+      "label": "AvatarGroup()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L137",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_priority",
+      "label": "Priority()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L147",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_progress",
+      "label": "Progress()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L162",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_inspyralogo",
+      "label": "InspyraLogo()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L167",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_nav",
+      "label": "NAV",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L187",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_sidebar",
+      "label": "Sidebar()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L228",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_screen_meta",
+      "label": "SCREEN_META",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L462",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_topbar",
+      "label": "Topbar()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L482",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_login",
+      "label": "Login()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L514",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_floatingcard",
+      "label": "FloatingCard()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L638",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_kpi",
+      "label": "KPI()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L671",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_pipeline",
+      "label": "PIPELINE",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L700",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_projects",
+      "label": "PROJECTS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L727",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_activity",
+      "label": "ACTIVITY",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L736",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_upcoming",
+      "label": "UPCOMING",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L746",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_dashboard",
+      "label": "Dashboard()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L754",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_revenuechart",
+      "label": "RevenueChart()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L974",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_com_tabs",
+      "label": "COM_TABS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1025",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_comercialtabs",
+      "label": "ComercialTabs()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1033",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_channels",
+      "label": "CHANNELS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1066",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_channeltag",
+      "label": "ChannelTag()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1078",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_score",
+      "label": "Score()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1091",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_temp",
+      "label": "Temp()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1103",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_quickactions",
+      "label": "QuickActions()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1115",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_automationflow",
+      "label": "AutomationFlow()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1138",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_bots",
+      "label": "BOTS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1175",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_botsstrip",
+      "label": "BotsStrip()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1183",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_prospects_data",
+      "label": "PROSPECTS_DATA",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1365",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_estado_label",
+      "label": "ESTADO_LABEL",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1379",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_estado_tone",
+      "label": "ESTADO_TONE",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1386",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_val_tone",
+      "label": "VAL_TONE",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1393",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_val_label",
+      "label": "VAL_LABEL",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1394",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_aistatefromscore",
+      "label": "aiStateFromScore()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1396",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_ai_state_label",
+      "label": "AI_STATE_LABEL",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1402",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_ai_state_tone",
+      "label": "AI_STATE_TONE",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1403",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_ai_state_color",
+      "label": "AI_STATE_COLOR",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1404",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_fmtdate",
+      "label": "fmtDate()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1406",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_proposalnextstep",
+      "label": "ProposalNextStep()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1417",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_prospectdrawer",
+      "label": "ProspectDrawer()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1451",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_researchjobdetaildrawer",
+      "label": "ResearchJobDetailDrawer()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L2834",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_prospects",
+      "label": "Prospects()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L3013",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_statep",
+      "label": "StateP()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L3684",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_ministatp",
+      "label": "MiniStatP()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L3689",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_enrichmentreviewmodal",
+      "label": "EnrichmentReviewModal()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L3704",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_camp_data",
+      "label": "CAMP_DATA",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L3925",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_campaigns",
+      "label": "Campaigns()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L3935",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_campkpi",
+      "label": "CampKpi()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4053",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_fu_groups",
+      "label": "FU_GROUPS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4091",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_followup",
+      "label": "Followup()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4127",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_fustat",
+      "label": "FuStat()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4233",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_pipe_cols",
+      "label": "PIPE_COLS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4281",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_pipestat",
+      "label": "PipeStat()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4398",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_meetings",
+      "label": "MEETINGS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4414",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_past",
+      "label": "PAST",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4422",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_via",
+      "label": "VIA",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4429",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_mtstat",
+      "label": "MtStat()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4536",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_minical",
+      "label": "MiniCal()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4552",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_clients",
+      "label": "CLIENTS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4598",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_healthbar",
+      "label": "HealthBar()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4611",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_minicard",
+      "label": "MiniCard()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4725",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_clientdrawer",
+      "label": "ClientDrawer()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4741",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_field",
+      "label": "Field()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4830",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_servicecard",
+      "label": "ServiceCard()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4839",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_projectrow",
+      "label": "ProjectRow()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4855",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_tli",
+      "label": "TLI()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4870",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_proj_kanban",
+      "label": "PROJ_KANBAN",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4884",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_task_cols",
+      "label": "TASK_COLS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4980",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_tasks",
+      "label": "Tasks()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5009",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_services",
+      "label": "SERVICES",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5074",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_svc_rows",
+      "label": "SVC_ROWS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5202",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_svcstat",
+      "label": "SvcStat()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5214",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_invoices",
+      "label": "INVOICES",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5232",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_billing",
+      "label": "Billing()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5245",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_billstat",
+      "label": "BillStat()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5351",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_cashflowchart",
+      "label": "CashflowChart()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5368",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_donutmix",
+      "label": "DonutMix()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5399",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_deploys",
+      "label": "DEPLOYS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5444",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_logs",
+      "label": "LOGS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5456",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_hostingguard",
+      "label": "HostingGuard()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5467",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_hgstat",
+      "label": "HgStat()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5608",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_resource",
+      "label": "Resource()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5627",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_minigauges",
+      "label": "MiniGauges()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5641",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_sslrow",
+      "label": "SslRow()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5658",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_trafficchart",
+      "label": "TrafficChart()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5671",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_lab_clients",
+      "label": "LAB_CLIENTS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5705",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_pinned",
+      "label": "PINNED",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5716",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_agents",
+      "label": "AGENTS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5722",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_lab",
+      "label": "Lab()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5732",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_output",
+      "label": "Output()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5948",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_settings_nav",
+      "label": "SETTINGS_NAV",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5998",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_members",
+      "label": "MEMBERS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6017",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_integrations",
+      "label": "INTEGRATIONS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6027",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_settings",
+      "label": "Settings()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6042",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_memberspanel",
+      "label": "MembersPanel()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6091",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_integrationspanel",
+      "label": "IntegrationsPanel()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6179",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_generalpanel",
+      "label": "GeneralPanel()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6221",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_placeholderpanel",
+      "label": "PlaceholderPanel()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6248",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_setting",
+      "label": "Setting()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6260",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_toggle",
+      "label": "Toggle()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6269",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_tickets",
+      "label": "TICKETS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6291",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_reports",
+      "label": "Reports()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6378",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_smallstat",
+      "label": "SmallStat()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6430",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_cloud_workloads",
+      "label": "CLOUD_WORKLOADS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6448",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_cloud_costs",
+      "label": "CLOUD_COSTS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6459",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_cloud_deploys",
+      "label": "CLOUD_DEPLOYS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6468",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_cloud_alerts",
+      "label": "CLOUD_ALERTS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6477",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_inspyracloud",
+      "label": "InspyraCloud()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6484",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_mail_threads",
+      "label": "MAIL_THREADS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6629",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_mail_tag_colors",
+      "label": "MAIL_TAG_COLORS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6640",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_inspyramail",
+      "label": "InspyraMail()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6642",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_team_data",
+      "label": "TEAM_DATA",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6744",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_team",
+      "label": "Team()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6753",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_social_posts",
+      "label": "SOCIAL_POSTS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6882",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_social_net_icons",
+      "label": "SOCIAL_NET_ICONS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6891",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_social_metrics_data",
+      "label": "SOCIAL_METRICS_DATA",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6892",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_social",
+      "label": "Social()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6899",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_email_campaigns",
+      "label": "EMAIL_CAMPAIGNS",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7045",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_emailmarketing",
+      "label": "EmailMarketing()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7054",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_mcp_tools_data",
+      "label": "MCP_TOOLS_DATA",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7205",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_mcpgateway",
+      "label": "MCPGateway()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7218",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_pol_candidates",
+      "label": "POL_CANDIDATES",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7396",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_politicahub",
+      "label": "PoliticaHub()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7402",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_metricshub",
+      "label": "MetricsHub()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7600",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_route_by_screen",
+      "label": "ROUTE_BY_SCREEN",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7860",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_screen_by_route",
+      "label": "SCREEN_BY_ROUTE",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7888",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_getscreenfrompath",
+      "label": "getScreenFromPath()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7892",
+      "_origin": "ast"
+    },
+    {
+      "id": "erp_erpprototype_app",
+      "label": "App()",
+      "file_type": "code",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7897",
+      "_origin": "ast"
+    }
+  ],
+  "edges": [
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_getstoredtoken",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_setstoredtoken",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_clearstoredtoken",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_silentrefresh",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L23",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_req",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L41",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_authapi",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L105",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_prospect",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L115",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_prospectkpis",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L162",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_paginationmeta",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L172",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_prospectsapi",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L179",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_decisionfactors",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L192",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_validationfeedback",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L199",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_prospectvalidation",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L204",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_validationkpis",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L223",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_reviewdto",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L239",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_validationsapi",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L247",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_researchjob",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L265",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_researchcandidate",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L280",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_researchapi",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L319",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_enrichmentjob",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L335",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_enrichmentresult",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L347",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_outreachprospect",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L378",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_outreachqueue",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L395",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_enrichmentqueue",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L400",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_enrichmentapi",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L410",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_outreachbriefdata",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L440",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_proposalpackage",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L456",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_commercialproposaldata",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L465",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_proposaldata",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L478",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_proposal",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L480",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_proposalsapi",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L503",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_agentroirow",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L528",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_agentroidashboard",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L540",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_contactchannel",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L555",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_outreachactivitytype",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L556",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_outreachactivity",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L558",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_outreachfunnel",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L568",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_outreachapi",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L576",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra",
+      "target": "api_inspyra_agentroiapi",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L599",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra_silentrefresh",
+      "target": "api_inspyra_setstoredtoken",
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L34",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra_req",
+      "target": "api_inspyra_silentrefresh",
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L73",
+      "weight": 1.0
+    },
+    {
+      "source": "api_inspyra_req",
+      "target": "api_inspyra_clearstoredtoken",
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\api\\inspyra.ts",
+      "source_location": "L77",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "react",
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "react",
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "react_router_dom",
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "react_query",
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "api_inspyra",
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "api_inspyra_authapi",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "api_inspyra_prospectsapi",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "api_inspyra_validationsapi",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "api_inspyra_researchapi",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "api_inspyra_enrichmentapi",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "api_inspyra_proposalsapi",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "api_inspyra_outreachapi",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "api_inspyra_getstoredtoken",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "api_inspyra_setstoredtoken",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "api_inspyra_clearstoredtoken",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "src_erp_dashboardv2_tsx",
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "src_erp_erp_css",
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_ic",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_icon",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L22",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_badge",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L96",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_spark",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L104",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_avatar",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L119",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_avatargroup",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L137",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_priority",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L147",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_progress",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L162",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_inspyralogo",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L167",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_nav",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L187",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_sidebar",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L228",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_screen_meta",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L462",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_topbar",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L482",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_login",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L514",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_floatingcard",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L638",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_kpi",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L671",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_pipeline",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L700",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_projects",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L727",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_activity",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L736",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_upcoming",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L746",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_dashboard",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L754",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_revenuechart",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L974",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_com_tabs",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1025",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_comercialtabs",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1033",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_channels",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1066",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_channeltag",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1078",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_score",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1091",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_temp",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1103",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_quickactions",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1115",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_automationflow",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1138",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_bots",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1175",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_botsstrip",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1183",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_prospects_data",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1365",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_estado_label",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1379",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_estado_tone",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1386",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_val_tone",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1393",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_val_label",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1394",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_aistatefromscore",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1396",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_ai_state_label",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1402",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_ai_state_tone",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1403",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_ai_state_color",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1404",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_fmtdate",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1406",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_proposalnextstep",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1417",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_prospectdrawer",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1451",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_researchjobdetaildrawer",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L2834",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_prospects",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L3013",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_statep",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L3684",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_ministatp",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L3689",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_enrichmentreviewmodal",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L3704",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_camp_data",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L3925",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_campaigns",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L3935",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_campkpi",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4053",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_fu_groups",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4091",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_followup",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4127",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_fustat",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4233",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_pipe_cols",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4281",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_pipeline",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4315",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_pipestat",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4398",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_meetings",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4414",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_past",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4422",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_via",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4429",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_meetings",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4435",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_mtstat",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4536",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_minical",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4552",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_clients",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4598",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_healthbar",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4611",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_clients",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4621",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_minicard",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4725",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_clientdrawer",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4741",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_field",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4830",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_servicecard",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4839",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_projectrow",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4855",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_tli",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4870",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_proj_kanban",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4884",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_projects",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4912",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_task_cols",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L4980",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_tasks",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5009",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_services",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5074",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_services",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5085",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_svc_rows",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5202",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_svcstat",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5214",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_invoices",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5232",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_billing",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5245",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_billstat",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5351",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_cashflowchart",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5368",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_donutmix",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5399",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_deploys",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5444",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_logs",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5456",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_hostingguard",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5467",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_hgstat",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5608",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_resource",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5627",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_minigauges",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5641",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_sslrow",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5658",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_trafficchart",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5671",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_lab_clients",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5705",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_pinned",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5716",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_agents",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5722",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_lab",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5732",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_output",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5948",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_settings_nav",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L5998",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_members",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6017",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_integrations",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6027",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_settings",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6042",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_memberspanel",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6091",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_integrationspanel",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6179",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_generalpanel",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6221",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_placeholderpanel",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6248",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_setting",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6260",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_toggle",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6269",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_tickets",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6291",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_tickets",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6301",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_reports",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6378",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_smallstat",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6430",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_cloud_workloads",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6448",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_cloud_costs",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6459",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_cloud_deploys",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6468",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_cloud_alerts",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6477",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_inspyracloud",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6484",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_mail_threads",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6629",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_mail_tag_colors",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6640",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_inspyramail",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6642",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_team_data",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6744",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_team",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6753",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_social_posts",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6882",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_social_net_icons",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6891",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_social_metrics_data",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6892",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_social",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L6899",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_email_campaigns",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7045",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_emailmarketing",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7054",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_mcp_tools_data",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7205",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_mcpgateway",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7218",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_pol_candidates",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7396",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_politicahub",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7402",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_metricshub",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7600",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_route_by_screen",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7860",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_screen_by_route",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7888",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_getscreenfrompath",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7892",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype",
+      "target": "erp_erpprototype_app",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L7897",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype_handlelogin",
+      "target": "api_inspyra_setstoredtoken",
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L525",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype_sidebar",
+      "target": "api_inspyra_getstoredtoken",
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L232",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype_comercialtabs",
+      "target": "api_inspyra_getstoredtoken",
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L1037",
+      "weight": 1.0
+    },
+    {
+      "source": "erp_erpprototype_prospects",
+      "target": "api_inspyra_getstoredtoken",
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src\\erp\\ERPPrototype.tsx",
+      "source_location": "L3021",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}
