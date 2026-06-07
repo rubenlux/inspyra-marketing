@@ -46,6 +46,18 @@ Cada archivo tiene un número de orden. Para entender el proyecto desde cero, se
 
 ---
 
+## Obligatoriedad
+
+**Project Brain es obligatorio. No es documentación opcional.**
+
+Antes de cualquier tarea de implementación, Claude debe leer:
+1. `CLAUDE_PROJECT_CONTEXT.md` — siempre
+2. Los archivos de Project Brain relevantes al dominio afectado
+
+Ignorar Project Brain en favor de "inferir desde el código" es el comportamiento que este sistema existe para prevenir. La documentación contiene decisiones que no son inferibles del código.
+
+---
+
 ## Regla de actualización
 
 Cuando una decisión importante se toma o cambia, debe registrarse en `08-known-decisions.md`. Project Brain no debe quedar desactualizado más de una semana respecto al código.

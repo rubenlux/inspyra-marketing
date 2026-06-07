@@ -63,6 +63,64 @@ Las empresas contactadas no están esperando ser contactadas. El outreach es fr�
 
 ---
 
+## Regla LATAM/ARG — nunca mostrar inversión anual total
+
+Para prospectos ARGENTINA y LATAM: **nunca mostrar el total anual de la inversión**. Solo mensual o setup. El total anual genera rechazo inmediato.
+
+Para USA/CANADA/EUROPE: mostrar el total anual es válido y esperado.
+
+Esto está codificado en `MARKET_CONFIG.avoidAnnualTotal` del Proposal Agent.
+
+---
+
+## Rangos de pricing por mercado (configurados en Proposal Agent)
+
+Estos rangos son los que usa el agente para generar propuestas. Son orientativos — el catálogo de servicios puede sobreescribirlos.
+
+| Mercado | Esencial | Crecimiento | Completo |
+|---|---|---|---|
+| ARGENTINA | USD 300–600 (setup) | USD 600–1.200 setup + desde USD 150/mes | USD 1.200–2.500 setup + desde USD 300/mes |
+| LATAM | USD 400–800 | USD 800–1.800 | USD 1.800–3.500 |
+| USA | USD 1.500–3.000 | USD 3.000–6.000 | USD 6.000–15.000+ |
+| CANADA | CAD 1.500–3.000 | CAD 3.000–6.000 | CAD 6.000–15.000+ |
+| EUROPE | EUR 1.200–2.500 | EUR 2.500–5.000 | EUR 5.000–12.000+ |
+
+Fuente: `proposals.service.ts` → `MARKET_CONFIG`.
+
+---
+
+## Perfiles de industria (INDUSTRY_CONFIG)
+
+El Proposal Agent adapta tono y foco según el rubro del prospecto. Perfiles definidos:
+
+| Industria | Focos principales | Tono |
+|---|---|---|
+| DENTAL | Confianza de pacientes, reputación, visibilidad local | Profesional y empático |
+| WINERY | Marca, enoturismo digital, ventas directas, premium | Sofisticado |
+| REAL_ESTATE | Captación de propietarios, consultas, WhatsApp | Directo y orientado a resultados |
+| LEGAL | Credibilidad, captación, reputación | Formal y confiable |
+| RETAIL | Tráfico web, conversión, ventas online | Dinámico |
+| MEDICAL | Confianza de pacientes, visibilidad local | Profesional y empático |
+| HOSPITALITY | Reservas directas, reputación, buscadores | Cálido |
+| GENERIC | Presencia digital, visibilidad, captación | Consultivo |
+
+La detección es automática basada en regex del campo `rubro` del prospecto.
+
+---
+
+## Detección de idioma de comunicación
+
+El Proposal Agent detecta `communicationLanguage` en el siguiente orden:
+
+1. Si `prospect.communicationLanguage` ya está setteado → usar ese valor
+2. TLD del website (`.fr` → FR, `.de`/`.at` → DE, `.com.br`/`.br` → PT)
+3. País/ciudad del prospecto
+4. Fallback: ES (español)
+
+Si se detecta automáticamente, se persiste en `Prospect.communicationLanguage` para futuras referencias.
+
+---
+
 ## Estructura de paquetes de servicios
 
 Cuando se menciona pricing, usar siempre la estructura de 3 tiers:

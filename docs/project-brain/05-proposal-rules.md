@@ -88,6 +88,21 @@ Campos clave: resumen, propuesta, paquetes (JSON), callToAction, communicationLa
 
 ---
 
+## Gate de generación (ESTRICTO — verificado en código)
+
+```typescript
+// proposals.service.ts:231
+if (prospect.estado !== 'LISTO_PROPUESTA') → BadRequestException
+```
+
+El Proposal Agent **solo puede actuar cuando el prospecto está EXACTAMENTE en `LISTO_PROPUESTA`**. No funciona desde LISTO_OUTREACH, CONTACTADO ni ningún otro estado posterior.
+
+Adicionalmente se requiere: `enrichmentResult.reviewStatus === 'APPROVED'`.
+
+**Idempotency gate:** Solo puede haber un DRAFT activo (jobStatus PENDING o RUNNING) por prospecto a la vez. Intentar generar una segunda propuesta mientras hay una en curso lanza `ConflictException`.
+
+---
+
 ## Ciclo de vida de una propuesta
 
 ```
@@ -97,6 +112,19 @@ ProposalStatus.REJECTED — operador humano la rechazó, se regenera o se descar
 ```
 
 **Invariante:** Solo un humano puede mover una propuesta de DRAFT a APPROVED. El agente siempre genera en DRAFT.
+
+### Efecto de la aprobación (side effect crítico)
+
+Cuando el humano aprueba una propuesta, el sistema hace dos cosas en una transacción atómica:
+
+```
+proposal.status → APPROVED
+prospect.estado → LISTO_OUTREACH   (solo si estaba en LISTO_PROPUESTA)
+```
+
+**La aprobación de la propuesta es el único mecanismo para que un prospecto llegue a `LISTO_OUTREACH`.** No existe un endpoint separado para esa transición de estado.
+
+Código de referencia: `proposals.service.ts` → `approve()`, líneas 343–352.
 
 ---
 

@@ -120,6 +120,18 @@ Estado: ACTIVA | OBSOLETA
 
 ---
 
+## 2026-05 — Aprobación de propuesta como trigger de LISTO_OUTREACH
+
+**Decisión:** La transición de estado `LISTO_PROPUESTA → LISTO_OUTREACH` no tiene endpoint propio. La dispara automáticamente la aprobación de la propuesta (`POST /proposals/:id/approve`), en un solo transaction junto con `proposal.status → APPROVED`.
+
+**Motivo:** Evitar que un prospecto quede en LISTO_OUTREACH sin propuesta aprobada. La aprobación de la propuesta y el avance de estado son atómicamente dependientes.
+
+**Impacto:** No existe ni existirá un endpoint `PATCH /prospects/:id/estado` que permita manualmente ir a LISTO_OUTREACH. Si se rompe este flujo (ej: propuesta generada pero no aprobada), el operador debe aprobar la propuesta, no parchear el estado directamente.
+
+**Estado:** ACTIVA
+
+---
+
 ## 2026-06 — Project Brain como fuente de contexto para agentes
 
 **Decisión:** Se crea `/docs/project-brain/` como directorio de memoria persistente del proyecto. Es parte del repositorio y se versiona con Git.

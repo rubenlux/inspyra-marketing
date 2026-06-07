@@ -29,7 +29,7 @@ Definidas en `prospects.service.ts` → `VALID_TRANSITIONS`:
 NUEVO           → INVESTIGADO, DESCARTADO, ARCHIVADO
 INVESTIGADO     → ENRIQUECIDO, DESCARTADO, ARCHIVADO
 ENRIQUECIDO     → LISTO_PROPUESTA, DESCARTADO, ARCHIVADO
-LISTO_PROPUESTA → LISTO_OUTREACH, DESCARTADO, ARCHIVADO
+LISTO_PROPUESTA → LISTO_OUTREACH*, DESCARTADO, ARCHIVADO
 LISTO_OUTREACH  → CONTACTADO, DESCARTADO, ARCHIVADO
 CONTACTADO      → RESPONDIO, DESCARTADO, ARCHIVADO
 RESPONDIO       → REUNION_AGENDADA, PASO_A_PIPELINE, DESCARTADO, ARCHIVADO
@@ -41,6 +41,8 @@ ARCHIVADO       → NUEVO (permite reactivar)
 ```
 
 **Cualquier transición fuera de este mapa lanza `BadRequestException`.**
+
+**(*) LISTO_PROPUESTA → LISTO_OUTREACH no es una transición manual directa.** La dispara automáticamente la aprobación de una propuesta (`POST /proposals/:id/approve`). No existe un endpoint separado para hacer esa transición. Ver `05-proposal-rules.md`.
 
 ---
 
