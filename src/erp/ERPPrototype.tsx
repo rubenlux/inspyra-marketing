@@ -3336,35 +3336,6 @@ function Prospects({ onNav }) {
         </div>
       </div>
 
-      {/* Pipeline steps */}
-      <div className="card" style={{ marginBottom: 16, padding: "12px 16px" }}>
-        <div className="row" style={{ gap: 0, justifyContent: "space-between", flexWrap: "wrap" }}>
-          {[
-            { ic: "search", t: "Descubre", s: "Busca empresas por rubro y zona" },
-            { ic: "layers", t: "Enriquece", s: "Web, IG, contacto, tamaño" },
-            { ic: "trend", t: "Detecta oportunidad", s: "Qué les falta digitalmente" },
-            { ic: "trend", t: "Califica (score)", s: "Prioridad comercial 0–100" },
-            { ic: "users", t: "Asigna", s: "Reparte al equipo comercial" },
-            { ic: "rocket", t: "Prepara outreach", s: "Listo para contactar" },
-          ].map((st, i, arr) => {
-            const IconC = Icon[st.ic] ?? Icon.trend;
-            return (
-              <React.Fragment key={i}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 150 }}>
-                  <span style={{ width: 30, height: 30, borderRadius: 8, background: "var(--primary-soft)", color: "var(--primary-700)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <IconC size={15}/>
-                  </span>
-                  <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-900)" }}>{st.t}</div>
-                    <div style={{ fontSize: 10.5, color: "var(--ink-500)" }}>{st.s}</div>
-                  </div>
-                </div>
-                {i < arr.length - 1 && <Icon.chevronRight size={14} color="var(--ink-300)" style={{ flexShrink: 0 }}/>}
-              </React.Fragment>
-            );
-          })}
-        </div>
-      </div>
 
       {/* KPIs — real data */}
       <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 10 }}>

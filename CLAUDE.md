@@ -4,6 +4,15 @@
 
 Inspyra ERP y ecosistema Inspyra deben seguir un enfoque spec-first.
 
+## Project Brain (leer primero)
+
+Antes de cualquier tarea, leer:
+
+- `CLAUDE_PROJECT_CONTEXT.md` — resumen ejecutivo del sistema, invariantes y puntos de entrada
+- `docs/project-brain/` — memoria persistente completa: arquitectura, reglas UI, estados, agentes, decisiones históricas
+
+El Project Brain contiene decisiones que no están en el código ni en las specs. Leerlo evita proponer cosas ya descartadas y duplicar trabajo existente.
+
 ## Spec Registry
 
 La fuente de verdad del proyecto es:
