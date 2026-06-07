@@ -79,6 +79,15 @@ export class OutreachController {
     return this.service.scheduleMeeting(prospectId, user.tenantId, user.sub, body.note, body.proposalId);
   }
 
+  @Post(':prospectId/send-email')
+  sendEmail(
+    @Param('prospectId') prospectId: string,
+    @Body() body: { subject: string; proposalId?: string; note?: string },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.service.sendEmail(prospectId, user.tenantId, user.sub, body.subject, body.proposalId, body.note);
+  }
+
   @Post(':prospectId/note')
   addNote(
     @Param('prospectId') prospectId: string,

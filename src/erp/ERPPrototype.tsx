@@ -1530,9 +1530,10 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
     enabled: isRealId,
   });
 
-  const [contactChannel, setContactChannel] = useState<string>('WHATSAPP');
+  const [contactChannel, setContactChannel] = useState<string>('EMAIL');
   const [contactNote, setContactNote] = useState('');
   const [actionNote, setActionNote] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
   const [responseType, setResponseType] = useState<string>('');
   const [outreachBusy, setOutreachBusy] = useState(false);
 
@@ -1545,6 +1546,8 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
       qc.invalidateQueries({ queryKey: ["outreach", "activities", prospectId] });
       qc.invalidateQueries({ queryKey: ["outreach", "funnel"] });
       setActionNote('');
+      setEmailSubject('');
+      setResponseType('');
     } catch (e: any) { alert('Error: ' + e.message); }
     finally { setOutreachBusy(false); }
   };
@@ -2275,26 +2278,93 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                   style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border-soft)", fontSize: 12, background: "var(--bg-1)", color: "var(--ink-800)", boxSizing: "border-box" }}
                 />
               );
-              if (estado === "LISTO_OUTREACH") return (
-                <div style={{ marginTop: 20 }}>
-                  <SLabel>Acción outreach</SLabel>
-                  <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
-                    {(["WHATSAPP","EMAIL","INSTAGRAM","FACEBOOK","LINKEDIN","OTRO"] as const).map(ch => (
-                      <button key={ch} onClick={() => setContactChannel(ch)}
-                        style={{ fontSize: 11, padding: "4px 10px", borderRadius: 99, border: `1px solid ${contactChannel === ch ? "#5B5BF7" : "var(--border-soft)"}`, background: contactChannel === ch ? "#EEF2FF" : "transparent", color: contactChannel === ch ? "#4338CA" : "var(--ink-500)", cursor: "pointer", fontWeight: contactChannel === ch ? 700 : 400 }}>
-                        {ch}
-                      </button>
-                    ))}
+              if (estado === "LISTO_OUTREACH") {
+                const availableChannels = [
+                  { key: 'EMAIL',     label: 'Email',     value: rowData?.email },
+                  { key: 'WHATSAPP',  label: 'WhatsApp',  value: rowData?.telefono },
+                  { key: 'LINKEDIN',  label: 'LinkedIn',  value: rowData?.linkedin },
+                  { key: 'INSTAGRAM', label: 'Instagram', value: rowData?.instagram },
+                  { key: 'FACEBOOK',  label: 'Facebook',  value: rowData?.facebook },
+                ].filter(c => !!c.value);
+                const activeChannel = availableChannels.find(c => c.key === contactChannel)?.key ?? availableChannels[0]?.key ?? 'EMAIL';
+                const outreachMsg = (latestProposal?.proposalData)?.outreachMessage ?? '';
+                const defaultSubject = `Análisis digital de ${rowData?.nombreEmpresa ?? 'tu empresa'}`;
+                const resolvedSubject = emailSubject || defaultSubject;
+                return (
+                  <div style={{ marginTop: 20 }}>
+                    <SLabel>Canal de contacto</SLabel>
+                    {availableChannels.length === 0 ? (
+                      <div style={{ fontSize: 12, color: "#F59E0B", padding: "10px 12px", background: "var(--bg-2)", borderRadius: 8, marginBottom: 12 }}>
+                        Sin datos de contacto disponibles. Completa el perfil del prospecto.
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+                        {availableChannels.map(({ key, label }) => (
+                          <button key={key} onClick={() => setContactChannel(key)}
+                            style={{ fontSize: 11, padding: "4px 10px", borderRadius: 99, border: `1px solid ${activeChannel === key ? "#5B5BF7" : "var(--border-soft)"}`, background: activeChannel === key ? "#EEF2FF" : "transparent", color: activeChannel === key ? "#4338CA" : "var(--ink-500)", cursor: "pointer", fontWeight: activeChannel === key ? 700 : 400 }}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {activeChannel === 'EMAIL' && rowData?.email ? (
+                      <>
+                        <div style={{ fontSize: 11, color: "var(--ink-400)", marginBottom: 10 }}>
+                          Destinatario: <strong>{rowData.email}</strong>
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <SLabel>Asunto</SLabel>
+                          <input value={emailSubject} onChange={e => setEmailSubject(e.target.value)} placeholder={defaultSubject}
+                            style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border-soft)", fontSize: 12, background: "var(--bg-1)", color: "var(--ink-800)", boxSizing: "border-box" }}/>
+                        </div>
+                        {outreachMsg ? (
+                          <div style={{ marginBottom: 10 }}>
+                            <SLabel>Vista previa del mensaje</SLabel>
+                            <div style={{ fontSize: 12, color: "var(--ink-600)", background: "var(--bg-2)", borderRadius: 8, padding: "10px 12px", lineHeight: 1.65, whiteSpace: "pre-line", maxHeight: 150, overflowY: "auto" }}>
+                              {outreachMsg}
+                            </div>
+                            <div style={{ fontSize: 11, color: "var(--ink-400)", marginTop: 4 }}>Propuesta v{latestProposal?.version} aprobada</div>
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 12, color: "#F59E0B", padding: "10px 12px", background: "var(--bg-2)", borderRadius: 8, marginBottom: 10 }}>
+                            Sin propuesta aprobada — genera y aprueba un Outreach Brief primero.
+                          </div>
+                        )}
+                        <div style={{ marginBottom: 8 }}>{noteInput}</div>
+                        <button disabled={outreachBusy || !outreachMsg}
+                          onClick={() => runOutreachAction(() => outreachApi.sendEmail(prospectId, { subject: resolvedSubject, proposalId: latestProposal?.id, note: actionNote || undefined }))}
+                          style={{ ...btnBase, background: "#5B5BF7", color: "#fff", opacity: (outreachBusy || !outreachMsg) ? 0.5 : 1, width: "100%", justifyContent: "center" }}>
+                          {outreachBusy ? "Enviando…" : "📨 Enviar email"}
+                        </button>
+                      </>
+                    ) : availableChannels.length > 0 ? (
+                      <>
+                        {outreachMsg && (
+                          <div style={{ marginBottom: 10 }}>
+                            <SLabel>Mensaje sugerido — enviar manualmente</SLabel>
+                            <div style={{ position: "relative" }}>
+                              <div style={{ fontSize: 12, color: "var(--ink-600)", background: "var(--bg-2)", borderRadius: 8, padding: "10px 12px", lineHeight: 1.65, whiteSpace: "pre-line", maxHeight: 150, overflowY: "auto" }}>
+                                {outreachMsg}
+                              </div>
+                              <button onClick={() => navigator.clipboard?.writeText(outreachMsg)}
+                                style={{ position: "absolute", top: 6, right: 6, fontSize: 10, padding: "2px 8px", borderRadius: 6, border: "1px solid var(--border-soft)", background: "var(--bg-1)", cursor: "pointer", color: "var(--ink-500)" }}>
+                                Copiar
+                              </button>
+                            </div>
+                            <div style={{ fontSize: 11, color: "var(--ink-400)", marginTop: 4 }}>Enviar manualmente por {activeChannel}</div>
+                          </div>
+                        )}
+                        <div style={{ marginBottom: 8 }}>{noteInput}</div>
+                        <button disabled={outreachBusy}
+                          onClick={() => runOutreachAction(() => outreachApi.contact(prospectId, activeChannel as any, actionNote || undefined))}
+                          style={{ ...btnBase, background: "#5B5BF7", color: "#fff", opacity: outreachBusy ? 0.6 : 1, width: "100%", justifyContent: "center" }}>
+                          {outreachBusy ? "Registrando…" : "📨 Registrar contacto manual"}
+                        </button>
+                      </>
+                    ) : null}
                   </div>
-                  <div style={{ marginBottom: 8 }}>{noteInput}</div>
-                  <button
-                    disabled={outreachBusy}
-                    onClick={() => runOutreachAction(() => outreachApi.contact(prospectId, contactChannel as any, actionNote || undefined))}
-                    style={{ ...btnBase, background: "#5B5BF7", color: "#fff", opacity: outreachBusy ? 0.6 : 1 }}>
-                    {outreachBusy ? "Guardando…" : "📨 Marcar como contactado"}
-                  </button>
-                </div>
-              );
+                );
+              }
               if (estado === "CONTACTADO") return (
                 <div style={{ marginTop: 20 }}>
                   <SLabel>Seguimiento</SLabel>

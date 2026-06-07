@@ -550,7 +550,7 @@ export interface AgentRoiDashboard {
   }
 }
 
-// ─── Outreach Execution (ERP-032 / ERP-035) ─────────────────────────────────
+// ─── Outreach Execution (ERP-032 / ERP-035 / ERP-036) ───────────────────────
 
 export type ContactChannel = 'EMAIL' | 'WHATSAPP' | 'INSTAGRAM' | 'FACEBOOK' | 'LINKEDIN' | 'OTRO'
 export type OutreachActivityType = 'CONTACTADO' | 'SEGUIMIENTO' | 'SIN_RESPUESTA' | 'RESPONDIO' | 'INTERESADO' | 'PERDIDO' | 'REUNION_AGENDADA' | 'NOTA'
@@ -596,6 +596,9 @@ export const outreachApi = {
 
   scheduleMeeting: (prospectId: string, note?: string, proposalId?: string) =>
     req<{ id: string; estado: string }>('POST', `/outreach/${prospectId}/schedule-meeting`, { note, proposalId }),
+
+  sendEmail: (prospectId: string, body: { subject: string; proposalId?: string; note?: string }) =>
+    req<{ id: string; estado: string }>('POST', `/outreach/${prospectId}/send-email`, body),
 
   addNote: (prospectId: string, note: string) =>
     req<OutreachActivity>('POST', `/outreach/${prospectId}/note`, { note }),
