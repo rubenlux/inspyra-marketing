@@ -2281,12 +2281,15 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                 />
               );
               if (estado === "LISTO_OUTREACH") {
+                // enrichmentResult is the authoritative source for contact data;
+                // prospect fields are the fallback (populated from early research)
+                const er = enrichmentResult;
                 const allChannels = [
-                  { key: 'EMAIL',     label: 'Email',     icon: '✉️', desc: 'Canal profesional y menos invasivo. Permite adjuntar la propuesta completa.', value: prospect?.email,    recommended: true  },
-                  { key: 'WHATSAPP',  label: 'WhatsApp',  icon: '💬', desc: 'Ideal para comunicación rápida y directa.',                                    value: prospect?.telefono, recommended: false },
-                  { key: 'LINKEDIN',  label: 'LinkedIn',  icon: '💼', desc: 'Ideal para mensajes profesionales.',                                            value: prospect?.linkedin, recommended: false },
-                  { key: 'INSTAGRAM', label: 'Instagram', icon: '📸', desc: 'Contacto visual e informal.',                                                   value: prospect?.instagram,recommended: false },
-                  { key: 'FACEBOOK',  label: 'Facebook',  icon: '👥', desc: 'Contacto vía Facebook.',                                                        value: prospect?.facebook, recommended: false },
+                  { key: 'EMAIL',     label: 'Email',     icon: '✉️', desc: 'Canal profesional y menos invasivo. Permite adjuntar la propuesta completa.', value: er?.email      ?? prospect?.email,                             recommended: true  },
+                  { key: 'WHATSAPP',  label: 'WhatsApp',  icon: '💬', desc: 'Ideal para comunicación rápida y directa.',                                    value: er?.whatsapp   ?? er?.telefono ?? prospect?.telefono,           recommended: false },
+                  { key: 'LINKEDIN',  label: 'LinkedIn',  icon: '💼', desc: 'Ideal para mensajes profesionales.',                                            value: er?.linkedin   ?? prospect?.linkedin,                          recommended: false },
+                  { key: 'INSTAGRAM', label: 'Instagram', icon: '📸', desc: 'Contacto visual e informal.',                                                   value: er?.instagram  ?? prospect?.instagram,                         recommended: false },
+                  { key: 'FACEBOOK',  label: 'Facebook',  icon: '👥', desc: 'Contacto vía Facebook.',                                                        value: er?.facebook   ?? prospect?.facebook,                          recommended: false },
                 ];
                 const availableChannels = allChannels.filter(c => !!c.value);
                 const recommendedCh = availableChannels.find(c => c.recommended) ?? availableChannels[0];
@@ -2297,15 +2300,16 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                 const resolvedSubject = emailSubject || defaultSubject;
 
                 // Phase 2 — compose form
+                const resolvedEmail = er?.email ?? prospect?.email;
                 if (showContactForm) {
-                  if (activeChannel === 'EMAIL' && prospect?.email) return (
+                  if (activeChannel === 'EMAIL' && resolvedEmail) return (
                     <div style={{ marginTop: 16 }}>
                       <button onClick={() => setShowContactForm(false)}
                         style={{ background: "none", border: "none", color: "var(--ink-400)", cursor: "pointer", fontSize: 12, padding: "0 0 12px", display: "flex", alignItems: "center", gap: 4 }}>
                         ← Volver
                       </button>
                       <div style={{ fontSize: 12, color: "var(--ink-700)", marginBottom: 10, background: "var(--bg-2)", padding: "8px 10px", borderRadius: 8 }}>
-                        ✉️ <strong>{prospect.email}</strong>
+                        ✉️ <strong>{resolvedEmail}</strong>
                       </div>
                       <div style={{ marginBottom: 8 }}>
                         <SLabel>Asunto</SLabel>

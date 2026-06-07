@@ -239,8 +239,17 @@ export class OutreachService {
         `El prospecto debe estar en LISTO_OUTREACH para enviar email (actual: ${prospect.estado})`,
       );
     }
-    if (!prospect.email) {
-      throw new BadRequestException('El prospecto no tiene email registrado');
+
+    // Email lives in enrichmentResult (authoritative) with fallback to prospect.email
+    const enrichmentResult = await this.prisma.enrichmentResult.findFirst({
+      where: { prospectId, tenantId },
+    });
+    const recipientEmail = prospect.email ?? enrichmentResult?.email;
+
+    if (!recipientEmail) {
+      throw new BadRequestException(
+        'El prospecto no tiene email registrado (ni en el perfil ni en el resultado de enriquecimiento)',
+      );
     }
 
     const resendApiKey = process.env.RESEND_API_KEY;
@@ -275,7 +284,7 @@ export class OutreachService {
 
     const { error } = await resend.emails.send({
       from: mailFrom,
-      to: prospect.email,
+      to: recipientEmail,
       subject,
       text: outreachMessage,
       html: `<div style="font-family:sans-serif;font-size:15px;line-height:1.6;color:#1a1a1a;max-width:600px">${htmlBody}</div>`,
