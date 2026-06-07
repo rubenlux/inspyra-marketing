@@ -4,6 +4,8 @@
 
 Última actualización: 2026-06-07
 
+> **ERP-034 — Enforcement activo:** Este archivo es cargado automáticamente via hook `UserPromptSubmit` en `.claude/settings.json`. Los invariantes también están inlineados en `CLAUDE.md`. Si estás leyendo esto, el sistema funciona.
+
 ---
 
 ## Qué es este proyecto
@@ -127,3 +129,36 @@ Para contexto profundo, leer en orden:
 - Aprobar sin revisión humana
 - Introducir secretos en el código
 - Modificar VALID_TRANSITIONS sin leer la spec primero
+
+---
+
+## Cómo funciona el enforcement (ERP-034)
+
+Project Brain no depende de que el agente recuerde leerlo. Está integrado en tres capas:
+
+| Capa | Mecanismo | Garantía |
+|---|---|---|
+| **CLAUDE.md** | Invariantes inlineados + checklist | Siempre cargado por Claude Code |
+| **Hook `UserPromptSubmit`** | `.claude/settings.json` → `brain-reminder.py` | Inyecta checklist al inicio de cada prompt |
+| **Este archivo** | `CLAUDE_PROJECT_CONTEXT.md` | Referenciado desde CLAUDE.md y desde el hook |
+
+### ¿Cómo saber si el hook está funcionando?
+
+Al inicio de cada interacción con Claude Code en este proyecto debería aparecer el bloque:
+```
+╔══════════════════════════════════════════════════════════╗
+║              PROJECT BRAIN — CHECKLIST ACTIVO            ║
+...
+╚══════════════════════════════════════════════════════════╝
+```
+
+Si no aparece, verificar que `.claude/settings.json` existe y contiene el hook `UserPromptSubmit`.
+
+### Actualizar Project Brain
+
+Cuando se toma una decisión importante nueva:
+1. Agregar entrada en `docs/project-brain/08-known-decisions.md`
+2. Si es una regla de UI → actualizar `docs/project-brain/03-ui-rules.md`
+3. Si es una regla comercial → actualizar `docs/project-brain/04-commercial-rules.md`
+4. Si cambia un estado → actualizar `docs/project-brain/06-state-machines.md`
+5. Actualizar `Última actualización:` en este archivo

@@ -132,6 +132,18 @@ Estado: ACTIVA | OBSOLETA
 
 ---
 
+## 2026-06-07 — ERP-034: Project Brain con enforcement activo
+
+**Decisión:** Project Brain no depende de que el agente recuerde leerlo. Está integrado en tres capas: (1) invariantes inlineados en CLAUDE.md, (2) hook `UserPromptSubmit` en `.claude/settings.json` que inyecta checklist al inicio de cada prompt, (3) CLAUDE_PROJECT_CONTEXT.md como archivo de referencia.
+
+**Motivo:** "Tener memoria" no es suficiente. La memoria tiene que consultarse. Sin enforcement activo, los agentes ignoran Project Brain en sesiones largas o después de cambios de contexto.
+
+**Impacto:** Al inicio de cada interacción con Claude Code en este proyecto, el agente ve el checklist de 5 puntos antes de procesar el prompt del usuario.
+
+**Estado:** ACTIVA
+
+---
+
 ## 2026-06 — Project Brain como fuente de contexto para agentes
 
 **Decisión:** Se crea `/docs/project-brain/` como directorio de memoria persistente del proyecto. Es parte del repositorio y se versiona con Git.

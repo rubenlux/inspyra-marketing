@@ -6,12 +6,40 @@ Inspyra ERP y ecosistema Inspyra deben seguir un enfoque spec-first.
 
 ## Project Brain (leer primero)
 
-Antes de cualquier tarea, leer:
+Leer `CLAUDE_PROJECT_CONTEXT.md` antes de cualquier tarea de implementación.
+Memoria completa en `docs/project-brain/` (arquitectura, UI rules, estados, agentes, decisiones históricas).
 
-- `CLAUDE_PROJECT_CONTEXT.md` — resumen ejecutivo del sistema, invariantes y puntos de entrada
-- `docs/project-brain/` — memoria persistente completa: arquitectura, reglas UI, estados, agentes, decisiones históricas
+## Invariantes críticos (siempre aplican — no hay excepciones)
 
-El Project Brain contiene decisiones que no están en el código ni en las specs. Leerlo evita proponer cosas ya descartadas y duplicar trabajo existente.
+Estos invariantes no necesitan verificación en spec ni en código. Son reglas absolutas:
+
+**Frontend**
+- `ERPPrototype.tsx` es el único frontend operativo. NO crear páginas nuevas, dashboards paralelos, routers ni layouts alternativos.
+- Todo cambio de UI va dentro del `ProspectDrawer` existente y sus 4 tabs: assessment · contacto · propuesta · historial.
+- NO duplicar KPIs, tabs, tablas, filtros ni drawers.
+
+**Backend**
+- Toda query de datos lleva `where: { tenantId }`. Sin excepción.
+- Los estados de `ProspectEstado` solo cambian según `VALID_TRANSITIONS` en `prospects.service.ts`. NO parchear estados directamente.
+- Extender módulos existentes antes de crear nuevos. Justificar explícitamente si se crea uno nuevo.
+
+**Agentes IA**
+- Ningún agente aprueba su propio output. Siempre `status: DRAFT` → revisión humana → `APPROVED`.
+- `LISTO_OUTREACH` se alcanza solo aprobando una propuesta (`POST /proposals/:id/approve`), no via transición directa.
+
+**Criterio de priorización**
+> ¿Esta tarea acerca un prospecto a convertirse en cliente?
+
+Si la respuesta es no, evaluar impacto operativo. Si tampoco, diferir.
+
+## Checklist pre-implementación (ejecutar mentalmente antes de escribir código)
+
+1. ¿Ya existe esto en `ERPPrototype.tsx`? → Verificar antes de crear
+2. ¿Necesita página nueva? → La respuesta casi siempre es NO
+3. ¿Hay `tenantId` en toda query de base de datos? → Obligatorio
+4. ¿Respeta `VALID_TRANSITIONS`? → No asumir, verificar en `prospects.service.ts`
+5. ¿La spec correspondiente fue leída en `spec-driven/`? → Leer antes de modificar el módulo
+6. ¿Hay human approval en la acción del agente? → Los agentes no aprueban
 
 ## Spec Registry
 
