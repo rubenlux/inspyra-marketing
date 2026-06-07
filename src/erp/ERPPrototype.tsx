@@ -3,7 +3,7 @@ import * as React from 'react'
 import { useEffect, useState, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { authApi, prospectsApi, validationsApi, researchApi, enrichmentApi, proposalsApi, getStoredToken, setStoredToken, clearStoredToken } from '../api/inspyra'
+import { authApi, prospectsApi, validationsApi, researchApi, enrichmentApi, proposalsApi, outreachApi, getStoredToken, setStoredToken, clearStoredToken } from '../api/inspyra'
 import DashboardV2 from './DashboardV2'
 import './erp.css'
 
@@ -1524,6 +1524,30 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
   const latestProposal = proposals?.[0] ?? null;
   const isGeneratingProposal = latestProposal?.jobStatus === 'PENDING' || latestProposal?.jobStatus === 'RUNNING';
 
+  const { data: activities, refetch: refetchActivities } = useQuery({
+    queryKey: ["outreach", "activities", prospectId],
+    queryFn: () => outreachApi.getActivities(prospectId),
+    enabled: isRealId,
+  });
+
+  const [contactChannel, setContactChannel] = useState<string>('WHATSAPP');
+  const [contactNote, setContactNote] = useState('');
+  const [actionNote, setActionNote] = useState('');
+  const [outreachBusy, setOutreachBusy] = useState(false);
+
+  const runOutreachAction = async (fn: () => Promise<any>) => {
+    setOutreachBusy(true);
+    try {
+      await fn();
+      qc.invalidateQueries({ queryKey: ["prospects"] });
+      qc.invalidateQueries({ queryKey: ["prospects", prospectId] });
+      qc.invalidateQueries({ queryKey: ["outreach", "activities", prospectId] });
+      qc.invalidateQueries({ queryKey: ["outreach", "funnel"] });
+      setActionNote('');
+    } catch (e: any) { alert('Error: ' + e.message); }
+    finally { setOutreachBusy(false); }
+  };
+
   const prevIsGenerating = React.useRef(false);
   React.useEffect(() => {
     if (prevIsGenerating.current && !isGeneratingProposal && proposals && proposals.length > 0) {
@@ -2237,6 +2261,78 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                 </div>
               </>
             )}
+
+            {/* ── Outreach Actions (ERP-032) ────────────────────────── */}
+            {isRealId && prospect && (() => {
+              const estado = prospect.estado;
+              const btnBase = { padding: "10px 0", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "none", width: "100%" };
+              const noteInput = (
+                <input
+                  value={actionNote}
+                  onChange={e => setActionNote(e.target.value)}
+                  placeholder="Nota opcional…"
+                  style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border-soft)", fontSize: 12, background: "var(--bg-1)", color: "var(--ink-800)", boxSizing: "border-box" }}
+                />
+              );
+              if (estado === "LISTO_OUTREACH") return (
+                <div style={{ marginTop: 20 }}>
+                  <SLabel>Acción outreach</SLabel>
+                  <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+                    {(["WHATSAPP","EMAIL","INSTAGRAM","FACEBOOK","LINKEDIN","OTRO"] as const).map(ch => (
+                      <button key={ch} onClick={() => setContactChannel(ch)}
+                        style={{ fontSize: 11, padding: "4px 10px", borderRadius: 99, border: `1px solid ${contactChannel === ch ? "#5B5BF7" : "var(--border-soft)"}`, background: contactChannel === ch ? "#EEF2FF" : "transparent", color: contactChannel === ch ? "#4338CA" : "var(--ink-500)", cursor: "pointer", fontWeight: contactChannel === ch ? 700 : 400 }}>
+                        {ch}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ marginBottom: 8 }}>{noteInput}</div>
+                  <button
+                    disabled={outreachBusy}
+                    onClick={() => runOutreachAction(() => outreachApi.contact(prospectId, contactChannel as any, actionNote || undefined))}
+                    style={{ ...btnBase, background: "#5B5BF7", color: "#fff", opacity: outreachBusy ? 0.6 : 1 }}>
+                    {outreachBusy ? "Guardando…" : "📨 Marcar como contactado"}
+                  </button>
+                </div>
+              );
+              if (estado === "CONTACTADO") return (
+                <div style={{ marginTop: 20 }}>
+                  <SLabel>Seguimiento</SLabel>
+                  <div style={{ marginBottom: 8 }}>{noteInput}</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <button disabled={outreachBusy} onClick={() => runOutreachAction(() => outreachApi.respond(prospectId, actionNote || undefined))}
+                      style={{ ...btnBase, background: "#10B981", color: "#fff", opacity: outreachBusy ? 0.6 : 1 }}>✓ Respondió</button>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button disabled={outreachBusy} onClick={() => runOutreachAction(() => outreachApi.noResponse(prospectId, actionNote || undefined))}
+                        style={{ ...btnBase, background: "var(--bg-2)", color: "var(--ink-700)", border: "1px solid var(--border-soft)", opacity: outreachBusy ? 0.6 : 1 }}>✗ Sin respuesta</button>
+                      <button disabled={outreachBusy} onClick={() => runOutreachAction(() => outreachApi.scheduleMeeting(prospectId, actionNote || undefined))}
+                        style={{ ...btnBase, background: "#3B82F6", color: "#fff", opacity: outreachBusy ? 0.6 : 1 }}>📅 Reunión</button>
+                    </div>
+                  </div>
+                </div>
+              );
+              if (estado === "RESPONDIO") return (
+                <div style={{ marginTop: 20 }}>
+                  <SLabel>Próximo paso</SLabel>
+                  <div style={{ marginBottom: 8 }}>{noteInput}</div>
+                  <button disabled={outreachBusy} onClick={() => runOutreachAction(() => outreachApi.scheduleMeeting(prospectId, actionNote || undefined))}
+                    style={{ ...btnBase, background: "#3B82F6", color: "#fff", opacity: outreachBusy ? 0.6 : 1 }}>📅 Agendar reunión</button>
+                </div>
+              );
+              if (["REUNION_AGENDADA","CONVERTIDO","DESCARTADO"].includes(estado)) return (
+                <div style={{ marginTop: 20 }}>
+                  <SLabel>Agregar nota</SLabel>
+                  <div style={{ marginBottom: 8 }}>
+                    <input value={actionNote} onChange={e => setActionNote(e.target.value)} placeholder="Escribe una nota…"
+                      style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border-soft)", fontSize: 12, background: "var(--bg-1)", color: "var(--ink-800)", boxSizing: "border-box" }}/>
+                  </div>
+                  <button disabled={outreachBusy || !actionNote.trim()} onClick={() => runOutreachAction(() => outreachApi.addNote(prospectId, actionNote))}
+                    style={{ ...btnBase, background: "var(--bg-2)", color: "var(--ink-700)", border: "1px solid var(--border-soft)", opacity: (outreachBusy || !actionNote.trim()) ? 0.5 : 1 }}>
+                    Guardar nota
+                  </button>
+                </div>
+              );
+              return null;
+            })()}
           </div>
         )}
 
@@ -2664,8 +2760,57 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                 </div>
               )}
 
-              {/* Future: Proposal Agent */}
-              {validation?.status === "VALIDATED" && (
+              {/* Proposal generated */}
+              {latestProposal?.jobStatus === "COMPLETED" && (
+                <div style={{ position: "relative", marginBottom: 24 }}>
+                  <div style={{ position: "absolute", left: -24, top: 0, width: 16, height: 16, borderRadius: 999, background: "#6D28D9", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Icon.doc size={8} color="#fff"/>
+                  </div>
+                  <div style={{ background: "var(--bg-2)", borderRadius: 10, padding: "12px 14px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink-800)" }}>
+                        {latestProposal.proposalType === "OUTREACH" ? "Outreach Brief generado" : "Propuesta Comercial generada"}
+                      </span>
+                      <span style={{ fontSize: 11, color: "var(--ink-400)" }}>{latestProposal.completedAt ? new Date(latestProposal.completedAt).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : ""}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--ink-600)" }}>
+                      v{latestProposal.version} · {latestProposal.status === "APPROVED" ? "✓ Aprobado" : latestProposal.status === "REJECTED" ? "✗ Rechazado" : "Borrador"}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Outreach activities — real commercial history */}
+              {activities && activities.length > 0 && (() => {
+                const ACT_META: Record<string, { label: string; color: string; icon: string }> = {
+                  CONTACTADO:      { label: "Contacto enviado",     color: "#5B5BF7", icon: "📨" },
+                  SEGUIMIENTO:     { label: "Seguimiento",          color: "#F59E0B", icon: "🔁" },
+                  SIN_RESPUESTA:   { label: "Sin respuesta",        color: "#9CA3AF", icon: "✗" },
+                  RESPONDIO:       { label: "Respondió",            color: "#10B981", icon: "✓" },
+                  REUNION_AGENDADA:{ label: "Reunión agendada",     color: "#3B82F6", icon: "📅" },
+                  NOTA:            { label: "Nota",                 color: "#6B7280", icon: "📝" },
+                };
+                return [...activities].reverse().map((act: any) => {
+                  const meta = ACT_META[act.type] ?? { label: act.type, color: "#6B7280", icon: "·" };
+                  return (
+                    <div key={act.id} style={{ position: "relative", marginBottom: 16 }}>
+                      <div style={{ position: "absolute", left: -24, top: 2, width: 16, height: 16, borderRadius: 999, background: meta.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8 }}>
+                        {meta.icon}
+                      </div>
+                      <div style={{ background: "var(--bg-2)", borderRadius: 10, padding: "10px 12px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: act.note ? 4 : 0 }}>
+                          <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink-800)" }}>{meta.label}{act.channel ? ` · ${act.channel}` : ""}</span>
+                          <span style={{ fontSize: 11, color: "var(--ink-400)" }}>{new Date(act.createdAt).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}</span>
+                        </div>
+                        {act.note && <div style={{ fontSize: 12, color: "var(--ink-600)", fontStyle: "italic" }}>"{act.note}"</div>}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+
+              {/* Placeholder next step when nothing commercial yet */}
+              {validation?.status === "VALIDATED" && !latestProposal && (
                 <div style={{ position: "relative", opacity: 0.4 }}>
                   <div style={{ position: "absolute", left: -24, top: 0, width: 16, height: 16, borderRadius: 999, border: "2px dashed var(--border-soft)", background: "var(--bg-1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Icon.doc size={8} color="var(--ink-300)"/>
@@ -2967,6 +3112,14 @@ function Prospects({ onNav }) {
     staleTime: 30000,
   });
 
+  const { data: outreachFunnel } = useQuery({
+    queryKey: ["outreach", "funnel"],
+    queryFn: outreachApi.getFunnel,
+    enabled: hasToken,
+    staleTime: 30000,
+    refetchInterval: 60000,
+  });
+
   const [enrichingId, setEnrichingId] = useState<string | null>(null);
   const [reviewingProspectId, setReviewingProspectId] = useState<string | null>(null);
   const [qualifyingId, setQualifyingId] = useState<string | null>(null);
@@ -3214,12 +3367,33 @@ function Prospects({ onNav }) {
       </div>
 
       {/* KPIs — real data */}
-      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
+      <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 10 }}>
         <MiniStatP label="Resultados" value={String(total)} sub={`+${nuevosEstaSemana} esta semana`} c="var(--primary)"/>
         <MiniStatP label="Prioridad máxima" value={String(aiCounts.PRIORIDAD_MAXIMA)} sub="Opp. Agent ≥ 90 · asignar ya" c="#10B981"/>
         <MiniStatP label="Aprobados IA" value={String(aiCounts.APROBADO_IA)} sub="Opp. Agent 75–89 · ready outreach" c="#5B5BF7"/>
         <MiniStatP label="Pendiente Opp." value={String(aiCounts.PENDIENTE_OPPORTUNITY)} sub="Opportunity Agent no procesó" c="#9CA3AF"/>
       </div>
+
+      {/* Outreach funnel — ERP-032 */}
+      {hasToken && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          {([
+            { label: "Listo outreach", value: outreachFunnel?.listoOutreach ?? 0,    c: "#5B5BF7", arrow: true  },
+            { label: "Contactado",     value: outreachFunnel?.contactado ?? 0,        c: "#3B82F6", arrow: true  },
+            { label: "Respondió",      value: outreachFunnel?.respondio ?? 0,         c: "#10B981", arrow: true  },
+            { label: "Reunión",        value: outreachFunnel?.reunionAgendada ?? 0,   c: "#F59E0B", arrow: true  },
+            { label: "Convertido",     value: outreachFunnel?.convertido ?? 0,        c: "#059669", arrow: false },
+          ] as const).map(({ label, value, c, arrow }) => (
+            <div key={label} style={{ flex: 1, display: "flex", alignItems: "center", gap: 0 }}>
+              <div style={{ flex: 1, padding: "8px 12px", background: "var(--bg-2)", borderRadius: 8, borderLeft: `3px solid ${c}` }}>
+                <div style={{ fontSize: 20, fontWeight: 800, color: c, lineHeight: 1 }}>{value}</div>
+                <div style={{ fontSize: 10, color: "var(--ink-400)", fontWeight: 600, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div>
+              </div>
+              {arrow && <div style={{ fontSize: 12, color: "var(--ink-300)", padding: "0 4px" }}>→</div>}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Enrichment Queue Panel */}
       {hasToken && enrichQueue && (enrichQueue.pending > 0 || enrichQueue.running > 0 || enrichQueue.completed > 0) && (

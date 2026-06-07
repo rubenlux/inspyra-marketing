@@ -168,6 +168,10 @@ model Prospect {
   proximoSeguimiento  DateTime?
   estado              ProspectEstado @default(NUEVO)
 
+  // Outreach execution (ERP-032)
+  contactedAt     DateTime?
+  contactChannel  ContactChannel?
+
   // Communication
   communicationLanguage CommunicationLanguage?
 
@@ -181,17 +185,57 @@ model Prospect {
   deletedAt     DateTime?
 
   // Relaciones
-  deals            Deal[]
-  validation       ProspectValidation?
-  enrichmentJobs   EnrichmentJob[]
-  enrichmentResult EnrichmentResult?
-  proposals        Proposal[]
+  deals              Deal[]
+  validation         ProspectValidation?
+  enrichmentJobs     EnrichmentJob[]
+  enrichmentResult   EnrichmentResult?
+  proposals          Proposal[]
+  outreachActivities OutreachActivity[]
 
   @@index([tenantId, estado])
   @@index([tenantId, score])
   @@index([tenantId, commercialScore])
   @@index([tenantId, ownerId])
   @@map("prospects")
+}
+
+// ─────────────────────────────────────────────
+// OUTREACH EXECUTION (ERP-032)
+// ─────────────────────────────────────────────
+
+enum ContactChannel {
+  EMAIL
+  WHATSAPP
+  INSTAGRAM
+  FACEBOOK
+  LINKEDIN
+  OTRO
+}
+
+enum OutreachActivityType {
+  CONTACTADO
+  SEGUIMIENTO
+  SIN_RESPUESTA
+  RESPONDIO
+  REUNION_AGENDADA
+  NOTA
+}
+
+model OutreachActivity {
+  id          String               @id @default(cuid())
+  tenantId    String
+  prospectId  String
+  type        OutreachActivityType
+  channel     ContactChannel?
+  note        String?
+  createdById String?
+  createdAt   DateTime             @default(now())
+
+  prospect    Prospect             @relation(fields: [prospectId], references: [id])
+
+  @@index([tenantId, prospectId])
+  @@index([prospectId, createdAt])
+  @@map("outreach_activities")
 }
 
 enum TamanoEmpresa {

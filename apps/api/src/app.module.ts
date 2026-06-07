@@ -18,6 +18,7 @@ import { AgentRoiModule } from './modules/agent-roi/agent-roi.module';
 import { ResearchModule } from './modules/research/research.module';
 import { EnrichmentModule } from './modules/enrichment/enrichment.module';
 import { ProposalsModule } from './modules/proposals/proposals.module';
+import { OutreachModule } from './modules/outreach/outreach.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -45,6 +46,7 @@ import configuration from './config/configuration';
     ResearchModule,
     EnrichmentModule,
     ProposalsModule,
+    OutreachModule,
   ],
 })
 export class AppModule {}

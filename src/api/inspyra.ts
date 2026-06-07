@@ -550,6 +550,52 @@ export interface AgentRoiDashboard {
   }
 }
 
+// ─── Outreach Execution (ERP-032) ────────────────────────────────────────────
+
+export type ContactChannel = 'EMAIL' | 'WHATSAPP' | 'INSTAGRAM' | 'FACEBOOK' | 'LINKEDIN' | 'OTRO'
+export type OutreachActivityType = 'CONTACTADO' | 'SEGUIMIENTO' | 'SIN_RESPUESTA' | 'RESPONDIO' | 'REUNION_AGENDADA' | 'NOTA'
+
+export interface OutreachActivity {
+  id: string
+  prospectId: string
+  type: OutreachActivityType
+  channel?: ContactChannel | null
+  note?: string | null
+  createdById?: string | null
+  createdAt: string
+}
+
+export interface OutreachFunnel {
+  listoOutreach: number
+  contactado: number
+  respondio: number
+  reunionAgendada: number
+  convertido: number
+}
+
+export const outreachApi = {
+  contact: (prospectId: string, channel: ContactChannel, note?: string) =>
+    req<{ id: string; estado: string }>('POST', `/outreach/${prospectId}/contact`, { channel, note }),
+
+  respond: (prospectId: string, note?: string) =>
+    req<{ id: string; estado: string }>('POST', `/outreach/${prospectId}/respond`, { note }),
+
+  noResponse: (prospectId: string, note?: string) =>
+    req<{ ok: boolean }>('POST', `/outreach/${prospectId}/no-response`, { note }),
+
+  scheduleMeeting: (prospectId: string, note?: string) =>
+    req<{ id: string; estado: string }>('POST', `/outreach/${prospectId}/schedule-meeting`, { note }),
+
+  addNote: (prospectId: string, note: string) =>
+    req<OutreachActivity>('POST', `/outreach/${prospectId}/note`, { note }),
+
+  getActivities: (prospectId: string) =>
+    req<OutreachActivity[]>('GET', `/outreach/${prospectId}/activities`),
+
+  getFunnel: () =>
+    req<OutreachFunnel>('GET', '/outreach/funnel'),
+}
+
 export const agentRoiApi = {
   dashboard: (period?: string) =>
     req<AgentRoiDashboard>('GET', '/agent-roi', undefined, period ? { period } : undefined),
