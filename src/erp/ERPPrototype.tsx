@@ -1379,14 +1379,14 @@ const PROSPECTS_DATA = [
 const ESTADO_LABEL = {
   NUEVO: "Nuevo", INVESTIGADO: "Investigado", ENRIQUECIDO: "Enriquecido",
   LISTO_PROPUESTA: "Listo propuesta", LISTO_OUTREACH: "Listo outreach",
-  CONTACTADO: "Contactado", RESPONDIO: "Respondió",
+  CONTACTADO: "Contactado", RESPONDIO: "Respondió", INTERESADO: "Interesado",
   REUNION_AGENDADA: "Reunión", PASO_A_PIPELINE: "Pipeline",
   CONVERTIDO: "Ganado", DESCARTADO: "Descartado", ARCHIVADO: "Archivado",
 };
 const ESTADO_TONE = {
   NUEVO: "default", INVESTIGADO: "info", ENRIQUECIDO: "info",
   LISTO_PROPUESTA: "brand", LISTO_OUTREACH: "success",
-  CONTACTADO: "info", RESPONDIO: "warning",
+  CONTACTADO: "info", RESPONDIO: "warning", INTERESADO: "brand",
   REUNION_AGENDADA: "brand", PASO_A_PIPELINE: "warning",
   CONVERTIDO: "success", DESCARTADO: "danger", ARCHIVADO: "default",
 };
@@ -1533,6 +1533,7 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
   const [contactChannel, setContactChannel] = useState<string>('WHATSAPP');
   const [contactNote, setContactNote] = useState('');
   const [actionNote, setActionNote] = useState('');
+  const [responseType, setResponseType] = useState<string>('');
   const [outreachBusy, setOutreachBusy] = useState(false);
 
   const runOutreachAction = async (fn: () => Promise<any>) => {
@@ -2299,7 +2300,7 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                   <SLabel>Seguimiento</SLabel>
                   <div style={{ marginBottom: 8 }}>{noteInput}</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <button disabled={outreachBusy} onClick={() => runOutreachAction(() => outreachApi.respond(prospectId, actionNote || undefined))}
+                    <button disabled={outreachBusy} onClick={() => runOutreachAction(() => outreachApi.respond(prospectId, { note: actionNote || undefined }))}
                       style={{ ...btnBase, background: "#10B981", color: "#fff", opacity: outreachBusy ? 0.6 : 1 }}>✓ Respondió</button>
                     <div style={{ display: "flex", gap: 8 }}>
                       <button disabled={outreachBusy} onClick={() => runOutreachAction(() => outreachApi.noResponse(prospectId, actionNote || undefined))}
@@ -2312,10 +2313,45 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
               );
               if (estado === "RESPONDIO") return (
                 <div style={{ marginTop: 20 }}>
+                  <SLabel>¿Qué respondió?</SLabel>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                    {([
+                      { v: "INTERESADO", label: "Interesado" },
+                      { v: "QUIERE_MAS_INFO", label: "Quiere info" },
+                      { v: "SIN_PRESUPUESTO", label: "Sin presupuesto" },
+                      { v: "YA_TIENE_PROVEEDOR", label: "Ya tiene proveedor" },
+                      { v: "NO_ES_PRIORIDAD", label: "No es prioridad" },
+                      { v: "OTRO", label: "Otro" },
+                    ] as const).map(({ v, label }) => (
+                      <button key={v} onClick={() => setResponseType(v)}
+                        style={{ fontSize: 11, padding: "4px 10px", borderRadius: 99, border: `1px solid ${responseType === v ? "#5B5BF7" : "var(--border-soft)"}`, background: responseType === v ? "#EEF2FF" : "transparent", color: responseType === v ? "#4338CA" : "var(--ink-500)", cursor: "pointer", fontWeight: responseType === v ? 700 : 400 }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ marginBottom: 8 }}>{noteInput}</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <button disabled={outreachBusy} onClick={() => runOutreachAction(() => outreachApi.markInterested(prospectId, { note: actionNote || undefined }))}
+                      style={{ ...btnBase, background: "#10B981", color: "#fff", opacity: outreachBusy ? 0.6 : 1 }}>⭐ Marcar como interesado</button>
+                    <button disabled={outreachBusy} onClick={() => runOutreachAction(() => outreachApi.scheduleMeeting(prospectId, actionNote || undefined))}
+                      style={{ ...btnBase, background: "#3B82F6", color: "#fff", opacity: outreachBusy ? 0.6 : 1 }}>📅 Agendar reunión</button>
+                    {responseType && !["INTERESADO"].includes(responseType) && (
+                      <button disabled={outreachBusy} onClick={() => runOutreachAction(() => outreachApi.markLost(prospectId, responseType as any, actionNote || undefined))}
+                        style={{ ...btnBase, background: "var(--bg-2)", color: "#EF4444", border: "1px solid #FCA5A5", opacity: outreachBusy ? 0.6 : 1 }}>✗ Marcar como perdido</button>
+                    )}
+                  </div>
+                </div>
+              );
+              if (estado === "INTERESADO") return (
+                <div style={{ marginTop: 20 }}>
                   <SLabel>Próximo paso</SLabel>
                   <div style={{ marginBottom: 8 }}>{noteInput}</div>
-                  <button disabled={outreachBusy} onClick={() => runOutreachAction(() => outreachApi.scheduleMeeting(prospectId, actionNote || undefined))}
-                    style={{ ...btnBase, background: "#3B82F6", color: "#fff", opacity: outreachBusy ? 0.6 : 1 }}>📅 Agendar reunión</button>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <button disabled={outreachBusy} onClick={() => runOutreachAction(() => outreachApi.scheduleMeeting(prospectId, actionNote || undefined))}
+                      style={{ ...btnBase, background: "#3B82F6", color: "#fff", opacity: outreachBusy ? 0.6 : 1 }}>📅 Agendar reunión</button>
+                    <button disabled={outreachBusy} onClick={() => runOutreachAction(() => outreachApi.markLost(prospectId, 'OTRO', actionNote || undefined))}
+                      style={{ ...btnBase, background: "var(--bg-2)", color: "#EF4444", border: "1px solid #FCA5A5", opacity: outreachBusy ? 0.6 : 1 }}>✗ Se perdió</button>
+                  </div>
                 </div>
               );
               if (["REUNION_AGENDADA","CONVERTIDO","DESCARTADO"].includes(estado)) return (
@@ -2787,6 +2823,8 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                   SEGUIMIENTO:     { label: "Seguimiento",          color: "#F59E0B", icon: "🔁" },
                   SIN_RESPUESTA:   { label: "Sin respuesta",        color: "#9CA3AF", icon: "✗" },
                   RESPONDIO:       { label: "Respondió",            color: "#10B981", icon: "✓" },
+                  INTERESADO:      { label: "Interesado",           color: "#8B5CF6", icon: "⭐" },
+                  PERDIDO:         { label: "Perdido",              color: "#EF4444", icon: "✗" },
                   REUNION_AGENDADA:{ label: "Reunión agendada",     color: "#3B82F6", icon: "📅" },
                   NOTA:            { label: "Nota",                 color: "#6B7280", icon: "📝" },
                 };
@@ -2798,10 +2836,18 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                         {meta.icon}
                       </div>
                       <div style={{ background: "var(--bg-2)", borderRadius: 10, padding: "10px 12px" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: act.note ? 4 : 0 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: (act.note || act.responseType || act.mensajeUtilizado) ? 4 : 0 }}>
                           <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink-800)" }}>{meta.label}{act.channel ? ` · ${act.channel}` : ""}</span>
                           <span style={{ fontSize: 11, color: "var(--ink-400)" }}>{new Date(act.createdAt).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}</span>
                         </div>
+                        {act.responseType && act.responseType !== act.type && (
+                          <div style={{ fontSize: 11, color: "var(--ink-500)", marginBottom: 3 }}>
+                            Motivo: <strong>{act.responseType.replace(/_/g, ' ')}</strong>
+                          </div>
+                        )}
+                        {act.mensajeUtilizado && (
+                          <div style={{ fontSize: 11, color: "var(--ink-400)", marginBottom: 3 }}>Mensaje: {act.mensajeUtilizado.slice(0, 80)}{act.mensajeUtilizado.length > 80 ? '…' : ''}</div>
+                        )}
                         {act.note && <div style={{ fontSize: 12, color: "var(--ink-600)", fontStyle: "italic" }}>"{act.note}"</div>}
                       </div>
                     </div>

@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.decorator';
 import { OutreachService } from './outreach.service';
-import { ContactChannel } from '@prisma/client';
+import { ContactChannel, ResponseType } from '@prisma/client';
 
 @Controller('outreach')
 @UseGuards(JwtAuthGuard)
@@ -31,10 +31,34 @@ export class OutreachController {
   @Post(':prospectId/respond')
   respond(
     @Param('prospectId') prospectId: string,
-    @Body() body: { note?: string },
+    @Body() body: { note?: string; responseType?: ResponseType; mensajeUtilizado?: string; proposalId?: string },
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.service.respond(prospectId, user.tenantId, user.sub, body.note);
+    return this.service.respond(
+      prospectId, user.tenantId, user.sub,
+      body.note, body.responseType, body.mensajeUtilizado, body.proposalId,
+    );
+  }
+
+  @Post(':prospectId/interested')
+  markInterested(
+    @Param('prospectId') prospectId: string,
+    @Body() body: { note?: string; mensajeUtilizado?: string; proposalId?: string },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.service.markInterested(
+      prospectId, user.tenantId, user.sub,
+      body.note, body.mensajeUtilizado, body.proposalId,
+    );
+  }
+
+  @Post(':prospectId/lost')
+  markLost(
+    @Param('prospectId') prospectId: string,
+    @Body() body: { responseType: ResponseType; note?: string },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.service.markLost(prospectId, user.tenantId, user.sub, body.responseType, body.note);
   }
 
   @Post(':prospectId/no-response')
@@ -49,10 +73,10 @@ export class OutreachController {
   @Post(':prospectId/schedule-meeting')
   scheduleMeeting(
     @Param('prospectId') prospectId: string,
-    @Body() body: { note?: string },
+    @Body() body: { note?: string; proposalId?: string },
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.service.scheduleMeeting(prospectId, user.tenantId, user.sub, body.note);
+    return this.service.scheduleMeeting(prospectId, user.tenantId, user.sub, body.note, body.proposalId);
   }
 
   @Post(':prospectId/note')

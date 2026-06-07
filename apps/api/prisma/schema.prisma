@@ -217,19 +217,34 @@ enum OutreachActivityType {
   SEGUIMIENTO
   SIN_RESPUESTA
   RESPONDIO
+  INTERESADO
+  PERDIDO
   REUNION_AGENDADA
   NOTA
 }
 
+enum ResponseType {
+  INTERESADO
+  QUIERE_MAS_INFO
+  SIN_PRESUPUESTO
+  YA_TIENE_PROVEEDOR
+  NO_ES_PRIORIDAD
+  NO_RESPONDE
+  OTRO
+}
+
 model OutreachActivity {
-  id          String               @id @default(cuid())
-  tenantId    String
-  prospectId  String
-  type        OutreachActivityType
-  channel     ContactChannel?
-  note        String?
-  createdById String?
-  createdAt   DateTime             @default(now())
+  id                String               @id @default(cuid())
+  tenantId          String
+  prospectId        String
+  type              OutreachActivityType
+  channel           ContactChannel?
+  note              String?
+  responseType      ResponseType?
+  proposalId        String?
+  mensajeUtilizado  String?              @db.Text
+  createdById       String?
+  createdAt         DateTime             @default(now())
 
   prospect    Prospect             @relation(fields: [prospectId], references: [id])
 
@@ -266,6 +281,7 @@ enum ProspectEstado {
   LISTO_OUTREACH
   CONTACTADO
   RESPONDIO
+  INTERESADO
   REUNION_AGENDADA
   PASO_A_PIPELINE
   CONVERTIDO

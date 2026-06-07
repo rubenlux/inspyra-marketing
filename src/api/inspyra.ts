@@ -550,10 +550,11 @@ export interface AgentRoiDashboard {
   }
 }
 
-// ─── Outreach Execution (ERP-032) ────────────────────────────────────────────
+// ─── Outreach Execution (ERP-032 / ERP-035) ─────────────────────────────────
 
 export type ContactChannel = 'EMAIL' | 'WHATSAPP' | 'INSTAGRAM' | 'FACEBOOK' | 'LINKEDIN' | 'OTRO'
-export type OutreachActivityType = 'CONTACTADO' | 'SEGUIMIENTO' | 'SIN_RESPUESTA' | 'RESPONDIO' | 'REUNION_AGENDADA' | 'NOTA'
+export type OutreachActivityType = 'CONTACTADO' | 'SEGUIMIENTO' | 'SIN_RESPUESTA' | 'RESPONDIO' | 'INTERESADO' | 'PERDIDO' | 'REUNION_AGENDADA' | 'NOTA'
+export type ResponseType = 'INTERESADO' | 'QUIERE_MAS_INFO' | 'SIN_PRESUPUESTO' | 'YA_TIENE_PROVEEDOR' | 'NO_ES_PRIORIDAD' | 'NO_RESPONDE' | 'OTRO'
 
 export interface OutreachActivity {
   id: string
@@ -561,6 +562,9 @@ export interface OutreachActivity {
   type: OutreachActivityType
   channel?: ContactChannel | null
   note?: string | null
+  responseType?: ResponseType | null
+  proposalId?: string | null
+  mensajeUtilizado?: string | null
   createdById?: string | null
   createdAt: string
 }
@@ -569,6 +573,7 @@ export interface OutreachFunnel {
   listoOutreach: number
   contactado: number
   respondio: number
+  interesado: number
   reunionAgendada: number
   convertido: number
 }
@@ -577,14 +582,20 @@ export const outreachApi = {
   contact: (prospectId: string, channel: ContactChannel, note?: string) =>
     req<{ id: string; estado: string }>('POST', `/outreach/${prospectId}/contact`, { channel, note }),
 
-  respond: (prospectId: string, note?: string) =>
-    req<{ id: string; estado: string }>('POST', `/outreach/${prospectId}/respond`, { note }),
+  respond: (prospectId: string, body: { note?: string; responseType?: ResponseType; mensajeUtilizado?: string; proposalId?: string }) =>
+    req<{ id: string; estado: string }>('POST', `/outreach/${prospectId}/respond`, body),
+
+  markInterested: (prospectId: string, body: { note?: string; mensajeUtilizado?: string; proposalId?: string }) =>
+    req<{ id: string; estado: string }>('POST', `/outreach/${prospectId}/interested`, body),
+
+  markLost: (prospectId: string, responseType: ResponseType, note?: string) =>
+    req<{ id: string; estado: string }>('POST', `/outreach/${prospectId}/lost`, { responseType, note }),
 
   noResponse: (prospectId: string, note?: string) =>
     req<{ ok: boolean }>('POST', `/outreach/${prospectId}/no-response`, { note }),
 
-  scheduleMeeting: (prospectId: string, note?: string) =>
-    req<{ id: string; estado: string }>('POST', `/outreach/${prospectId}/schedule-meeting`, { note }),
+  scheduleMeeting: (prospectId: string, note?: string, proposalId?: string) =>
+    req<{ id: string; estado: string }>('POST', `/outreach/${prospectId}/schedule-meeting`, { note, proposalId }),
 
   addNote: (prospectId: string, note: string) =>
     req<OutreachActivity>('POST', `/outreach/${prospectId}/note`, { note }),

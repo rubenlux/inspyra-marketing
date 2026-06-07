@@ -1,12 +1,14 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { ContactChannel, OutreachActivityType, ProspectEstado } from '@prisma/client';
+import { ContactChannel, OutreachActivityType, ProspectEstado, ResponseType } from '@prisma/client';
 
 const CONTACTABLE_FROM: ProspectEstado[] = ['LISTO_OUTREACH'];
 const RESPOND_FROM: ProspectEstado[] = ['CONTACTADO'];
-const SCHEDULE_FROM: ProspectEstado[] = ['CONTACTADO', 'RESPONDIO'];
+const INTERESTED_FROM: ProspectEstado[] = ['RESPONDIO'];
+const LOST_FROM: ProspectEstado[] = ['CONTACTADO', 'RESPONDIO', 'INTERESADO'];
+const SCHEDULE_FROM: ProspectEstado[] = ['CONTACTADO', 'RESPONDIO', 'INTERESADO'];
 const ACTIVITY_STATES: ProspectEstado[] = [
-  'LISTO_OUTREACH', 'CONTACTADO', 'RESPONDIO', 'REUNION_AGENDADA', 'PASO_A_PIPELINE', 'CONVERTIDO',
+  'LISTO_OUTREACH', 'CONTACTADO', 'RESPONDIO', 'INTERESADO', 'REUNION_AGENDADA', 'PASO_A_PIPELINE', 'CONVERTIDO',
 ];
 
 @Injectable()
@@ -44,7 +46,15 @@ export class OutreachService {
 
   // ── Respond ───────────────────────────────────────────────────────────────────
 
-  async respond(prospectId: string, tenantId: string, userId: string, note?: string) {
+  async respond(
+    prospectId: string,
+    tenantId: string,
+    userId: string,
+    note?: string,
+    responseType?: ResponseType,
+    mensajeUtilizado?: string,
+    proposalId?: string,
+  ) {
     const prospect = await this.findProspect(prospectId, tenantId);
     if (!RESPOND_FROM.includes(prospect.estado)) {
       throw new BadRequestException(
@@ -59,7 +69,81 @@ export class OutreachService {
         data: { estado: 'RESPONDIO', ultimoContacto: now },
       }),
       this.prisma.outreachActivity.create({
-        data: { tenantId, prospectId, type: 'RESPONDIO', note: note ?? null, createdById: userId },
+        data: {
+          tenantId, prospectId, type: 'RESPONDIO',
+          note: note ?? null, createdById: userId,
+          responseType: responseType ?? null,
+          mensajeUtilizado: mensajeUtilizado ?? null,
+          proposalId: proposalId ?? null,
+        },
+      }),
+    ]);
+    return updated;
+  }
+
+  // ── Mark Interested ───────────────────────────────────────────────────────────
+
+  async markInterested(
+    prospectId: string,
+    tenantId: string,
+    userId: string,
+    note?: string,
+    mensajeUtilizado?: string,
+    proposalId?: string,
+  ) {
+    const prospect = await this.findProspect(prospectId, tenantId);
+    if (!INTERESTED_FROM.includes(prospect.estado)) {
+      throw new BadRequestException(
+        `El prospecto debe estar en RESPONDIO para marcar como interesado (actual: ${prospect.estado})`,
+      );
+    }
+
+    const now = new Date();
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.prospect.update({
+        where: { id: prospectId },
+        data: { estado: 'INTERESADO', ultimoContacto: now },
+      }),
+      this.prisma.outreachActivity.create({
+        data: {
+          tenantId, prospectId, type: 'INTERESADO',
+          responseType: 'INTERESADO',
+          note: note ?? null, createdById: userId,
+          mensajeUtilizado: mensajeUtilizado ?? null,
+          proposalId: proposalId ?? null,
+        },
+      }),
+    ]);
+    return updated;
+  }
+
+  // ── Mark Lost ─────────────────────────────────────────────────────────────────
+
+  async markLost(
+    prospectId: string,
+    tenantId: string,
+    userId: string,
+    responseType: ResponseType,
+    note?: string,
+  ) {
+    const prospect = await this.findProspect(prospectId, tenantId);
+    if (!LOST_FROM.includes(prospect.estado)) {
+      throw new BadRequestException(
+        `Estado inválido para marcar como perdido (actual: ${prospect.estado})`,
+      );
+    }
+
+    const now = new Date();
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.prospect.update({
+        where: { id: prospectId },
+        data: { estado: 'DESCARTADO', ultimoContacto: now },
+      }),
+      this.prisma.outreachActivity.create({
+        data: {
+          tenantId, prospectId, type: 'PERDIDO',
+          responseType, note: note ?? null, createdById: userId,
+        },
       }),
     ]);
     return updated;
@@ -84,11 +168,11 @@ export class OutreachService {
 
   // ── Schedule Meeting ──────────────────────────────────────────────────────────
 
-  async scheduleMeeting(prospectId: string, tenantId: string, userId: string, note?: string) {
+  async scheduleMeeting(prospectId: string, tenantId: string, userId: string, note?: string, proposalId?: string) {
     const prospect = await this.findProspect(prospectId, tenantId);
     if (!SCHEDULE_FROM.includes(prospect.estado)) {
       throw new BadRequestException(
-        `El prospecto debe estar en CONTACTADO o RESPONDIO para agendar reunión (actual: ${prospect.estado})`,
+        `El prospecto debe estar en CONTACTADO, RESPONDIO o INTERESADO para agendar reunión (actual: ${prospect.estado})`,
       );
     }
 
@@ -99,7 +183,7 @@ export class OutreachService {
         data: { estado: 'REUNION_AGENDADA', ultimoContacto: now },
       }),
       this.prisma.outreachActivity.create({
-        data: { tenantId, prospectId, type: 'REUNION_AGENDADA', note: note ?? null, createdById: userId },
+        data: { tenantId, prospectId, type: 'REUNION_AGENDADA', note: note ?? null, createdById: userId, proposalId: proposalId ?? null },
       }),
     ]);
     return updated;
@@ -127,14 +211,15 @@ export class OutreachService {
   // ── Funnel Metrics ────────────────────────────────────────────────────────────
 
   async getFunnel(tenantId: string) {
-    const [listoOutreach, contactado, respondio, reunionAgendada, convertido] = await Promise.all([
+    const [listoOutreach, contactado, respondio, interesado, reunionAgendada, convertido] = await Promise.all([
       this.prisma.prospect.count({ where: { tenantId, deletedAt: null, estado: 'LISTO_OUTREACH' } }),
       this.prisma.prospect.count({ where: { tenantId, deletedAt: null, estado: 'CONTACTADO' } }),
       this.prisma.prospect.count({ where: { tenantId, deletedAt: null, estado: 'RESPONDIO' } }),
+      this.prisma.prospect.count({ where: { tenantId, deletedAt: null, estado: 'INTERESADO' } }),
       this.prisma.prospect.count({ where: { tenantId, deletedAt: null, estado: 'REUNION_AGENDADA' } }),
       this.prisma.prospect.count({ where: { tenantId, deletedAt: null, estado: 'CONVERTIDO' } }),
     ]);
-    return { listoOutreach, contactado, respondio, reunionAgendada, convertido };
+    return { listoOutreach, contactado, respondio, interesado, reunionAgendada, convertido };
   }
 
   // ── Private ───────────────────────────────────────────────────────────────────
