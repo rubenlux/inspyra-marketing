@@ -1451,7 +1451,22 @@ function ProposalNextStep({ prospectId, latestProposal, isGenerating, onGenerate
 function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReviewEnrichment }) {
   const [tab, setTab] = useState("assessment");
   const [enrichingFromDrawer, setEnrichingFromDrawer] = useState(false);
+  const [xlat, setXlat] = useState<Record<string, string>>({});
+  const [xlatLoading, setXlatLoading] = useState(false);
   const qc = useQueryClient();
+
+  const doTranslate = async (pairs: Array<[string, string]>, lang: string) => {
+    const needed = pairs.filter(([k, text]) => !xlat[k] && Boolean(text));
+    if (!needed.length || lang === 'ES') return;
+    setXlatLoading(true);
+    try {
+      const results = await Promise.all(
+        needed.map(([k, text]) => proposalsApi.translate(text, lang).then(r => [k, r.translation] as [string, string]))
+      );
+      setXlat(s => Object.fromEntries([...Object.entries(s), ...results]));
+    } catch (e: any) { alert('Error al traducir: ' + e.message); }
+    finally { setXlatLoading(false); }
+  };
 
   const handleEnrichFromDrawer = async () => {
     setEnrichingFromDrawer(true);
@@ -2313,8 +2328,16 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                           )}
                           {d.communicationLanguage && (
                             <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 99, background: d.communicationLanguage === "EN" ? "#DBEAFE" : "#F0FDF4", color: d.communicationLanguage === "EN" ? "#1D4ED8" : "#166534" }}>
-                              {d.communicationLanguage}
+                              🌎 {d.communicationLanguage}
                             </span>
+                          )}
+                          {d.communicationLanguage && d.communicationLanguage !== "ES" && (
+                            <button
+                              onClick={() => doTranslate([["outreachMsg", d.outreachMessage], ["cta", d.cta]], d.communicationLanguage)}
+                              disabled={xlatLoading}
+                              style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, border: "1px solid #7C3AED", background: xlat["outreachMsg"] ? "#7C3AED" : "transparent", color: xlat["outreachMsg"] ? "#fff" : "#7C3AED", cursor: "pointer", opacity: xlatLoading ? 0.6 : 1 }}>
+                              {xlatLoading ? "…" : xlat["outreachMsg"] ? "✓ ES" : "🔄 Ver traducción"}
+                            </button>
                           )}
                         </div>
                       )}
@@ -2323,19 +2346,42 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                       {d.outreachMessage && (
                         <div style={{ background: "#1E1B4B", borderRadius: 12, padding: "14px 16px" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, color: "#A5B4FC", textTransform: "uppercase", letterSpacing: "0.05em" }}>Mensaje Outreach</span>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(d.outreachMessage).then(() => {
-                                  const btn = document.activeElement as HTMLElement;
-                                  if (btn) { btn.textContent = "✓ Copiado"; setTimeout(() => { btn.textContent = "Copiar"; }, 1800); }
-                                });
-                              }}
-                              style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid #4338CA", background: "transparent", color: "#A5B4FC", cursor: "pointer" }}>
-                              Copiar
-                            </button>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: "#A5B4FC", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                              Mensaje Outreach {d.communicationLanguage && d.communicationLanguage !== "ES" ? `(${d.communicationLanguage})` : ""}
+                            </span>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              {d.communicationLanguage && d.communicationLanguage !== "ES" && (
+                                <button
+                                  onClick={() => doTranslate([["outreachMsg", d.outreachMessage]], d.communicationLanguage)}
+                                  disabled={xlatLoading}
+                                  style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid #6366F1", background: xlat["outreachMsg"] ? "#6366F1" : "transparent", color: "#A5B4FC", cursor: "pointer", opacity: xlatLoading ? 0.6 : 1 }}>
+                                  {xlatLoading && !xlat["outreachMsg"] ? "…" : xlat["outreachMsg"] ? "✓ ES" : "🔄 ES"}
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(d.outreachMessage).then(() => {
+                                    const btn = document.activeElement as HTMLElement;
+                                    if (btn) { btn.textContent = "✓ Copiado"; setTimeout(() => { btn.textContent = "Copiar"; }, 1800); }
+                                  });
+                                }}
+                                style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid #4338CA", background: "transparent", color: "#A5B4FC", cursor: "pointer" }}>
+                                Copiar
+                              </button>
+                            </div>
                           </div>
-                          <div style={{ fontSize: 13, color: "#E0E7FF", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{d.outreachMessage}</div>
+                          {xlat["outreachMsg"] ? (
+                            <>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: "#6366F1", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>ORIGINAL ({d.communicationLanguage})</div>
+                              <div style={{ fontSize: 13, color: "#C7D2FE", lineHeight: 1.7, whiteSpace: "pre-wrap", marginBottom: 12 }}>{d.outreachMessage}</div>
+                              <div style={{ borderTop: "1px solid rgba(99,102,241,0.3)", paddingTop: 12 }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: "#A5B4FC", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>TRADUCCIÓN (ES)</div>
+                                <div style={{ fontSize: 13, color: "#E0E7FF", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{xlat["outreachMsg"]}</div>
+                              </div>
+                            </>
+                          ) : (
+                            <div style={{ fontSize: 13, color: "#E0E7FF", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{d.outreachMessage}</div>
+                          )}
                         </div>
                       )}
 
@@ -2379,6 +2425,12 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                         <div style={{ padding: "14px 16px", background: "#EDE9FE", borderRadius: 10, borderLeft: "3px solid #7C3AED" }}>
                           <div style={{ fontSize: 11, fontWeight: 700, color: "#6D28D9", textTransform: "uppercase", marginBottom: 6 }}>CTA</div>
                           <div style={{ fontSize: 13.5, color: "#4C1D95", fontWeight: 500, lineHeight: 1.6 }}>"{d.cta}"</div>
+                          {xlat["cta"] && (
+                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #C4B5FD" }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: "#7C3AED", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>ES</div>
+                              <div style={{ fontSize: 13, color: "#5B21B6", fontStyle: "italic", lineHeight: 1.6 }}>"{xlat["cta"]}"</div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2388,12 +2440,37 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                 {/* COMMERCIAL — packages view */}
                 {latestProposal.jobStatus === "COMPLETED" && latestProposal.proposalData?.proposalType === "COMMERCIAL" && (() => {
                   const d = latestProposal.proposalData as any;
+                  const lang = (fetchedProspect?.communicationLanguage ?? rowData?.communicationLanguage ?? 'ES') as string;
+                  const needsTranslation = lang !== 'ES';
+                  const commercialPairs: Array<[string, string]> = [
+                    ['c_resumen', d.resumenEjecutivo],
+                    ['c_cta', d.cta],
+                    ...(d.paquetes?.map((pkg: any, i: number) => [`c_pkg_${i}`, pkg.descripcion] as [string, string]) ?? []),
+                  ].filter(([, text]) => Boolean(text));
                   return (
                     <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                      {/* Lang badge + translate button */}
+                      {needsTranslation && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 99, background: "#DBEAFE", color: "#1D4ED8" }}>🌎 {lang}</span>
+                          <button
+                            onClick={() => doTranslate(commercialPairs, lang)}
+                            disabled={xlatLoading}
+                            style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99, border: "1px solid #3B82F6", background: xlat["c_resumen"] ? "#3B82F6" : "transparent", color: xlat["c_resumen"] ? "#fff" : "#3B82F6", cursor: "pointer", opacity: xlatLoading ? 0.6 : 1 }}>
+                            {xlatLoading ? "…" : xlat["c_resumen"] ? "✓ ES" : "🔄 Ver traducción"}
+                          </button>
+                        </div>
+                      )}
                       {d.resumenEjecutivo && (
                         <div style={{ padding: "12px 14px", background: "#EFF6FF", borderRadius: 10, borderLeft: "3px solid #3B82F6" }}>
                           <div style={{ fontSize: 11, fontWeight: 700, color: "#1D4ED8", textTransform: "uppercase", marginBottom: 6 }}>Resumen</div>
                           <div style={{ fontSize: 13, color: "var(--ink-800)", lineHeight: 1.6 }}>{d.resumenEjecutivo}</div>
+                          {xlat["c_resumen"] && (
+                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #BFDBFE" }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>ES</div>
+                              <div style={{ fontSize: 13, color: "var(--ink-700)", fontStyle: "italic", lineHeight: 1.6 }}>{xlat["c_resumen"]}</div>
+                            </div>
+                          )}
                         </div>
                       )}
                       {d.paquetes?.length > 0 && (
@@ -2414,7 +2491,10 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                                     </span>
                                   )}
                                 </div>
-                                <div style={{ fontSize: 12, color: "var(--ink-600)", marginBottom: 6 }}>{pkg.descripcion}</div>
+                                <div style={{ fontSize: 12, color: "var(--ink-600)", marginBottom: 4 }}>{pkg.descripcion}</div>
+                                {xlat[`c_pkg_${i}`] && (
+                                  <div style={{ fontSize: 11.5, color: "var(--ink-500)", fontStyle: "italic", marginBottom: 6 }}>ES: {xlat[`c_pkg_${i}`]}</div>
+                                )}
                                 {pkg.incluye?.length > 0 && (
                                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                                     {pkg.incluye.map((item: string, j: number) => (
@@ -2439,6 +2519,12 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                         <div style={{ padding: "12px 14px", background: "#EFF6FF", borderRadius: 10 }}>
                           <div style={{ fontSize: 11, fontWeight: 700, color: "#1D4ED8", textTransform: "uppercase", marginBottom: 6 }}>Próximo paso</div>
                           <div style={{ fontSize: 13, color: "var(--ink-800)", lineHeight: 1.6 }}>{d.cta}</div>
+                          {xlat["c_cta"] && (
+                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #BFDBFE" }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>ES</div>
+                              <div style={{ fontSize: 13, color: "var(--ink-700)", fontStyle: "italic", lineHeight: 1.6 }}>{xlat["c_cta"]}</div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -3421,6 +3507,7 @@ function Prospects({ onNav }) {
             style={{ position: "fixed", inset: 0, top: 56, background: "rgba(0,0,0,0.35)", zIndex: 98 }}
           />
           <ProspectDrawer
+            key={selectedId}
             prospectId={selectedId}
             rowData={selectedRow}
             validationById={validationById}

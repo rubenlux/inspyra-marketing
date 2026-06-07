@@ -53,4 +53,13 @@ export class ProposalsController {
   regenerate(@Param('id') id: string, @Request() req: AuthRequest) {
     return this.proposalsService.regenerate(id, req.user.tenantId, req.user.id);
   }
+
+  @Post('translate')
+  async translate(
+    @Body() body: { text: string; sourceLang: string },
+    @Request() _req: AuthRequest,
+  ) {
+    const translation = await this.proposalsService.translate(body.text ?? '', body.sourceLang ?? 'EN');
+    return { translation };
+  }
 }

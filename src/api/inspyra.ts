@@ -518,6 +518,9 @@ export const proposalsApi = {
 
   regenerate: (id: string) =>
     req<Proposal>('POST', `/proposals/${id}/regenerate`),
+
+  translate: (text: string, sourceLang: string) =>
+    req<{ translation: string }>('POST', '/proposals/translate', { text, sourceLang }),
 }
 
 // ─── Agent ROI ────────────────────────────────────────────────────────────────

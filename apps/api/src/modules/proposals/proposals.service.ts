@@ -382,6 +382,14 @@ export class ProposalsService {
     return this.generate(existing.prospectId, tenantId, userId, existing.proposalType as 'OUTREACH' | 'COMMERCIAL');
   }
 
+  async translate(text: string, sourceLang: string): Promise<string> {
+    const names: Record<string, string> = { EN: 'English', PT: 'Portuguese', FR: 'French', DE: 'German' };
+    const source = names[sourceLang] ?? sourceLang;
+    const prompt = `Translate the following ${source} text to Spanish (español rioplatense, informal, vos tuteo).\nReturn ONLY the translated text. No explanations. No quotes around the translation.\n\nTEXT:\n${text}`;
+    const raw = await this.spawnClaude(prompt, 'claude-haiku-4-5-20251001', 30_000);
+    return raw.trim();
+  }
+
   // ── Agent ──────────────────────────────────────────────────────────────────────
 
   private async runProposalAgent(
