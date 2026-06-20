@@ -3,41 +3,10 @@ import { PrismaService } from '../../database/prisma.service';
 import { CreateResearchJobDto } from './dto/create-research-job.dto';
 import { spawn } from 'child_process';
 import * as path from 'path';
-
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-export class DiscoveryInfrastructureError extends Error {
-  constructor(
-    public readonly code: 'API_BUDGET_EXCEEDED' | 'WEBSEARCH_TIMEOUT' | 'MCP_UNAVAILABLE' | 'INVALID_JSON' | 'UNKNOWN',
-    message: string,
-    public readonly rawOutput?: string
-  ) {
-    super(`[${code}] ${message}`);
-    this.name = 'DiscoveryInfrastructureError';
-  }
-}
-
-interface RawCompany {
-  nombreEmpresa: string;
-  ciudad?: string;
-  pais?: string;
-  provincia?: string;
-  rubro?: string;
-  website?: string;
-  instagram?: string;
-  linkedin?: string;
-  descripcion?: string;
-  empleadosEstimado?: number;
-  añosFundacion?: string;
-  presenciaDigital?: {
-    tieneWeb?: boolean;
-    tieneSeo?: boolean;
-    tieneRedes?: boolean;
-    tieneEcommerce?: boolean;
-    tieneAgendaOnline?: boolean;
-  };
-  facturacionEstimada?: string;
-}
+import type { DiscoveryProvider, RawCompany } from './discovery-provider.interface';
+import { DiscoveryInfrastructureError } from './discovery-provider.interface';
+import { GoogleMapsDiscoveryProvider } from './google-maps.provider';
+import { AgenticDiscoveryProvider } from './agentic.provider';
 
 interface SonnetEvaluation {
   index: number;
@@ -286,7 +255,9 @@ IMPORTANTE: serviciosSugeridos debe reflejar los problemas REALES encontrados en
       // ── Phase 1: Real web search discovery ──────────────────────────────────
       await this.updateJobOutput(jobId, `[Fase 1/4] Buscando empresas reales: "${query}"…`);
 
-      const { companies: rawCompanies, sinEvidencia: sinEvidenciaCount } = await this.discoverRealWithWebSearch(query, limit);
+      const provider = this.getDiscoveryProvider();
+      this.logger.log(`[Job ${jobId}] Discovery provider: ${process.env.DISCOVERY_PROVIDER ?? 'google_maps'}`);
+      const { companies: rawCompanies, sinEvidencia: sinEvidenciaCount } = await provider.discover(query, limit);
       this.logger.log(`[Job ${jobId}] [DISCOVERY] Phase 1 done — ${rawCompanies.length} con evidencia, ${sinEvidenciaCount} sin evidencia descartadas`);
 
       if (rawCompanies.length === 0) {
@@ -465,162 +436,18 @@ IMPORTANTE: serviciosSugeridos debe reflejar los problemas REALES encontrados en
       
       await this.prisma.researchJob.update({
         where: { id: jobId },
-        data: { status: 'FAILED', completedAt: new Date(), errorMessage: finalMsg.slice(0, 1000) },
+        data: { status: 'FAILED', completedAt: new Date(), errorMessage: finalMsg.slice(0, 4000) },
       });
     }
-  }
-
-  // ── Phase 1: Real Web Search Discovery ────────────────────────────────────────
-
-  private async discoverRealWithWebSearch(
-    query: string,
-    limit: number,
-  ): Promise<{ companies: RawCompany[]; sinEvidencia: number }> {
-    // Generate 3 diversified search queries to maximize coverage
-    const queries = await this.generateSearchQueries(query, 3);
-    this.logger.log(`[DISCOVERY] Queries (${queries.length}): ${queries.join(' | ')}`);
-
-    const perQueryLimit = Math.ceil(limit / queries.length) * 3; // 3x overshoot, dedup later
-    const results: RawCompany[] = [];
-    let sinEvidencia = 0;
-
-    for (const q of queries) {
-      try {
-        const { companies, sinEvidencia: querySinEvidencia } = await this.searchCompaniesForQuery(q, perQueryLimit);
-        results.push(...companies);
-        sinEvidencia += querySinEvidencia;
-        this.logger.log(`[DISCOVERY] "${q}" → ${companies.length} con evidencia, ${querySinEvidencia} sin evidencia`);
-      } catch (err) {
-        this.logger.warn(`[DISCOVERY] Query "${q}" failed: ${(err as Error).message}`);
-      }
-    }
-
-    // Intra-batch dedup by normalized domain
-    const seenDomains = new Set<string>();
-    const seenNames = new Set<string>();
-    const unique = results.filter(c => {
-      const nameKey = c.nombreEmpresa.toLowerCase().trim();
-      if (seenNames.has(nameKey)) return false;
-      seenNames.add(nameKey);
-
-      if (c.website) {
-        const domain = this.normalizeDomain(c.website);
-        if (domain && seenDomains.has(domain)) return false;
-        if (domain) seenDomains.add(domain);
-      }
-      return true;
-    });
-
-    this.logger.log(`[DISCOVERY] Total: ${results.length} raw → ${unique.length} unique (${results.length - unique.length} intra-batch dupes)`);
-    return { companies: unique.slice(0, limit * 2), sinEvidencia };
-  }
-
-  private async generateSearchQueries(query: string, count: number): Promise<string[]> {
-    const prompt = `Genera exactamente ${count} queries de búsqueda web DIVERSIFICADAS para encontrar empresas reales que coincidan con: "${query}"
-
-Reglas ESTRICTAS:
-- Las queries deben encontrar EMPRESAS, no filtrar por sus características digitales
-- CORRECTO: "restaurantes mendoza", "bodegas premium argentina", "inmobiliarias capital federal"
-- INCORRECTO: "restaurantes sin web", "bodegas con SEO malo"
-- Variar geografía y ángulos entre queries
-- Objetivo: MAXIMIZAR diversidad de empresas reales encontradas
-
-Devuelve SOLO un JSON array de strings, sin markdown:
-["query 1", "query 2", "query 3"]`;
-
-    try {
-      const output = await this.spawnClaudeText(prompt, 'claude-sonnet-4-6', 60_000);
-      const match = output.match(/\[[\s\S]*?\]/);
-      if (!match) {
-        const lower = output.toLowerCase();
-        let code: DiscoveryInfrastructureError['code'] = 'INVALID_JSON';
-        if (/limit|exceeded|budget|quota/i.test(lower)) code = 'API_BUDGET_EXCEEDED';
-        throw new DiscoveryInfrastructureError(code, "Fallo al generar subqueries.", output);
-      }
-      const parsed = JSON.parse(match[0]) as string[];
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed.slice(0, count) : [query];
-    } catch (err) {
-      if (err instanceof DiscoveryInfrastructureError) throw err;
-      return [query];
-    }
-  }
-
-  private async searchCompaniesForQuery(
-    query: string,
-    limit: number,
-  ): Promise<{ companies: RawCompany[]; sinEvidencia: number }> {
-    const prompt = `Usa web_search para buscar: "${query}"
-
-Extraé de los resultados de búsqueda hasta ${limit} empresas REALES que hayan aparecido.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠ CONTRATO ANTI-ALUCINACIÓN — OBLIGATORIO
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. NO inventes empresas. NO generes nombres de ejemplo. NO infieras nombres.
-2. SOLO incluí empresas que aparecieron EXPLÍCITAMENTE en los resultados de la búsqueda.
-3. Cada empresa DEBE tener al menos UNO de: website, instagram, linkedin.
-4. Si una empresa apareció pero no tenés ningún canal verificable → NO incluirla.
-5. Si los resultados no contienen empresas reales → devolvé [] (array vacío).
-6. NO incluyas directorios, listados, artículos, marketplaces — solo empresas individuales.
-
-La respuesta debe contener únicamente un JSON array válido.
-No incluir explicaciones. No incluir markdown. No incluir bloques \`\`\`json.
-
-Formato exacto (null para campos que no encontraste):
-[{
-  "nombreEmpresa": "Nombre exacto como apareció en el resultado",
-  "website": "https://sitio.com o null",
-  "instagram": "https://instagram.com/... o null",
-  "linkedin": "https://linkedin.com/... o null",
-  "ciudad": "Ciudad",
-  "pais": "País",
-  "provincia": "Provincia o null",
-  "rubro": "Sector/industria",
-  "descripcion": "Qué hace la empresa (máx 1 oración)",
-  "empleadosEstimado": null,
-  "añosFundacion": null,
-  "presenciaDigital": { "tieneWeb": true, "tieneSeo": false, "tieneRedes": false, "tieneEcommerce": false, "tieneAgendaOnline": false },
-  "facturacionEstimada": null
-}]`;
-
-    const output = await this.spawnClaudeAgentic(prompt, 'claude-sonnet-4-6', 60_000, 180_000);
-
-    let parsed: RawCompany[] = [];
-    try {
-      parsed = JSON.parse(output.trim()) as RawCompany[];
-    } catch {
-      const match = output.match(/\[[\s\S]*\]/);
-      if (match) {
-        try { parsed = JSON.parse(match[0]) as RawCompany[]; } catch { /* irreparable */ }
-      }
-    }
-
-    if (!Array.isArray(parsed)) {
-      const lower = output.toLowerCase();
-      let code: DiscoveryInfrastructureError['code'] = 'UNKNOWN';
-      if (/limit|exceeded|budget|quota/i.test(lower)) code = 'API_BUDGET_EXCEEDED';
-      else if (/timeout/i.test(lower)) code = 'WEBSEARCH_TIMEOUT';
-      else if (/mcp|tool/i.test(lower)) code = 'MCP_UNAVAILABLE';
-      else code = 'INVALID_JSON';
-      
-      throw new DiscoveryInfrastructureError(code, "El agente falló en devolver entidades válidas", output);
-    }
-
-    const withEvidence = parsed.filter(
-      c => c.nombreEmpresa && (c.website || c.instagram || c.linkedin),
-    );
-    const sinEvidencia = parsed.length - withEvidence.length;
-
-    for (const c of withEvidence) {
-      this.logger.log(`[DISCOVERY] Empresa encontrada: ${c.nombreEmpresa} | web: ${c.website ?? 'null'} | ig: ${c.instagram ?? 'null'} | li: ${c.linkedin ?? 'null'}`);
-    }
-
-    return { companies: withEvidence, sinEvidencia };
   }
 
   // ── Evidence Validation (Real HTTP) ────────────────────────────────────────────
 
   private async validateEvidence(company: RawCompany): Promise<{ valid: boolean; details: string }> {
+    if (company.googlePlaceId) {
+      return { valid: true, details: `place_id:${company.googlePlaceId.slice(0, 20)}✓ (GPS verified)` };
+    }
+
     const checks: string[] = [];
     let anyValid = false;
 
@@ -698,15 +525,6 @@ Formato exacto (null para campos que no encontraste):
     return { valid: anyValid, details };
   }
 
-  private normalizeDomain(urlOrDomain: string): string | null {
-    try {
-      const withScheme = urlOrDomain.startsWith('http') ? urlOrDomain : `https://${urlOrDomain}`;
-      return new URL(withScheme).hostname.toLowerCase().replace(/^www\./, '');
-    } catch {
-      return null;
-    }
-  }
-
   // ── Save candidates (Phase 1 → DB) ───────────────────────────────────────────
 
   private async saveCandidates(jobId: string, tenantId: string, companies: RawCompany[]) {
@@ -778,7 +596,7 @@ Formato exacto (null para campos que no encontraste):
       hasEcommerce: c.presenciaDigital?.tieneEcommerce ?? false,
       hasOnlineAgenda: c.presenciaDigital?.tieneAgendaOnline ?? false,
       evidence: {
-        website: c.website ?? null,
+        website: c.website ?? c.googleMaps ?? null,
         linkedin: c.linkedin ?? null,
         instagram: c.instagram ?? null,
       },
@@ -884,6 +702,9 @@ Evalúa las ${companies.length} empresas. SOLO el JSON array.`;
     const prioridad = this.scoreToPrioridad(evaluation.score);
     const bvs = this.calculateBVS(company, evaluation.estimatedTicketUsd ?? 0);
 
+    const mapsProblems = this.deriveMapsProblems(company);
+    const allProblems = [...new Set([...mapsProblems, ...(evaluation.problemasDetectados ?? [])])];
+
     return this.prisma.prospect.create({
       data: {
         tenantId,
@@ -894,15 +715,16 @@ Evalúa las ${companies.length} empresas. SOLO el JSON array.`;
         website: company.website,
         instagram: company.instagram,
         linkedin: company.linkedin,
+        telefono: company.telefono ?? null,
         empleadosEstimado: company.empleadosEstimado,
         oportunidadDetectada: evaluation.oportunidadDetectada,
-        problemasEncontrados: evaluation.problemasDetectados ?? [],
+        problemasEncontrados: allProblems,
         nivelOportunidad: nivel,
         servicioSugerido: evaluation.servicioSugerido,
         score: evaluation.score,
         commercialScore: bvs,
         prioridad,
-        fuente: 'MANUAL',
+        fuente: company.source === 'google_maps' ? 'GOOGLE_MAPS' : 'MANUAL',
         detectadoPor: 'IA',
         estado: 'NUEVO',
       },
@@ -973,6 +795,30 @@ Evalúa las ${companies.length} empresas. SOLO el JSON array.`;
     await this.prisma.researchJob.update({ where: { id: jobId }, data: { agentOutput: msg } });
   }
 
+  // ── Discovery Provider ────────────────────────────────────────────────────────
+
+  private getDiscoveryProvider(): DiscoveryProvider {
+    const type = process.env.DISCOVERY_PROVIDER ?? 'google_maps';
+    if (type === 'agentic_web_search') {
+      return new AgenticDiscoveryProvider(
+        this.spawnClaudeAgentic.bind(this),
+        this.spawnClaudeText.bind(this),
+        this.logger,
+      );
+    }
+    return new GoogleMapsDiscoveryProvider();
+  }
+
+  private deriveMapsProblems(company: RawCompany): string[] {
+    if (company.source !== 'google_maps') return [];
+    const problems: string[] = [];
+    if (!company.website) problems.push('Sin sitio web');
+    if ((company.rating ?? 5) < 4.0) problems.push('Calificación baja en Google Maps');
+    if ((company.reviewCount ?? 100) < 20) problems.push('Pocas reseñas en Google Maps');
+    if (!company.instagram && !company.linkedin) problems.push('Sin presencia en redes sociales detectada');
+    return problems;
+  }
+
   // ── Claude spawn (text only, no MCP) ─────────────────────────────────────────
 
   // allowedTools: tool name to allow. Pass 'none' (non-existent tool) to disable all tools (pure reasoning mode).
@@ -1035,9 +881,9 @@ Evalúa las ${companies.length} empresas. SOLO el JSON array.`;
         '--dangerously-skip-permissions',
         '--strict-mcp-config',
         '--model', model,
-        '--allowedTools', 'WebFetch,WebSearch',
+        '--allowedTools', 'WebSearch',
       ];
-      this.logger.log(`Spawning claude agentic | model: ${model} | idle: ${idleTimeoutMs / 1000}s | total: ${totalTimeoutMs / 1000}s`);
+      this.logger.log(`Spawning claude agentic | model: ${model} | tools: WebSearch | idle: ${idleTimeoutMs / 1000}s | total: ${totalTimeoutMs / 1000}s`);
 
       const child = spawn('claude', args, {
         cwd: this.projectRoot,
