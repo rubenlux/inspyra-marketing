@@ -26,7 +26,9 @@ Estos invariantes no necesitan verificación en spec ni en código. Son reglas a
 **Agentes IA**
 - Ningún agente aprueba su propio output. Siempre `status: DRAFT` → revisión humana → `APPROVED`.
 - `LISTO_OUTREACH` se alcanza solo aprobando una propuesta (`POST /proposals/:id/approve`), no via transición directa.
-- El Opportunity Agent (`runAgent`) funciona sin `problemasEncontrados` — usa SIR catalog via `buildProspectContext()`. NO re-agregar la guard `if (problems.length === 0) throw 400`.
+- El Opportunity Agent (`runAgent`) — ERP-052 — usa `problemasEncontrados` para scoring Service Match First. Si `problems.length === 0` → `ValidationStatus.DISCARDED` con `discardReason: INSUFFICIENT_DATA`. Si ningún problema mapea a un servicio INSPYRA → `DISCARDED` con `NO_SERVICE_MATCH`. NO es un error 400 — es un descarte legítimo.
+- Prospectos `isLegacy = true` (creados antes de 2026-06-17) → `runAgent` lanza BadRequestException. Excluir de todas las queries con `where: { isLegacy: false }`.
+- `PATCH /prospect-validations/:id/reactivate` revierte DISCARDED → PENDING. Solo acción humana, nunca automática.
 
 **Google Maps Discovery**
 - Los prospectos importados desde Google Maps entran en estado `NUEVO`.
@@ -56,13 +58,25 @@ La fuente de verdad del proyecto es:
 
 Antes de generar codigo se deben revisar las specs relacionadas al dominio afectado.
 
+## ERP-052 — Service Match First (vigente desde 2026-06-20)
+
+Score = `matchFitScore(0-40) + impactScore(0-40) + contactScore(0-20)`, cap 100.
+Score deriva del catálogo en `apps/api/src/modules/service-intelligence/catalog/problem-match.ts`.
+
+**Reglas del catálogo:**
+- Las reglas más específicas van primero. GBP antes que seo-local (evita que "no aparece en Google Maps" en contexto GBP sea robado por seo-local).
+- SSL inválido/vencido → `hostingguard` EXACT_MATCH HIGH (no PARTIAL LOW).
+- NO_SERVICE_MATCH no es un error — es un resultado válido de negocio.
+
+**No modificar el catálogo sin:** (1) reporte de problemas sin match en datos reales, (2) análisis de familias canónicas, (3) verificación de falsos positivos.
+
 ## ERP Functional Specs
 
 Las specs funcionales oficiales del ERP viven en:
 
 - `spec-driven/`
 
-Este directorio esta en la raiz del proyecto y contiene la constitucion del sistema y las specs `ERP-001` a `ERP-050` (en crecimiento).
+Este directorio esta en la raiz del proyecto y contiene la constitucion del sistema y las specs `ERP-001` a `ERP-052` (en crecimiento).
 
 Antes de implementar o modificar cualquier modulo ERP, Claude debe leer primero la spec correspondiente dentro de `spec-driven/` y respetar su alcance, modelo de datos, flujos, reglas de negocio y restricciones.
 

@@ -6,6 +6,17 @@ import * as path from 'path';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
+export class DiscoveryInfrastructureError extends Error {
+  constructor(
+    public readonly code: 'API_BUDGET_EXCEEDED' | 'WEBSEARCH_TIMEOUT' | 'MCP_UNAVAILABLE' | 'INVALID_JSON' | 'UNKNOWN',
+    message: string,
+    public readonly rawOutput?: string
+  ) {
+    super(`[${code}] ${message}`);
+    this.name = 'DiscoveryInfrastructureError';
+  }
+}
+
 interface RawCompany {
   nombreEmpresa: string;
   ciudad?: string;
@@ -272,14 +283,28 @@ IMPORTANTE: serviciosSugeridos debe reflejar los problemas REALES encontrados en
     this.logger.log(`[Job ${jobId}] Pipeline start | "${query}" | limit: ${limit}`);
 
     try {
-      // ── Phase 1: Haiku discovers companies ──────────────────────────────────
-      await this.updateJobOutput(jobId, `[Fase 1/3] Haiku descubriendo ${limit} empresas…`);
+      // ── Phase 1: Real web search discovery ──────────────────────────────────
+      await this.updateJobOutput(jobId, `[Fase 1/4] Buscando empresas reales: "${query}"…`);
 
-      const rawCompanies = await this.discoverWithHaiku(query, limit);
-      this.logger.log(`[Job ${jobId}] Phase 1 done — ${rawCompanies.length} companies`);
+      const { companies: rawCompanies, sinEvidencia: sinEvidenciaCount } = await this.discoverRealWithWebSearch(query, limit);
+      this.logger.log(`[Job ${jobId}] [DISCOVERY] Phase 1 done — ${rawCompanies.length} con evidencia, ${sinEvidenciaCount} sin evidencia descartadas`);
+
+      if (rawCompanies.length === 0) {
+        await this.prisma.researchJob.update({
+          where: { id: jobId },
+          data: {
+            status: 'COMPLETED',
+            completedAt: new Date(),
+            candidatesFound: 0,
+            prospectsFound: 0,
+            agentOutput: `Discovery: 0 empresas reales encontradas para "${query}". ${sinEvidenciaCount} sin evidencia descartadas.`,
+          },
+        });
+        return;
+      }
 
       // ── Save all candidates as DISCOVERED ───────────────────────────────────
-      await this.updateJobOutput(jobId, `[Fase 2/3] Guardando ${rawCompanies.length} candidatos…`);
+      await this.updateJobOutput(jobId, `[Fase 2/4] Guardando ${rawCompanies.length} candidatos verificados…`);
 
       const savedCandidates = await this.saveCandidates(jobId, tenantId, rawCompanies);
       await this.prisma.researchJob.update({
@@ -287,47 +312,66 @@ IMPORTANTE: serviciosSugeridos debe reflejar los problemas REALES encontrados en
         data: { candidatesFound: rawCompanies.length },
       });
 
-      // ── Phase 2a: Evidence gate — discard companies with no verifiable presence ─
-      const withEvidenceIndices: number[] = [];
-      const noEvidenceIndices: number[] = [];
+      // ── Phase 2: Real evidence validation (HTTP) ────────────────────────────
+      await this.updateJobOutput(jobId, `[Fase 2/4] Validando evidencia real de ${rawCompanies.length} empresas…`);
+
+      const validatedIndices: number[] = [];
+      const invalidatedIndices: number[] = [];
+
       for (let i = 0; i < rawCompanies.length; i++) {
         const c = rawCompanies[i];
-        if (c.website || c.instagram || c.linkedin) {
-          withEvidenceIndices.push(i);
+        const evidenceResult = await this.validateEvidence(c);
+        const candidate = savedCandidates[i];
+
+        if (evidenceResult.valid) {
+          validatedIndices.push(i);
+          this.logger.log(`[Job ${jobId}] [EVIDENCE] ✓ ${c.nombreEmpresa} — ${evidenceResult.details}`);
         } else {
-          noEvidenceIndices.push(i);
+          invalidatedIndices.push(i);
+          this.logger.log(`[Job ${jobId}] [EVIDENCE] ✗ ${c.nombreEmpresa} — ${evidenceResult.details}`);
+          if (candidate) {
+            await this.prisma.researchCandidate.update({
+              where: { id: candidate.id },
+              data: { status: 'DISCARDED', discardReason: `Evidencia no verificable: ${evidenceResult.details}` },
+            });
+          }
         }
       }
 
-      if (noEvidenceIndices.length > 0) {
-        await Promise.all(
-          noEvidenceIndices.map(i => {
-            const candidate = savedCandidates[i];
-            if (!candidate) return Promise.resolve();
-            return this.prisma.researchCandidate.update({
-              where: { id: candidate.id },
-              data: { status: 'DISCARDED', discardReason: 'Sin evidencia verificable' },
-            });
-          }),
-        );
-      }
-      this.logger.log(`[Job ${jobId}] Evidence gate: ${withEvidenceIndices.length} con evidencia, ${noEvidenceIndices.length} sin evidencia → descartadas`);
+      this.logger.log(`[Job ${jobId}] [EVIDENCE] Gate: ${validatedIndices.length} verificadas, ${invalidatedIndices.length} invalidadas`);
 
-      // ── Phase 2b: Pre-filter → Sonnet on top 20 with evidence only ────────────
-      const withEvidenceCompanies = withEvidenceIndices.map(i => rawCompanies[i]);
-      const selectedSubIndices = this.preSelectForSonnet(withEvidenceCompanies, 20);
-      const selectedIndices = selectedSubIndices.map(j => withEvidenceIndices[j]);
+      if (validatedIndices.length === 0) {
+        await this.prisma.researchJob.update({
+          where: { id: jobId },
+          data: {
+            status: 'COMPLETED',
+            completedAt: new Date(),
+            prospectsFound: 0,
+            agentOutput: `Discovery: ${rawCompanies.length} encontradas, 0 con evidencia verificable.`,
+          },
+        });
+        return;
+      }
+
+      // ── Phase 3: Pre-filter → Sonnet on top 20 validated ────────────────────
+      const validatedCompanies = validatedIndices.map(i => rawCompanies[i]);
+      const selectedSubIndices = this.preSelectForSonnet(validatedCompanies, 20);
+      const selectedIndices = selectedSubIndices.map(j => validatedIndices[j]);
       const selectedSet = new Set(selectedIndices);
-      const preDiscardedIndices = withEvidenceIndices.filter(i => !selectedSet.has(i));
+      const preDiscardedIndices = validatedIndices.filter(i => !selectedSet.has(i));
 
       this.logger.log(`[Job ${jobId}] Pre-filter: ${selectedIndices.length} → Sonnet, ${preDiscardedIndices.length} → auto-discard`);
 
       await this.updateJobOutput(jobId,
-        `[Fase 2/3] Evidencia: ${withEvidenceIndices.length} verificables, ${noEvidenceIndices.length} sin evidencia descartadas. Evaluando ${selectedIndices.length} con Sonnet…`,
+        `[Fase 3/4] Evidencia: ${validatedIndices.length} verificadas. Evaluando ${selectedIndices.length} con Sonnet…`,
       );
 
       const sonnetBatch = selectedIndices.map(i => rawCompanies[i]);
       const sonnetEvaluations = await this.evaluateWithSonnet(sonnetBatch, selectedIndices);
+
+      for (const ev of sonnetEvaluations) {
+        this.logger.log(`[Job ${jobId}] [EVALUATION] ${rawCompanies[ev.index]?.nombreEmpresa} → ${ev.action} (score: ${ev.score})`);
+      }
 
       const preDiscardEvaluations: SonnetEvaluation[] = preDiscardedIndices.map(i => ({
         index: i,
@@ -338,11 +382,11 @@ IMPORTANTE: serviciosSugeridos debe reflejar los problemas REALES encontrados en
       }));
 
       const evaluations = [...sonnetEvaluations, ...preDiscardEvaluations];
-      this.logger.log(`[Job ${jobId}] Phase 2 done — ${sonnetEvaluations.length} Sonnet evals + ${preDiscardEvaluations.length} auto-discards`);
+      this.logger.log(`[Job ${jobId}] Phase 3 done — ${sonnetEvaluations.length} Sonnet evals + ${preDiscardEvaluations.length} auto-discards`);
 
-      // ── Phase 3: Create prospects for qualified candidates ──────────────────
+      // ── Phase 4: Create prospects for qualified candidates ──────────────────
       await this.updateJobOutput(jobId,
-        `[Fase 3/3] Creando prospectos para los que califican…`,
+        `[Fase 4/4] Creando prospectos para los que califican…`,
       );
 
       let prospectsFound = 0;
@@ -363,16 +407,6 @@ IMPORTANTE: serviciosSugeridos debe reflejar los problemas REALES encontrados en
 
         if (evaluation.action === 'PROMOTE' && evaluation.score >= 60) {
           const company = rawCompanies[evaluation.index];
-          const hasEvidence = !!(company.website || company.instagram || company.linkedin);
-          if (!hasEvidence) {
-            // Final safety net — should have been caught by evidence gate, but double-checked here
-            this.logger.warn(`[Job ${jobId}] Evidence gate (final): blocked synthetic prospect "${company.nombreEmpresa}"`);
-            await this.prisma.researchCandidate.update({
-              where: { id: candidate.id },
-              data: { ...commonUpdate, status: 'DISCARDED', discardReason: 'Sin evidencia verificable' },
-            });
-            continue;
-          }
           const prospect = await this.createProspectFromEvaluation(
             tenantId, company, evaluation,
           );
@@ -397,56 +431,280 @@ IMPORTANTE: serviciosSugeridos debe reflejar los problemas REALES encontrados en
           status: 'COMPLETED',
           completedAt: new Date(),
           prospectsFound,
-          agentOutput: `Haiku: ${rawCompanies.length} empresas descubiertas | Sonnet: ${prospectsFound} promovidas a prospecto, ${rawCompanies.length - prospectsFound} descartadas`,
+          agentOutput: [
+            `=== DISCOVERY REAL ===`,
+            `Query: "${query}"`,
+            `Encontradas: ${rawCompanies.length + sinEvidenciaCount}`,
+            `Sin evidencia (descartadas en búsqueda): ${sinEvidenciaCount}`,
+            `Con evidencia: ${rawCompanies.length}`,
+            `Evidencia verificada (HTTP): ${validatedIndices.length}`,
+            `Evidencia fallida: ${invalidatedIndices.length}`,
+            `Enviadas a Sonnet: ${selectedIndices.length}`,
+            `PROMOVIDAS a prospecto: ${prospectsFound}`,
+            `Descartadas: ${rawCompanies.length - prospectsFound}`,
+          ].join('\n'),
         },
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.error(`[Job ${jobId}] Failed: ${msg}`);
+      let statusStr = 'FAILED';
+      let errorCategory = 'UNKNOWN_ERROR';
+      let msg = err instanceof Error ? err.message : String(err);
+      let rawOut = '';
+
+      if (err instanceof DiscoveryInfrastructureError) {
+        errorCategory = err.code;
+        if (err.code === 'API_BUDGET_EXCEEDED') statusStr = 'RATE_LIMITED';
+        else if (err.code === 'INVALID_JSON') statusStr = 'EVALUATION_FAILED';
+        else statusStr = 'INFRASTRUCTURE_FAILED';
+        rawOut = `\nRaw Provider Output:\n${err.rawOutput?.slice(0, 500) ?? 'N/A'}`;
+      }
+
+      this.logger.error(`[Job ${jobId}] Failed (${errorCategory}): ${msg}`);
+      
+      const finalMsg = `[${statusStr}] ${errorCategory} - ${msg}${rawOut}`;
+      
       await this.prisma.researchJob.update({
         where: { id: jobId },
-        data: { status: 'FAILED', completedAt: new Date(), errorMessage: msg.slice(0, 1000) },
+        data: { status: 'FAILED', completedAt: new Date(), errorMessage: finalMsg.slice(0, 1000) },
       });
     }
   }
 
-  // ── Phase 1: Haiku Discovery ──────────────────────────────────────────────────
+  // ── Phase 1: Real Web Search Discovery ────────────────────────────────────────
 
-  private async discoverWithHaiku(query: string, limit: number): Promise<RawCompany[]> {
-    const prompt = `Generá un JSON array con ${limit} empresas que coincidan con: "${query}"
+  private async discoverRealWithWebSearch(
+    query: string,
+    limit: number,
+  ): Promise<{ companies: RawCompany[]; sinEvidencia: number }> {
+    // Generate 3 diversified search queries to maximize coverage
+    const queries = await this.generateSearchQueries(query, 3);
+    this.logger.log(`[DISCOVERY] Queries (${queries.length}): ${queries.join(' | ')}`);
 
-SOLO JSON, sin texto adicional.
+    const perQueryLimit = Math.ceil(limit / queries.length) * 3; // 3x overshoot, dedup later
+    const results: RawCompany[] = [];
+    let sinEvidencia = 0;
 
-REGLAS DE URLs — CRÍTICAS:
-- website: solo si conocés ese dominio de tu entrenamiento (ej: "closdelossiete.com"). Si no estás seguro → null
-- instagram: solo @handle que conocés de tu entrenamiento. Si no estás seguro → null
-- linkedin: solo URL que conocés de tu entrenamiento. Si no estás seguro → null
-- NUNCA inventes ni construyas URLs que suenen plausibles. Si no la conocés con certeza → null
-- Es válido incluir empresas con website=null e instagram=null si no conocés sus URLs reales
+    for (const q of queries) {
+      try {
+        const { companies, sinEvidencia: querySinEvidencia } = await this.searchCompaniesForQuery(q, perQueryLimit);
+        results.push(...companies);
+        sinEvidencia += querySinEvidencia;
+        this.logger.log(`[DISCOVERY] "${q}" → ${companies.length} con evidencia, ${querySinEvidencia} sin evidencia`);
+      } catch (err) {
+        this.logger.warn(`[DISCOVERY] Query "${q}" failed: ${(err as Error).message}`);
+      }
+    }
 
-[
-  {
-    "nombreEmpresa": "Bodega Clos de los Siete",
-    "ciudad": "Mendoza", "provincia": "Mendoza", "pais": "Argentina",
-    "rubro": "Bodega / Vino de alta gama",
-    "website": "closdelossiete.com", "instagram": "@closdelossiete", "linkedin": "linkedin.com/company/clos-de-los-siete",
-    "descripcion": "Bodega boutique fundada en 2002, produce Malbec y Cabernet. Exporta a Europa y EEUU. Venta directa al consumidor poco desarrollada.",
-    "empleadosEstimado": 25, "añosFundacion": "2002",
-    "presenciaDigital": { "tieneWeb": true, "tieneSeo": false, "tieneRedes": true, "tieneEcommerce": false, "tieneAgendaOnline": false },
-    "facturacionEstimada": "mediana"
+    // Intra-batch dedup by normalized domain
+    const seenDomains = new Set<string>();
+    const seenNames = new Set<string>();
+    const unique = results.filter(c => {
+      const nameKey = c.nombreEmpresa.toLowerCase().trim();
+      if (seenNames.has(nameKey)) return false;
+      seenNames.add(nameKey);
+
+      if (c.website) {
+        const domain = this.normalizeDomain(c.website);
+        if (domain && seenDomains.has(domain)) return false;
+        if (domain) seenDomains.add(domain);
+      }
+      return true;
+    });
+
+    this.logger.log(`[DISCOVERY] Total: ${results.length} raw → ${unique.length} unique (${results.length - unique.length} intra-batch dupes)`);
+    return { companies: unique.slice(0, limit * 2), sinEvidencia };
   }
-]
 
-Generá los ${limit} registros con variedad de situaciones digitales. SOLO JSON.`;
+  private async generateSearchQueries(query: string, count: number): Promise<string[]> {
+    const prompt = `Genera exactamente ${count} queries de búsqueda web DIVERSIFICADAS para encontrar empresas reales que coincidan con: "${query}"
 
-    const output = await this.spawnClaudeText(prompt, 'claude-haiku-4-5-20251001', 3 * 60 * 1000);
+Reglas ESTRICTAS:
+- Las queries deben encontrar EMPRESAS, no filtrar por sus características digitales
+- CORRECTO: "restaurantes mendoza", "bodegas premium argentina", "inmobiliarias capital federal"
+- INCORRECTO: "restaurantes sin web", "bodegas con SEO malo"
+- Variar geografía y ángulos entre queries
+- Objetivo: MAXIMIZAR diversidad de empresas reales encontradas
 
-    const match = output.match(/\[[\s\S]*\]/);
-    if (!match) throw new Error(`Haiku no devolvió JSON válido. Output: ${output.slice(0, 300)}`);
+Devuelve SOLO un JSON array de strings, sin markdown:
+["query 1", "query 2", "query 3"]`;
 
-    const parsed = JSON.parse(match[0]) as RawCompany[];
-    if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('Haiku devolvió JSON vacío');
-    return parsed;
+    try {
+      const output = await this.spawnClaudeText(prompt, 'claude-sonnet-4-6', 60_000);
+      const match = output.match(/\[[\s\S]*?\]/);
+      if (!match) {
+        const lower = output.toLowerCase();
+        let code: DiscoveryInfrastructureError['code'] = 'INVALID_JSON';
+        if (/limit|exceeded|budget|quota/i.test(lower)) code = 'API_BUDGET_EXCEEDED';
+        throw new DiscoveryInfrastructureError(code, "Fallo al generar subqueries.", output);
+      }
+      const parsed = JSON.parse(match[0]) as string[];
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed.slice(0, count) : [query];
+    } catch (err) {
+      if (err instanceof DiscoveryInfrastructureError) throw err;
+      return [query];
+    }
+  }
+
+  private async searchCompaniesForQuery(
+    query: string,
+    limit: number,
+  ): Promise<{ companies: RawCompany[]; sinEvidencia: number }> {
+    const prompt = `Usa web_search para buscar: "${query}"
+
+Extraé de los resultados de búsqueda hasta ${limit} empresas REALES que hayan aparecido.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠ CONTRATO ANTI-ALUCINACIÓN — OBLIGATORIO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. NO inventes empresas. NO generes nombres de ejemplo. NO infieras nombres.
+2. SOLO incluí empresas que aparecieron EXPLÍCITAMENTE en los resultados de la búsqueda.
+3. Cada empresa DEBE tener al menos UNO de: website, instagram, linkedin.
+4. Si una empresa apareció pero no tenés ningún canal verificable → NO incluirla.
+5. Si los resultados no contienen empresas reales → devolvé [] (array vacío).
+6. NO incluyas directorios, listados, artículos, marketplaces — solo empresas individuales.
+
+La respuesta debe contener únicamente un JSON array válido.
+No incluir explicaciones. No incluir markdown. No incluir bloques \`\`\`json.
+
+Formato exacto (null para campos que no encontraste):
+[{
+  "nombreEmpresa": "Nombre exacto como apareció en el resultado",
+  "website": "https://sitio.com o null",
+  "instagram": "https://instagram.com/... o null",
+  "linkedin": "https://linkedin.com/... o null",
+  "ciudad": "Ciudad",
+  "pais": "País",
+  "provincia": "Provincia o null",
+  "rubro": "Sector/industria",
+  "descripcion": "Qué hace la empresa (máx 1 oración)",
+  "empleadosEstimado": null,
+  "añosFundacion": null,
+  "presenciaDigital": { "tieneWeb": true, "tieneSeo": false, "tieneRedes": false, "tieneEcommerce": false, "tieneAgendaOnline": false },
+  "facturacionEstimada": null
+}]`;
+
+    const output = await this.spawnClaudeAgentic(prompt, 'claude-sonnet-4-6', 60_000, 180_000);
+
+    let parsed: RawCompany[] = [];
+    try {
+      parsed = JSON.parse(output.trim()) as RawCompany[];
+    } catch {
+      const match = output.match(/\[[\s\S]*\]/);
+      if (match) {
+        try { parsed = JSON.parse(match[0]) as RawCompany[]; } catch { /* irreparable */ }
+      }
+    }
+
+    if (!Array.isArray(parsed)) {
+      const lower = output.toLowerCase();
+      let code: DiscoveryInfrastructureError['code'] = 'UNKNOWN';
+      if (/limit|exceeded|budget|quota/i.test(lower)) code = 'API_BUDGET_EXCEEDED';
+      else if (/timeout/i.test(lower)) code = 'WEBSEARCH_TIMEOUT';
+      else if (/mcp|tool/i.test(lower)) code = 'MCP_UNAVAILABLE';
+      else code = 'INVALID_JSON';
+      
+      throw new DiscoveryInfrastructureError(code, "El agente falló en devolver entidades válidas", output);
+    }
+
+    const withEvidence = parsed.filter(
+      c => c.nombreEmpresa && (c.website || c.instagram || c.linkedin),
+    );
+    const sinEvidencia = parsed.length - withEvidence.length;
+
+    for (const c of withEvidence) {
+      this.logger.log(`[DISCOVERY] Empresa encontrada: ${c.nombreEmpresa} | web: ${c.website ?? 'null'} | ig: ${c.instagram ?? 'null'} | li: ${c.linkedin ?? 'null'}`);
+    }
+
+    return { companies: withEvidence, sinEvidencia };
+  }
+
+  // ── Evidence Validation (Real HTTP) ────────────────────────────────────────────
+
+  private async validateEvidence(company: RawCompany): Promise<{ valid: boolean; details: string }> {
+    const checks: string[] = [];
+    let anyValid = false;
+
+    // Validate website
+    if (company.website) {
+      const url = company.website.startsWith('http') ? company.website : `https://${company.website}`;
+      try {
+        const res = await fetch(url, {
+          method: 'HEAD',
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; InspyraBot/1.0)' },
+          signal: AbortSignal.timeout(8000),
+          redirect: 'follow',
+        });
+        if (res.ok || res.status === 403 || res.status === 405) {
+          // 403/405 = server exists but blocks HEAD, still valid evidence
+          checks.push(`website:${res.status}✓`);
+          anyValid = true;
+        } else {
+          checks.push(`website:${res.status}✗`);
+        }
+      } catch (err) {
+        checks.push(`website:unreachable(${(err as Error).message.slice(0, 30)})`);
+      }
+    }
+
+    // Validate Instagram (HEAD check on profile URL)
+    if (company.instagram) {
+      const igUrl = company.instagram.startsWith('http')
+        ? company.instagram
+        : `https://instagram.com/${company.instagram.replace(/^@/, '')}`;
+      try {
+        const res = await fetch(igUrl, {
+          method: 'HEAD',
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; InspyraBot/1.0)' },
+          signal: AbortSignal.timeout(8000),
+          redirect: 'follow',
+        });
+        // Instagram returns 200 for existing profiles, 404 for non-existent
+        if (res.ok) {
+          checks.push('instagram:✓');
+          anyValid = true;
+        } else {
+          checks.push(`instagram:${res.status}✗`);
+        }
+      } catch {
+        checks.push('instagram:unreachable');
+      }
+    }
+
+    // Validate LinkedIn
+    if (company.linkedin) {
+      const liUrl = company.linkedin.startsWith('http')
+        ? company.linkedin
+        : `https://${company.linkedin}`;
+      try {
+        const res = await fetch(liUrl, {
+          method: 'HEAD',
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; InspyraBot/1.0)' },
+          signal: AbortSignal.timeout(8000),
+          redirect: 'follow',
+        });
+        if (res.ok || res.status === 999) {
+          // LinkedIn returns 999 for bot detection, but the profile exists
+          checks.push('linkedin:✓');
+          anyValid = true;
+        } else {
+          checks.push(`linkedin:${res.status}✗`);
+        }
+      } catch {
+        checks.push('linkedin:unreachable');
+      }
+    }
+
+    const details = checks.join(' | ') || 'Sin URLs para validar';
+    return { valid: anyValid, details };
+  }
+
+  private normalizeDomain(urlOrDomain: string): string | null {
+    try {
+      const withScheme = urlOrDomain.startsWith('http') ? urlOrDomain : `https://${urlOrDomain}`;
+      return new URL(withScheme).hostname.toLowerCase().replace(/^www\./, '');
+    } catch {
+      return null;
+    }
   }
 
   // ── Save candidates (Phase 1 → DB) ───────────────────────────────────────────
@@ -597,8 +855,13 @@ Evalúa las ${companies.length} empresas. SOLO el JSON array.`;
 
     const match = output.match(/\[[\s\S]*\]/);
     if (!match) {
-      this.logger.warn(`Sonnet output (first 500): ${output.slice(0, 500)}`);
-      throw new Error(`Sonnet no devolvió JSON válido`);
+      const lower = output.toLowerCase();
+      let code: DiscoveryInfrastructureError['code'] = 'INVALID_JSON';
+      if (/limit|exceeded|budget|quota/i.test(lower)) code = 'API_BUDGET_EXCEEDED';
+      else if (/timeout/i.test(lower)) code = 'WEBSEARCH_TIMEOUT';
+      
+      this.logger.warn(`[Sonnet ERROR] ${output.slice(0, 500)}`);
+      throw new DiscoveryInfrastructureError(code, 'Sonnet no devolvió output válido', output);
     }
 
     try {
@@ -749,6 +1012,93 @@ Evalúa las ${companies.length} empresas. SOLO el JSON array.`;
       child.stderr.on('data', (c: Buffer) => { stderr += c.toString(); });
       child.on('close', code => {
         if (code === 0) done();
+        else done(new Error(`claude exited ${code}. stderr: ${stderr.slice(-400)}`));
+      });
+      child.on('error', done);
+    });
+  }
+
+  // ── Claude spawn (agentic mode with WebSearch/WebFetch) ───────────────────────
+  // Uses stream-json output to handle tool calls. Idle timeout kills stuck WebFetch.
+
+  private spawnClaudeAgentic(
+    prompt: string,
+    model: string,
+    idleTimeoutMs: number,
+    totalTimeoutMs: number,
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const args = [
+        '-p', '-',
+        '--output-format', 'stream-json',
+        '--verbose',
+        '--dangerously-skip-permissions',
+        '--strict-mcp-config',
+        '--model', model,
+        '--allowedTools', 'WebFetch,WebSearch',
+      ];
+      this.logger.log(`Spawning claude agentic | model: ${model} | idle: ${idleTimeoutMs / 1000}s | total: ${totalTimeoutMs / 1000}s`);
+
+      const child = spawn('claude', args, {
+        cwd: this.projectRoot,
+        env: { ...process.env },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      child.stdin.write(prompt, 'utf8');
+      child.stdin.end();
+
+      let stderr = '';
+      let lineBuffer = '';
+      let settled = false;
+
+      const done = (err?: Error, result?: string) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(totalTimer);
+        clearTimeout(idleTimer);
+        if (err) reject(err);
+        else resolve(result!);
+      };
+
+      const totalTimer = setTimeout(() => {
+        child.kill('SIGTERM');
+        done(new Error(`Timeout ${model} after ${totalTimeoutMs / 60000}min`));
+      }, totalTimeoutMs);
+
+      let idleTimer = setTimeout(() => {
+        child.kill('SIGTERM');
+        done(new Error(`Idle timeout ${model}: no output for ${idleTimeoutMs / 1000}s`));
+      }, idleTimeoutMs);
+
+      child.stdout.on('data', (chunk: Buffer) => {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          child.kill('SIGTERM');
+          done(new Error(`Idle timeout ${model}: no output for ${idleTimeoutMs / 1000}s`));
+        }, idleTimeoutMs);
+
+        lineBuffer += chunk.toString();
+        const lines = lineBuffer.split('\n');
+        lineBuffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+            if (event.type === 'result') {
+              if (event.subtype === 'success') {
+                done(undefined, event.result ?? '');
+              } else {
+                done(new Error(`claude result error: ${JSON.stringify(event).slice(0, 200)}`));
+              }
+            }
+          } catch { /* partial or non-JSON line */ }
+        }
+      });
+
+      child.stderr.on('data', (c: Buffer) => { stderr += c.toString(); });
+      child.on('close', (code) => {
+        if (settled) return;
+        if (code === 0) done(new Error('claude closed without result event'));
         else done(new Error(`claude exited ${code}. stderr: ${stderr.slice(-400)}`));
       });
       child.on('error', done);

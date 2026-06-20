@@ -23,8 +23,10 @@ interface RawCompany {
   provincia?: string;
   rubro?: string;
   website?: string;
+  googleMaps?: string;
   instagram?: string;
   linkedin?: string;
+  facebook?: string;
   descripcion?: string;
   empleadosEstimado?: number;
   añosFundacion?: string;
@@ -337,8 +339,8 @@ export class CampaignsService implements OnModuleDestroy {
     try {
       // ── Phase 1: Discover companies via web_search ──────────────────────────
       await this.updateJobOutput(jobId, '[1/5] Generando queries y buscando empresas…');
-      const rawCompanies = await this.discoverWithWebSearch(campaign, limit);
-      this.logger.log(`[Job ${jobId}] Phase 1 done — ${rawCompanies.length} companies found`);
+      const { companies: rawCompanies, sinEvidencia: sinEvidenciaCount } = await this.discoverWithWebSearch(campaign, limit);
+      this.logger.log(`[Job ${jobId}] Phase 1 done — ${rawCompanies.length} con evidencia, ${sinEvidenciaCount} sin evidencia descartadas`);
 
       // ── Phase 2: Deduplication ──────────────────────────────────────────────
       await this.updateJobOutput(jobId, `[2/5] Deduplicando ${rawCompanies.length} candidatos…`);
@@ -452,18 +454,21 @@ export class CampaignsService implements OnModuleDestroy {
         .join('\n');
 
       await this.upsertDiscoveryMetrics(tenantId, campaign.id, {
-        candidates:   rawCompanies.length,
-        duplicates:   duplicateCount,
-        noWebsite:    noWebsiteCount,
-        auditFailed:  auditFailedCount,
-        scoreBelow:   scoreBelowCount,
-        audited:      auditResults.size,
-        promoted:     prospectsFound,
+        candidates:    rawCompanies.length,
+        sinEvidencia:  sinEvidenciaCount,
+        duplicates:    duplicateCount,
+        noWebsite:     noWebsiteCount,
+        auditFailed:   auditFailedCount,
+        scoreBelow:    scoreBelowCount,
+        audited:       auditResults.size,
+        promoted:      prospectsFound,
       });
 
       const summary = [
         `=== DISCOVERY FUNNEL — ${campaign.name} ===`,
-        `Encontrados:        ${rawCompanies.length}`,
+        `Encontrados:        ${rawCompanies.length + sinEvidenciaCount}`,
+        `Sin evidencia:     -${sinEvidenciaCount}`,
+        `Con evidencia:      ${rawCompanies.length}`,
         `Deduplicados:      -${duplicateCount}`,
         `Sin website:       -${noWebsiteCount}`,
         `Audit fallido:     -${auditFailedCount}`,
@@ -498,50 +503,54 @@ export class CampaignsService implements OnModuleDestroy {
 
   // ── Phase 1: Web Search Discovery ─────────────────────────────────────────
 
-  private async discoverWithWebSearch(campaign: DiscoveryCampaign, limit: number): Promise<RawCompany[]> {
-    // Step 1a: Generate 5 diversified contextual search queries
+  private async discoverWithWebSearch(
+    campaign: DiscoveryCampaign,
+    limit: number,
+  ): Promise<{ companies: RawCompany[]; sinEvidencia: number }> {
+    // Step 1a: Generate 5 diversified discovery queries (no problem signals — only sector + geo)
     const queries = await this.generateSearchQueries(campaign, 5);
     this.logger.log(`[Discovery] Queries (${queries.length}): ${queries.join(' | ')}`);
 
     // Step 1b: 3x overshoot per query — dedup will trim, but we want broad coverage
     const perQueryLimit = Math.ceil(limit / queries.length) * 3;
     const results: RawCompany[] = [];
+    let sinEvidencia = 0;
 
     for (const query of queries) {
       try {
-        const companies = await this.searchCompaniesForQuery(query, campaign, perQueryLimit);
+        const { companies, sinEvidencia: querysinEvidencia } = await this.searchCompaniesForQuery(query, campaign, perQueryLimit);
         results.push(...companies);
-        this.logger.log(`[Discovery] Query "${query}" → ${companies.length} companies`);
+        sinEvidencia += querysinEvidencia;
+        this.logger.log(`[Discovery] "${query}" → ${companies.length} con evidencia, ${querysinEvidencia} sin evidencia descartadas`);
       } catch (err) {
         this.logger.warn(`[Discovery] Query "${query}" failed: ${(err as Error).message}`);
       }
     }
 
     // Keep generous headroom for dedup — do NOT trim aggressively here
-    return results.slice(0, limit * 8);
+    return { companies: results.slice(0, limit * 8), sinEvidencia };
   }
 
   private async generateSearchQueries(campaign: DiscoveryCampaign, count: number): Promise<string[]> {
-    const signals = (campaign.problemSignals as string[]).slice(0, 4).join(', ');
     const markets = (campaign.targetMarkets as string[]).join(', ') || 'LATAM, Argentina, Chile, México';
     const industries = (campaign.targetIndustries as string[]).join(', ') || 'pymes, empresas locales';
 
     const prompt = `Eres un especialista en prospección B2B para una agencia digital.
 
 Campaña: "${campaign.name}"
-Objetivo: ${campaign.objective}
-${campaign.strategyPrompt ? `Estrategia: ${campaign.strategyPrompt}` : ''}
-Señales de problema: ${signals}
 Mercados: ${markets}
 Industrias objetivo: ${industries}
 
-Genera exactamente ${count} queries de búsqueda web DIVERSIFICADAS para encontrar empresas reales.
-Reglas:
-- Cada query debe explorar un ángulo distinto (sector, ciudad, tipo de empresa, problema específico)
-- Queries en español, orientadas a encontrar empresas con sitio web propio
-- Variar la geografía entre las queries (diferentes países/ciudades de LATAM)
-- Variar el sector cuando sea posible (no repetir el mismo rubro)
-- El objetivo es MAXIMIZAR la cantidad de candidatos únicos encontrados
+Genera exactamente ${count} queries de búsqueda web DIVERSIFICADAS para ENCONTRAR empresas reales en estos sectores y mercados.
+
+Reglas ESTRICTAS:
+- Las queries deben encontrar EMPRESAS, no filtrar por sus características digitales
+- CORRECTO: "restaurantes mendoza", "bodegas premium argentina", "inmobiliarias capital federal"
+- INCORRECTO: "restaurantes sin web", "bodegas con SEO malo", "inmobiliarias digitales"
+- La evaluación digital ocurre después — la query solo localiza empresas
+- Variar la geografía entre las queries (diferentes países/ciudades)
+- Variar el ángulo: nombre del sector, sinónimo, subsector, zona geográfica
+- Objetivo: MAXIMIZAR diversidad de empresas reales encontradas
 
 Devuelve SOLO un JSON array de strings, sin markdown:
 ["query 1", "query 2", "query 3", "query 4", "query 5"]`;
@@ -560,41 +569,63 @@ Devuelve SOLO un JSON array de strings, sin markdown:
 
   private async searchCompaniesForQuery(
     query: string,
-    campaign: DiscoveryCampaign,
+    _campaign: DiscoveryCampaign,
     limit: number,
-  ): Promise<RawCompany[]> {
-    const servicios = (campaign.servicesToSell as string[]).join(', ');
-
+  ): Promise<{ companies: RawCompany[]; sinEvidencia: number }> {
     const prompt = `Usa web_search para buscar: "${query}"
 
-Objetivo: encontrar empresas reales que podrían necesitar: ${servicios}
+Extraé de los resultados de búsqueda hasta ${limit} empresas REALES que hayan aparecido.
 
-Después de buscar, extrae hasta ${limit} empresas reales de los resultados.
-Para cada empresa incluye: nombre, website (URL completa), ciudad, país, rubro y descripción breve.
-Solo incluir empresas con sitio web propio (no redes sociales ni directorios).
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠ CONTRATO ANTI-ALUCINACIÓN — OBLIGATORIO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. NO inventes empresas. NO generes nombres de ejemplo. NO infieras nombres de barrios o categorías.
+2. SOLO incluí empresas que aparecieron EXPLÍCITAMENTE en los resultados de la búsqueda.
+3. Cada empresa DEBE tener al menos UNO de: website, googleMaps, instagram, linkedin, facebook.
+4. Si una empresa apareció pero no tenés ningún canal verificable → NO incluirla.
+5. Si los resultados no contienen empresas reales → devolvé [] (array vacío).
+6. NO incluyas directorios, listados, artículos, marketplaces — solo empresas individuales.
 
-Devuelve SOLO este JSON array, sin markdown:
-[
-  {
-    "nombreEmpresa": "Nombre real",
-    "website": "https://ejemplo.com",
-    "ciudad": "Ciudad",
-    "pais": "País",
-    "rubro": "Sector/industria",
-    "descripcion": "Qué hace la empresa"
-  }
-]`;
+La evaluación de madurez digital ocurre en otra fase. Tu único trabajo es ENCONTRAR empresas reales.
+
+La respuesta debe contener únicamente un JSON array válido.
+No incluir explicaciones. No incluir markdown. No incluir bloques \`\`\`json.
+No incluir texto antes ni después del JSON.
+
+Formato exacto (null para campos que no encontraste):
+[{
+  "nombreEmpresa": "Nombre exacto como apareció en el resultado",
+  "website": "https://sitio.com o null",
+  "googleMaps": "https://maps.google.com/... o null",
+  "instagram": "https://instagram.com/... o null",
+  "linkedin": "https://linkedin.com/... o null",
+  "ciudad": "Ciudad",
+  "pais": "País",
+  "rubro": "Sector/industria",
+  "descripcion": "Qué hace la empresa (máx 1 oración)"
+}]`;
 
     const output = await this.spawnClaude(prompt, 'claude-sonnet-4-6', 90_000);
-    const match = output.match(/\[[\s\S]*\]/);
-    if (!match) return [];
 
+    let parsed: RawCompany[] = [];
     try {
-      const parsed = JSON.parse(match[0]) as RawCompany[];
-      return Array.isArray(parsed) ? parsed.filter(c => c.nombreEmpresa && c.website) : [];
+      parsed = JSON.parse(output.trim()) as RawCompany[];
     } catch {
-      return [];
+      // Model added extra text despite the contract — try array extraction as last resort
+      const match = output.match(/\[[\s\S]*\]/);
+      if (match) {
+        try { parsed = JSON.parse(match[0]) as RawCompany[]; } catch { /* irreparable */ }
+      }
     }
+
+    if (!Array.isArray(parsed)) return { companies: [], sinEvidencia: 0 };
+
+    const withEvidence = parsed.filter(
+      c => c.nombreEmpresa && (c.website || c.googleMaps || c.instagram || c.linkedin || c.facebook),
+    );
+    const sinEvidencia = parsed.length - withEvidence.length;
+
+    return { companies: withEvidence, sinEvidencia };
   }
 
   // ── Phase 2: Deduplication ────────────────────────────────────────────────
@@ -943,7 +974,7 @@ Devuelve ÚNICAMENTE este JSON (sin markdown):
     tenantId: string,
     campaignId: string,
     stats: {
-      candidates: number; duplicates: number; noWebsite: number;
+      candidates: number; sinEvidencia: number; duplicates: number; noWebsite: number;
       auditFailed: number; scoreBelow: number; audited: number; promoted: number;
     },
   ) {
@@ -951,14 +982,15 @@ Devuelve ÚNICAMENTE este JSON (sin markdown):
     const agentId = `discovery-${campaignId}`;
 
     const metrics = [
-      { metricName: 'candidates_found',    value: stats.candidates },
-      { metricName: 'duplicates_skipped',  value: stats.duplicates },
-      { metricName: 'no_website_skipped',  value: stats.noWebsite },
-      { metricName: 'audit_failed',        value: stats.auditFailed },
-      { metricName: 'score_below',         value: stats.scoreBelow },
-      { metricName: 'sites_audited',       value: stats.audited },
-      { metricName: 'prospects_promoted',  value: stats.promoted },
-      { metricName: 'conversion_rate',     value: stats.audited > 0 ? stats.promoted / stats.audited : 0 },
+      { metricName: 'candidates_found',       value: stats.candidates },
+      { metricName: 'sin_evidencia_skipped',  value: stats.sinEvidencia },
+      { metricName: 'duplicates_skipped',     value: stats.duplicates },
+      { metricName: 'no_website_skipped',     value: stats.noWebsite },
+      { metricName: 'audit_failed',           value: stats.auditFailed },
+      { metricName: 'score_below',            value: stats.scoreBelow },
+      { metricName: 'sites_audited',          value: stats.audited },
+      { metricName: 'prospects_promoted',     value: stats.promoted },
+      { metricName: 'conversion_rate',        value: stats.audited > 0 ? stats.promoted / stats.audited : 0 },
     ];
 
     await Promise.all(

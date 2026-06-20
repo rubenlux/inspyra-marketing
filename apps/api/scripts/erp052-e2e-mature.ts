@@ -125,12 +125,30 @@ Respondé ÚNICAMENTE con JSON puro:
 }`;
 
   const raw = await spawnClaude(prompt);
-  const match = raw.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('Discovery: no JSON en respuesta');
-  const parsed = JSON.parse(match[0]);
-  const companies: DiscoveredCompany[] = parsed.companies ?? [];
-  console.log(`[Discovery] Encontradas: ${companies.length} empresas`);
-  return companies;
+
+  // Intentar extraer JSON por varias vías (Claude a veces envuelve en ```json```)
+  let jsonStr: string | null = null;
+  const directMatch = raw.match(/\{[\s\S]*"companies"[\s\S]*\}/);
+  if (directMatch) { jsonStr = directMatch[0]; }
+  else {
+    const codeBlock = raw.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+    if (codeBlock) jsonStr = codeBlock[1];
+  }
+
+  if (!jsonStr) {
+    console.warn(`[Discovery] Respuesta sin JSON válido (${raw.length} chars). Saltando sector.`);
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(jsonStr);
+    const companies: DiscoveredCompany[] = parsed.companies ?? [];
+    console.log(`[Discovery] Encontradas: ${companies.length} empresas`);
+    return companies;
+  } catch (e) {
+    console.warn(`[Discovery] JSON parse error: ${(e as Error).message.slice(0, 80)}`);
+    return [];
+  }
 }
 
 async function auditPresence(company: DiscoveredCompany): Promise<{ problems: string[]; yaResueltos: string[] }> {
@@ -218,8 +236,14 @@ function score052(problems: string[], ctx: { hasWebsite: boolean; hasInstagram: 
 }
 
 async function runSector(query: string, sector: string) {
-  const companies = await discoverCompanies(query, sector);
-  if (companies.length === 0) { console.warn(`[Warn] Discovery devolvió 0 empresas para: ${sector}`); return []; }
+  let companies: DiscoveredCompany[];
+  try {
+    companies = await discoverCompanies(query, sector);
+  } catch (e) {
+    console.warn(`[Sector] Discovery falló para "${sector}": ${(e as Error).message.slice(0, 80)}`);
+    return [];
+  }
+  if (companies.length === 0) { console.warn(`[Warn] Discovery devolvió 0 empresas para: ${sector} — sector omitido`); return []; }
 
   type Result = {
     empresa: string; rubro: string;

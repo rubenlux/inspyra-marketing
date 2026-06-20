@@ -1,0 +1,39 @@
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +26ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDatabaseModule dependencies initialized[39m[38;5;3m +2ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPassportModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +6ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigHostModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTerminusModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mHealthModule dependencies initialized[39m[38;5;3m +2ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mUsersModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProspectsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDealsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mClientsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mServicesModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mServiceCatalogModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mServiceIntelligenceModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPricingModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAgentRunsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAgentRoiModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mResearchModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mEnrichmentModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProposalsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProspectValidationModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOutreachModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mServiceAccountsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAuthModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[PrismaService] [39m[32mConnected to PostgreSQL[39m
+Running discoverRealWithWebSearch...
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:43 [32m    LOG[39m [38;5;3m[ResearchService] [39m[32mSpawning claude | model: claude-sonnet-4-6 | tools: default[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:45 [32m    LOG[39m [38;5;3m[ResearchService] [39m[32m[DISCOVERY] Queries (1): Bodegas en Mendoza[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:45 [32m    LOG[39m [38;5;3m[ResearchService] [39m[32mSpawning claude agentic | model: claude-sonnet-4-6 | idle: 60s | total: 180s[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:47 [32m    LOG[39m [38;5;3m[ResearchService] [39m[32m[DISCOVERY] "Bodegas en Mendoza" ÔåÆ 0 con evidencia, 0 sin evidencia[39m
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:47 [32m    LOG[39m [38;5;3m[ResearchService] [39m[32m[DISCOVERY] Total: 0 raw ÔåÆ 0 unique (0 intra-batch dupes)[39m
+{
+  "companies": [],
+  "sinEvidencia": 0
+}
+[32m[Nest] 23624  - [39m20/06/2026, 12:52:47 [32m    LOG[39m [38;5;3m[PrismaService] [39m[32mDisconnected from PostgreSQL[39m
