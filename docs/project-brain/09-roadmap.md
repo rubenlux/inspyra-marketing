@@ -52,6 +52,23 @@ Estado: **implementado**, en uso operativo. Pendiente:
 - Métricas de tasa de respuesta por canal
 - Integración WhatsApp/Email (futura)
 
+### ERP-045 — OpenClaw Discovery Agent
+Estado: **spec aprobada** (2026-06-16). Pendiente implementación.
+
+Spec: `spec-driven/erp-045-discovery-agent.md`
+
+Resumen: OpenClaw opera sobre `DiscoveryCampaign` — hipótesis comerciales con `objective`, `strategyPrompt`, `servicesToSell`, `problemSignals`. Descubre empresas reales, las audita con `websiteAudit()` y promueve las que califican directamente a `INVESTIGADO`. Elimina la generación manual de prospectos.
+
+Plan de etapas (8 etapas):
+- Etapa 1 — Schema + migraciones (3-4 días)
+- Etapa 2 — CRUD de campañas (2-3 días)
+- Etapa 3 — Pipeline con web_search (4-5 días)
+- Etapa 4 — Website Audit + Threshold (3-4 días)
+- Etapa 5 — OpenClaw agent config (2 días)
+- Etapa 6 — Métricas y UI (2-3 días)
+- Etapa 7 — Google Places API (3-4 días)
+- Etapa 8 — Automatización SEMI_AUTO (futuro)
+
 ---
 
 ## Futuro (backlog)
@@ -60,6 +77,7 @@ Estado: **implementado**, en uso operativo. Pendiente:
 
 | Item | Descripción | Prioridad |
 |---|---|---|
+| **ERP-045 Etapa 1-6** | Discovery Agent — schema, pipeline, UI | **Alta** |
 | Columna Contactability | Score de contactabilidad visible en la tabla de prospectos | Alta |
 | Email Marketing (ERP-021) | Campañas masivas + segmentación | Media |
 | Seguimiento automatizado | Recordatorios, follow-up scheduling | Media |

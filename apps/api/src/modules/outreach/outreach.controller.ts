@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.decorator';
 import { OutreachService } from './outreach.service';
@@ -12,6 +12,35 @@ export class OutreachController {
   @Get('funnel')
   getFunnel(@CurrentUser() user: JwtPayload) {
     return this.service.getFunnel(user.tenantId);
+  }
+
+  @Get('mail/folders')
+  getMailFolders(@Query('email') email: string) {
+    return this.service.getMailFolders(email);
+  }
+
+  @Get('mail/sent')
+  getSentEmails(@CurrentUser() user: JwtPayload) {
+    return this.service.getSentEmails(user.tenantId);
+  }
+
+  @Get('mail/messages')
+  getMailMessages(
+    @Query('email') email: string,
+    @Query('folder') folder: string = 'inbox',
+    @Query('limit') limit: string = '50',
+    @Query('offset') offset: string = '0',
+  ) {
+    return this.service.getMailMessages(email, folder, parseInt(limit, 10) || 50, parseInt(offset, 10) || 0);
+  }
+
+  @Get('mail/messages/:uid')
+  getMailMessage(
+    @Param('uid') uid: string,
+    @Query('email') email: string,
+    @Query('folder') folder: string = 'inbox',
+  ) {
+    return this.service.getMailMessage(parseInt(uid, 10), email, folder);
   }
 
   @Get(':prospectId/activities')
@@ -86,6 +115,61 @@ export class OutreachController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.service.sendEmail(prospectId, user.tenantId, user.sub, body.subject, body.proposalId, body.note);
+  }
+
+  @Post('mail/send')
+  sendFreeEmail(
+    @Body() body: { from?: string; to: string; subject: string; body?: string; bodyHtml?: string },
+  ) {
+    return this.service.sendFreeEmail(body.to, body.subject, body.body ?? '', body.from, body.bodyHtml);
+  }
+
+  @Get('mail/mailboxes')
+  getMailboxes() {
+    return this.service.getMailboxes();
+  }
+
+  @Post('mail/mailboxes')
+  createMailbox(@Body() body: { localPart: string; quotaMB?: number }) {
+    return this.service.createMailbox(body);
+  }
+
+  @Delete('mail/mailboxes/:mbEmail')
+  @HttpCode(204)
+  deleteMailbox(@Param('mbEmail') mbEmail: string) {
+    return this.service.deleteMailbox(mbEmail);
+  }
+
+  @Post('mail/mailboxes/:mbEmail/reset-password')
+  resetMailboxPassword(@Param('mbEmail') mbEmail: string) {
+    return this.service.resetMailboxPassword(mbEmail);
+  }
+
+  @Get('mail/drafts')
+  getMailDrafts() {
+    return this.service.getMailDrafts();
+  }
+
+  @Post('mail/drafts')
+  createMailDraft(
+    @Body() body: { to: string; subject: string; html: string; externalRef?: string },
+  ) {
+    return this.service.createMailDraft(body);
+  }
+
+  @Post('mail/drafts/:draftId/send')
+  sendMailDraft(
+    @Param('draftId') draftId: string,
+    @Body() body: { prospectId?: string },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.service.sendMailDraft(draftId, user.tenantId, user.sub, body.prospectId);
+  }
+
+  @Delete('mail/drafts/:draftId')
+  @HttpCode(204)
+  deleteMailDraft(@Param('draftId') draftId: string) {
+    return this.service.deleteMailDraft(draftId);
   }
 
   @Post(':prospectId/note')

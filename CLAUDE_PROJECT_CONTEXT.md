@@ -2,7 +2,7 @@
 
 **Leer este archivo primero. Siempre.**
 
-Última actualización: 2026-06-07
+Última actualización: 2026-06-18
 
 > **ERP-034 — Enforcement activo:** Este archivo es cargado automáticamente via hook `UserPromptSubmit` en `.claude/settings.json`. Los invariantes también están inlineados en `CLAUDE.md`. Si estás leyendo esto, el sistema funciona.
 
@@ -78,6 +78,8 @@ Cada flecha es una aprobación humana. Los agentes proponen, los humanos aprueba
 3. **VALID_TRANSITIONS** — el estado del prospecto solo puede cambiar según la tabla en `prospects.service.ts`
 4. **Propuesta en idioma del prospecto** — el operador trabaja en español, el prospecto recibe su idioma
 5. **No duplicar** — antes de crear algo nuevo, verificar que no existe ya
+6. **`problemasEncontrados` es inmutable** — snapshot del discovery, nunca se modifica. Los agentes leen `currentProblems` (recomputado post-enrichment). Si `currentProblems` está vacío, fallback a `problemasEncontrados`. Ver ERP-051.
+7. **VERIFIED DIGITAL PRESENCE** — el Outreach Agent nunca puede contradecir datos confirmados por enrichment. El prompt siempre incluye el bloque de presencia verificada.
 
 ---
 
@@ -115,6 +117,9 @@ Para contexto profundo, leer en orden:
 | `apps/api/prisma/schema.prisma` | Fuente de verdad del schema de DB |
 | `apps/api/src/app.module.ts` | Módulos NestJS registrados |
 | `apps/api/src/modules/prospects/prospects.service.ts` | VALID_TRANSITIONS, lógica core de prospectos |
+| `apps/api/src/modules/enrichment/enrichment.service.ts` | `recomputeCurrentProblems()` — ejecuta post-enrichment |
+| `apps/api/src/modules/proposals/proposals.service.ts` | Outreach + Commercial prompts con VERIFIED DIGITAL PRESENCE |
+| `apps/api/src/modules/prospect-validation/prospect-validation.service.ts` | Opportunity Agent — usa `currentProblems` |
 | `src/erp/ERPPrototype.tsx` | Todo el frontend |
 | `src/api/inspyra.ts` | Todos los clientes de API |
 

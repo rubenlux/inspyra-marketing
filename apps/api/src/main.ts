@@ -11,7 +11,7 @@ import { AgentAuditInterceptor } from './common/interceptors/agent-audit.interce
 import { PrismaService } from './database/prisma.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   const config = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 

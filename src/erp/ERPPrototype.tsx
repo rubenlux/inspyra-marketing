@@ -1,9 +1,9 @@
 // @ts-nocheck
 import * as React from 'react'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { authApi, prospectsApi, validationsApi, researchApi, enrichmentApi, proposalsApi, outreachApi, getStoredToken, setStoredToken, clearStoredToken } from '../api/inspyra'
+import { authApi, prospectsApi, validationsApi, researchApi, enrichmentApi, proposalsApi, outreachApi, mailApi, mailboxApi, getStoredToken, setStoredToken, clearStoredToken } from '../api/inspyra'
 import DashboardV2 from './DashboardV2'
 import './erp.css'
 
@@ -50,6 +50,7 @@ const Icon = {
   sparkles: (p) => <Ic {...p} d={<><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></>}/>,
   beaker: (p) => <Ic {...p} d={<><path d="M9 3v6l-5 9a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3l-5-9V3"/><path d="M8 3h8"/><path d="M6 14h12"/></>}/>,
   globe:  (p) => <Ic {...p} d={<><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 3 4 6 4 9s-1.5 6-4 9c-2.5-3-4-6-4-9s1.5-6 4-9z"/></>}/>,
+  trash:  (p) => <Ic {...p} d={<><path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></>}/>,
   link:   (p) => <Ic {...p} d={<><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7L11 7"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7L13 17"/></>}/>,
   trend:  (p) => <Ic {...p} d={<><path d="m3 17 6-6 4 4 8-8"/><path d="M14 7h7v7"/></>}/>,
   bolt:   (p) => <Ic {...p} d={<><path d="M13 2 4 14h7l-2 8 9-12h-7z"/></>}/>,
@@ -1390,8 +1391,14 @@ const ESTADO_TONE = {
   REUNION_AGENDADA: "brand", PASO_A_PIPELINE: "warning",
   CONVERTIDO: "success", DESCARTADO: "danger", ARCHIVADO: "default",
 };
-const VAL_TONE = { PENDING: "warning", VALIDATED: "success", REJECTED: "danger" };
-const VAL_LABEL = { PENDING: "Pendiente", VALIDATED: "Aprobado", REJECTED: "Rechazado" };
+const VAL_TONE = { PENDING: "warning", VALIDATED: "success", REJECTED: "danger", DISCARDED: "default" };
+const VAL_LABEL = { PENDING: "Pendiente", VALIDATED: "Aprobado", REJECTED: "Rechazado", DISCARDED: "Descartado" };
+const DISCARD_REASON_LABEL: Record<string, string> = {
+  NO_SERVICE_MATCH:  "Sin match con servicios INSPYRA",
+  ALREADY_SOLVED:    "Ya tiene solución",
+  LOW_IMPACT:        "Impacto comercial insuficiente",
+  INSUFFICIENT_DATA: "Datos insuficientes",
+};
 
 const aiStateFromScore = (s: number | null | undefined) =>
   s == null ? "PENDIENTE_OPPORTUNITY" :
@@ -1448,7 +1455,7 @@ function ProposalNextStep({ prospectId, latestProposal, isGenerating, onGenerate
 }
 
 // ── Prospect Drawer — 6 tabs: General · AI Assessment · Contacto · Validación · Propuesta · Historial
-function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReviewEnrichment }) {
+function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReviewEnrichment, onNav }) {
   const [tab, setTab] = useState("assessment");
   const [enrichingFromDrawer, setEnrichingFromDrawer] = useState(false);
   const [xlat, setXlat] = useState<Record<string, string>>({});
@@ -1478,6 +1485,19 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
       alert("Error al enriquecer: " + e.message);
     } finally {
       setEnrichingFromDrawer(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    const prospect = rowData ?? fetchedProspect;
+    if (!confirm(`¿Eliminar "${prospect?.nombreEmpresa}"? Esta acción no se puede deshacer.`)) return;
+    try {
+      await prospectsApi.remove(prospectId);
+      qc.invalidateQueries({ queryKey: ['prospects'] });
+      qc.invalidateQueries({ queryKey: ['prospects', 'kpis'] });
+      onClose();
+    } catch (e) {
+      alert('Error al eliminar: ' + e.message);
     }
   };
 
@@ -1659,6 +1679,11 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
             ? <Badge tone="warning" dot>Generando propuesta…</Badge>
             : <Badge tone={ESTADO_TONE[prospect.estado] ?? "default"} dot>{ESTADO_LABEL[prospect.estado] ?? prospect.estado}</Badge>
         )}
+        <button onClick={handleDelete} title="Eliminar prospecto" style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ink-300)", padding: 6, borderRadius: 6, display: "flex" }}
+          onMouseEnter={e => (e.currentTarget.style.color = '#EF4444')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'var(--ink-300)')}>
+          <Icon.trash size={15}/>
+        </button>
         <button onClick={onClose} style={{ background: "none", border: 0, cursor: "pointer", color: "var(--ink-400)", padding: 6, borderRadius: 6, display: "flex" }}>
           <Icon.x size={16}/>
         </button>
@@ -1822,26 +1847,53 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                   )}
                 </div>
 
-                {/* Score breakdown */}
+                {/* Score breakdown — ERP-052 Service Match First */}
                 {df && (
                   <div style={{ marginBottom: 16 }}>
                     <SLabel>Score breakdown</SLabel>
-                    {[
-                      { k: "problemScore",  l: "Problemas detectados" },
-                      { k: "priorityScore", l: "Severidad de problemas" },
-                      { k: "fitScore",      l: "Service fit" },
-                      { k: "ticketScore",   l: "Tamaño de ticket" },
-                    ].map(({ k, l }) => (
-                      <div key={k} style={{ marginBottom: 8 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                          <span style={{ color: "var(--ink-600)" }}>{l}</span>
-                          <span style={{ fontWeight: 700, color: "var(--ink-900)" }}>{df[k] ?? 0}/25</span>
+                    {df.matchFitScore != null ? (
+                      /* ERP-052 layout */
+                      [
+                        { k: "matchFitScore",  l: "Service Match Fit",  max: 40 },
+                        { k: "impactScore",    l: "Business Impact",    max: 40 },
+                        { k: "contactScore",   l: "Contactabilidad",    max: 20 },
+                      ].map(({ k, l, max }) => (
+                        <div key={k} style={{ marginBottom: 8 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                            <span style={{ color: "var(--ink-600)" }}>{l}</span>
+                            <span style={{ fontWeight: 700, color: "var(--ink-900)" }}>{df[k] ?? 0}/{max}</span>
+                          </div>
+                          <div style={{ height: 5, background: "var(--border-soft)", borderRadius: 3 }}>
+                            <div style={{ width: `${((df[k] ?? 0) / max) * 100}%`, height: "100%", background: "var(--primary)", borderRadius: 3, transition: "width 400ms ease" }}/>
+                          </div>
                         </div>
-                        <div style={{ height: 5, background: "var(--border-soft)", borderRadius: 3 }}>
-                          <div style={{ width: `${((df[k] ?? 0) / 25) * 100}%`, height: "100%", background: "var(--primary)", borderRadius: 3, transition: "width 400ms ease" }}/>
+                      ))
+                    ) : (
+                      /* Legacy layout */
+                      [
+                        { k: "problemScore",  l: "Problemas detectados" },
+                        { k: "priorityScore", l: "Severidad de problemas" },
+                        { k: "fitScore",      l: "Service fit" },
+                        { k: "ticketScore",   l: "Tamaño de ticket" },
+                      ].map(({ k, l }) => (
+                        <div key={k} style={{ marginBottom: 8 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                            <span style={{ color: "var(--ink-600)" }}>{l}</span>
+                            <span style={{ fontWeight: 700, color: "var(--ink-900)" }}>{df[k] ?? 0}/25</span>
+                          </div>
+                          <div style={{ height: 5, background: "var(--border-soft)", borderRadius: 3 }}>
+                            <div style={{ width: `${((df[k] ?? 0) / 25) * 100}%`, height: "100%", background: "var(--primary)", borderRadius: 3, transition: "width 400ms ease" }}/>
+                          </div>
                         </div>
+                      ))
+                    )}
+                    {df.bestMatch && (
+                      <div style={{ marginTop: 10, padding: "8px 12px", background: "var(--bg-2)", borderRadius: 8, fontSize: 12 }}>
+                        <span style={{ color: "var(--ink-500)" }}>Mejor match: </span>
+                        <span style={{ fontWeight: 600, color: "var(--ink-800)" }}>{df.bestMatch.serviceId}</span>
+                        <span style={{ color: "var(--ink-400)" }}> · {df.bestMatch.matchType} · {df.bestMatch.businessImpact}</span>
                       </div>
-                    ))}
+                    )}
                   </div>
                 )}
 
@@ -1898,6 +1950,38 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                   El Opportunity Agent debe analizar este prospecto antes de poder validarlo.<br/>
                   El prospecto debe estar en estado INVESTIGADO.
                 </div>
+              </div>
+            ) : validation.status === "DISCARDED" ? (
+              /* ── DISCARDED: auto-descarte por agente ── */
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", background: "var(--bg-3, #f5f5f5)", borderRadius: 12, marginBottom: 16, border: "1px solid var(--border-soft)" }}>
+                  <span style={{ fontSize: 20 }}>◌</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, color: "var(--ink-700)", fontSize: 14 }}>Descartado automáticamente</div>
+                    {validation.discardReason && (
+                      <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 2 }}>
+                        {DISCARD_REASON_LABEL[validation.discardReason] ?? validation.discardReason}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={async () => {
+                      await fetch(`/api/prospect-validations/${validation.id}/reactivate`, { method: "PATCH", headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
+                      window.location.reload();
+                    }}
+                    style={{ fontSize: 12, padding: "5px 12px", borderRadius: 6, border: "1px solid var(--border-soft)", background: "white", cursor: "pointer", color: "var(--ink-700)", fontWeight: 600 }}
+                  >
+                    Reactivar
+                  </button>
+                </div>
+                {validation.reasoning && (
+                  <div>
+                    <SLabel>Justificación del agente</SLabel>
+                    <div style={{ fontSize: 12.5, color: "var(--ink-600)", lineHeight: 1.7, padding: "10px 12px", background: "var(--bg-2)", borderRadius: 8, borderLeft: "3px solid var(--border-soft)" }}>
+                      {validation.reasoning}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : validation.status !== "PENDING" ? (
               /* ── Already reviewed ── */
@@ -2329,11 +2413,25 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                           Sin propuesta aprobada — genera y aprueba un Outreach Brief primero.
                         </div>
                       )}
-                      <div style={{ marginBottom: 8 }}>{noteInput}</div>
-                      <button disabled={outreachBusy || !outreachMsg}
-                        onClick={() => runOutreachAction(() => outreachApi.sendEmail(prospectId, { subject: resolvedSubject, proposalId: latestProposal?.id, note: actionNote || undefined }))}
-                        style={{ ...btnBase, background: "#5B5BF7", color: "#fff", opacity: (outreachBusy || !outreachMsg) ? 0.5 : 1 }}>
-                        {outreachBusy ? "Enviando…" : "📨 Enviar email"}
+                      <div style={{ fontSize: 12, color: "var(--ink-400)", padding: "10px 12px", background: "var(--bg-2)", borderRadius: 8, marginBottom: 12 }}>
+                        El prospecto pasará a <strong>CONTACTADO</strong> cuando el email sea enviado desde Inspyra Mail.
+                      </div>
+                      <button disabled={!outreachMsg}
+                        onClick={() => {
+                          _outreachDraft = {
+                            id: `draft-${Date.now()}`,
+                            prospectId,
+                            empresa: prospect?.nombreEmpresa ?? '',
+                            to: resolvedEmail,
+                            subject: resolvedSubject,
+                            body: outreachMsg,
+                            proposalId: latestProposal?.id,
+                          };
+                          onClose();
+                          onNav?.('mailInspyra');
+                        }}
+                        style={{ ...btnBase, background: "#5B5BF7", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: !outreachMsg ? 0.5 : 1 }}>
+                        ✉️ Abrir en Inspyra Mail →
                       </button>
                     </div>
                   );
@@ -3225,7 +3323,29 @@ function Prospects({ onNav }) {
   // ── Research job state ──
   const [activeJobId, setActiveJobId] = useState(null);
   const [activeJob, setActiveJob] = useState(null);
+  const [auditResult, setAuditResult] = useState(null);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditUrl, setAuditUrl] = useState('');
+  const [auditDrawerOpen, setAuditDrawerOpen] = useState(false);
   const qc = useQueryClient();
+
+  // ── Source input mode ──
+  const [researchMode, setResearchMode] = useState('ai');
+  const [manualForm, setManualForm] = useState({ nombreEmpresa: '', rubro: '', ciudad: '', website: '', email: '', telefono: '' });
+  const [manualLoading, setManualLoading] = useState(false);
+  const [manualError, setManualError] = useState('');
+  const [csvRows, setCsvRows] = useState([]);
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvResult, setCsvResult] = useState(null);
+  const [urlInput, setUrlInput] = useState('');
+  const [urlLoading, setUrlLoading] = useState(false);
+  const [urlPreview, setUrlPreview] = useState(null);
+  const [urlSaving, setUrlSaving] = useState(false);
+  const [selectedDiscovery, setSelectedDiscovery] = useState(new Set());
+  const [discoveryImporting, setDiscoveryImporting] = useState(false);
+  const [searchEmpresa, setSearchEmpresa] = useState('');
+  const [discoveryResult, setDiscoveryResult] = useState(null);
+  const [discoveryScores, setDiscoveryScores] = useState<Array<{ index: number; score: number; action: 'PROMOTE' | 'DISCARD'; services: string[]; ticket: number }>>([]);
 
   // Poll active job every 3s while PENDING/RUNNING
   React.useEffect(() => {
@@ -3250,15 +3370,263 @@ function Prospects({ onNav }) {
     return () => clearInterval(interval);
   }, [activeJobId, activeJob?.status, hasToken]);
 
-  const handleDescubrir = async () => {
-    if (!query.trim() || !hasToken) return;
+  const extractURL = (s) => {
+    const m = s.match(/https?:\/\/[^\s]+/);
+    if (m) return m[0];
     try {
-      const job = await researchApi.createJob(query.trim());
-      setActiveJobId(job.id);
-      setActiveJob(job);
-    } catch (e) {
-      alert('Error al iniciar investigación: ' + e.message);
+      const trimmed = s.trim();
+      if (!trimmed.includes(' ')) {
+        const u = new URL(`https://${trimmed}`);
+        if (u.hostname.includes('.') && !u.hostname.startsWith('localhost')) return `https://${trimmed}`;
+      }
+    } catch { /* not a URL */ }
+    return null;
+  };
+
+  const isURL = (s) => extractURL(s) !== null;
+
+  const handleSubmit = async () => {
+    if (!query.trim() || !hasToken) return;
+    const detectedUrl = extractURL(query);
+    if (detectedUrl) {
+      setAuditLoading(true);
+      setAuditResult(null);
+      setAuditUrl(detectedUrl);
+      try {
+        const result = await researchApi.websiteAudit(detectedUrl);
+        setAuditResult(result);
+      } catch (e) {
+        alert('Error en auditoría: ' + e.message);
+      } finally {
+        setAuditLoading(false);
+      }
+    } else {
+      try {
+        const job = await researchApi.createJob(query.trim());
+        setActiveJobId(job.id);
+        setActiveJob(job);
+      } catch (e) {
+        alert('Error al iniciar investigación: ' + e.message);
+      }
     }
+  };
+
+  const handleCreateProspectFromAudit = async () => {
+    if (!auditResult) return;
+    try {
+      const normalizedUrl = auditUrl.startsWith('http') ? auditUrl : `https://${auditUrl}`;
+      const p = await prospectsApi.create({
+        nombreEmpresa: auditResult.empresa,
+        website: normalizedUrl,
+        rubro: auditResult.rubroEstimado,
+        oportunidadDetectada: auditResult.outreachBrief,
+        problemasEncontrados: [
+          ...(auditResult.severidad?.critico ?? []),
+          ...(auditResult.severidad?.alto ?? []),
+          ...(auditResult.erroresVisibles ?? []),
+          ...(auditResult.hallazgos?.seo?.issues ?? []),
+          ...(auditResult.hallazgos?.frontend?.issues ?? []),
+          ...(auditResult.hallazgos?.performance?.issues ?? []),
+          ...(auditResult.hallazgos?.seguridad?.issues ?? []),
+          ...(auditResult.hallazgos?.arquitectura?.issues ?? []),
+        ].filter((v, i, a) => a.indexOf(v) === i),
+        servicioSugerido: auditResult.serviciosSugeridos?.[0] ?? undefined,
+        score: auditResult.commercialOpportunityScore,
+        fuente: 'MANUAL',
+        detectadoPor: 'IA',
+        estado: 'INVESTIGADO',
+      });
+      setAuditResult(null);
+      setPage(1);
+      setSortBy('createdAt');
+      qc.invalidateQueries({ queryKey: ['prospects'] });
+      qc.invalidateQueries({ queryKey: ['prospects', 'kpis'] });
+      alert(`✓ Prospecto "${p.nombreEmpresa}" creado. Aparece primero en la tabla.`);
+    } catch (e) {
+      alert('Error al crear prospecto: ' + e.message);
+    }
+  };
+
+  const parseCsvLine = (line) => {
+    const result = []; let current = ''; let inQ = false;
+    for (const ch of line) {
+      if (ch === '"') inQ = !inQ;
+      else if (ch === ',' && !inQ) { result.push(current.trim()); current = ''; }
+      else current += ch;
+    }
+    result.push(current.trim());
+    return result;
+  };
+
+  const handleManualCreate = async () => {
+    if (!manualForm.nombreEmpresa.trim()) return;
+    setManualLoading(true); setManualError('');
+    try {
+      const website = manualForm.website
+        ? (manualForm.website.startsWith('http') ? manualForm.website : `https://${manualForm.website}`)
+        : undefined;
+      await prospectsApi.create({ ...manualForm, website, fuente: 'MANUAL', detectadoPor: 'MANUAL' });
+      setManualForm({ nombreEmpresa: '', rubro: '', ciudad: '', website: '', email: '', telefono: '' });
+      setPage(1); setSortBy('createdAt');
+      qc.invalidateQueries({ queryKey: ['prospects'] });
+      qc.invalidateQueries({ queryKey: ['prospects', 'kpis'] });
+    } catch (e) {
+      setManualError(e?.message ?? 'Error al crear el prospecto');
+    } finally { setManualLoading(false); }
+  };
+
+  const handleCsvFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result;
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) return;
+      const headers = parseCsvLine(lines[0]);
+      const rows = lines.slice(1)
+        .map(line => Object.fromEntries(headers.map((h, i) => [h.trim(), parseCsvLine(line)[i] ?? ''])))
+        .filter(row => Object.values(row).some(v => v));
+      setCsvRows(rows); setCsvResult(null);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleCsvImport = async () => {
+    setCsvImporting(true);
+    try {
+      const prospects = csvRows.map(row => ({
+        nombreEmpresa: row.nombreEmpresa || row.empresa || row.name || '',
+        email: row.email || '', telefono: row.telefono || row.phone || '',
+        website: row.website || row.url || '', ciudad: row.ciudad || row.city || '',
+        rubro: row.rubro || row.industria || row.sector || '',
+        instagram: row.instagram || '', linkedin: row.linkedin || '',
+      })).filter(p => p.nombreEmpresa);
+      const result = await prospectsApi.bulk(prospects);
+      setCsvResult(result);
+      qc.invalidateQueries({ queryKey: ['prospects'] });
+      qc.invalidateQueries({ queryKey: ['prospects', 'kpis'] });
+    } catch (e) {
+      setCsvResult({ created: 0, duplicates: 0, errors: [{ row: 0, error: e?.message ?? 'Error al importar' }] });
+    } finally { setCsvImporting(false); }
+  };
+
+  const scoreDiscoveryCompany = (c: any, index: number) => {
+    const hasWeb = !!c.website;
+    const hasIG  = !!c.instagram;
+    const hasGMB = !!c.googleBusiness;
+    const rubro  = (c.rubro ?? '').toLowerCase();
+    const highDemand = ['juridico','legal','abogad','dental','clinic','gastronom','restaur','inmobi','turismo','contab','salud','medic','veterinar','estudio'].some(r => rubro.includes(r));
+    let score = 0;
+    const svcs: string[] = [];
+    if (!hasWeb) { score += 30; svcs.push('Web'); }
+    if (!hasGMB) { score += 20; svcs.push('GBP'); }
+    if (!hasIG)  { score += 15; svcs.push('Redes'); }
+    svcs.push('SEO');
+    score += 15; // assume no SEO until enrichment confirms otherwise
+    if (highDemand) score += 10;
+    if (hasWeb && hasIG && hasGMB) score = Math.max(0, score - 25);
+    score = Math.min(100, Math.max(0, score));
+    const action = score >= 60 ? 'PROMOTE' : 'DISCARD';
+    return { index, score, action: action as 'PROMOTE' | 'DISCARD', services: [...new Set(svcs)].slice(0, 3), ticket: score >= 60 ? score * 20 : 0 };
+  };
+
+  const handleUrlExtract = async () => {
+    const raw = urlInput.trim();
+    if (!raw) return;
+    setUrlLoading(true); setUrlPreview(null); setDiscoveryScores([]);
+    try {
+      const normalized = raw.startsWith('http') ? raw : `https://${raw}`;
+      const result = await prospectsApi.fromUrl(normalized);
+      setUrlPreview(result);
+      if (result.sourceMode === 'DISCOVERY' && Array.isArray(result.companies)) {
+        const scored = (result.companies as any[]).map((c, i) => scoreDiscoveryCompany(c, i));
+        setDiscoveryScores(scored);
+        setSelectedDiscovery(new Set(scored.filter(s => s.action === 'PROMOTE').map(s => s.index)));
+      }
+    } catch (e) {
+      alert('Error al analizar URL: ' + (e?.message ?? 'Error desconocido'));
+    } finally { setUrlLoading(false); }
+  };
+
+  const handleUrlSave = async () => {
+    if (!urlPreview?.empresa?.trim()) return;
+    setUrlSaving(true);
+    try {
+      const fuenteMap = { GOOGLE_MAPS_PLACE: 'GOOGLE_MAPS', GOOGLE_MAPS: 'GOOGLE_MAPS', INSTAGRAM: 'INSTAGRAM', LINKEDIN: 'LINKEDIN' };
+      const topServices = (urlPreview.oportunidades ?? [])
+        .slice().sort((a, b) => b.score - a.score).slice(0, 3)
+        .map(o => o.servicio).join(' + ');
+      const nivelMap = { ALTA: 'ALTA', MEDIA: 'MEDIA', BAJA: 'BAJA', CRITICA: 'CRITICA' };
+      await prospectsApi.create({
+        nombreEmpresa: urlPreview.empresa,
+        website: urlPreview.website ?? undefined,
+        instagram: urlPreview.instagram ?? undefined,
+        linkedin: urlPreview.linkedin ?? undefined,
+        facebook: urlPreview.facebook ?? undefined,
+        googleBusiness: urlPreview.googleBusiness ?? undefined,
+        ciudad: urlPreview.ciudad ?? undefined,
+        rubro: urlPreview.rubro ?? undefined,
+        oportunidadDetectada: urlPreview.oportunidadDetectada ?? undefined,
+        servicioSugerido: topServices || undefined,
+        nivelOportunidad: nivelMap[urlPreview.prioridad] ?? 'MEDIA',
+        score: Math.max(...(urlPreview.oportunidades ?? []).map(o => o.score), 0),
+        fuente: fuenteMap[urlPreview.sourceType] ?? 'MANUAL',
+        detectadoPor: 'IA',
+        estado: 'INVESTIGADO',
+      });
+      setUrlPreview(null); setUrlInput('');
+      setPage(1); setSortBy('createdAt');
+      qc.invalidateQueries({ queryKey: ['prospects'] });
+      qc.invalidateQueries({ queryKey: ['prospects', 'kpis'] });
+    } catch (e) {
+      alert('Error al guardar: ' + (e?.message ?? 'Error desconocido'));
+    } finally { setUrlSaving(false); }
+  };
+
+  const handleDiscoveryImport = async () => {
+    if (!urlPreview?.companies || selectedDiscovery.size === 0) return;
+    const unscored = [...selectedDiscovery].some(i => !discoveryScores.find(s => s.index === i));
+    if (unscored) { alert('Esperá a que finalice el análisis de oportunidades.'); return; }
+    setDiscoveryImporting(true);
+    try {
+      const toImport = [...selectedDiscovery].map(i => {
+        const c = (urlPreview.companies as any[])[i as number];
+        const sd = discoveryScores.find(s => s.index === i);
+        return {
+          nombreEmpresa: c.nombreEmpresa,
+          ...(c.website ? { website: c.website } : {}),
+          ...(c.instagram ? { instagram: c.instagram } : {}),
+          ...(c.telefono ? { telefono: c.telefono } : {}),
+          ...(c.email ? { email: c.email } : {}),
+          ...(c.googleBusiness ? { googleBusiness: c.googleBusiness } : {}),
+          ...(c.ciudad ? { ciudad: c.ciudad } : {}),
+          ...(c.rubro ? { rubro: c.rubro } : {}),
+          fuente: 'GOOGLE_MAPS',
+          detectadoPor: 'IA',
+          score: sd?.score ?? 0,
+          servicioSugerido: sd?.services[0] ?? undefined,
+          nivelOportunidad: sd && sd.score >= 80 ? 'ALTA' : 'MEDIA',
+          oportunidadDetectada: sd ? `Gaps detectados: ${sd.services.join(', ')}. Score heurístico: ${sd.score}/100.` : undefined,
+          problemasEncontrados: sd ? sd.services.map((s: string) => ({
+            'Web': 'Sin sitio web',
+            // Found via Google Maps = exists on Maps; GBP gap is about optimization, not existence
+            'GBP': 'Perfil GBP sin reclamar',
+            'Redes': 'Sin presencia en redes sociales',
+            'SEO': 'Sin posicionamiento SEO',
+          } as Record<string, string>)[s] ?? `Falta: ${s}`).filter(Boolean) : [],
+        };
+      });
+      const result = await prospectsApi.bulk(toImport);
+      setDiscoveryResult(result);
+      setPage(1);
+      setSortBy('createdAt');
+      setAiFilter('ACTIVOS');
+      qc.invalidateQueries({ queryKey: ['prospects'] });
+      qc.invalidateQueries({ queryKey: ['prospects', 'kpis'] });
+    } catch (e) {
+      alert('Error al importar: ' + (e?.message ?? 'Error'));
+    } finally { setDiscoveryImporting(false); }
   };
 
   const SUGGESTED = [
@@ -3276,8 +3644,8 @@ function Prospects({ onNav }) {
   });
 
   const { data: prospectsData, isLoading, isError: listError, error: listErrorObj } = useQuery({
-    queryKey: ["prospects", { page, limit: 20, sortBy }],
-    queryFn: () => prospectsApi.list({ page, limit: 20, sortBy }),
+    queryKey: ["prospects", { page, limit: 20, sortBy, search: searchEmpresa || undefined }],
+    queryFn: () => prospectsApi.list({ page, limit: 20, sortBy, ...(searchEmpresa ? { search: searchEmpresa } : {}) }),
     enabled: hasToken,
     staleTime: 30000,
     retry: 1,
@@ -3369,7 +3737,7 @@ function Prospects({ onNav }) {
 
   const handleRunAllPending = async () => {
     if (!hasToken || batchQualifying) return;
-    const pending = allRows.filter(r => r.isReal && r.aiState === "PENDIENTE_OPPORTUNITY" && r.estado === "INVESTIGADO");
+    const pending = allRows.filter(r => r.isReal && r.aiState === "PENDIENTE_OPPORTUNITY");
     if (pending.length === 0) return;
     setBatchQualifying(true);
     let ok = 0;
@@ -3412,9 +3780,20 @@ function Prospects({ onNav }) {
       opp: p.oportunidadDetectada ?? p.problemasEncontrados?.slice(0, 2).join(" · ") ?? "—",
       svc: p.servicioSugerido ?? validationById[p.id]?.servicesRecommended?.[0] ?? "—",
       score: p.score,
-      opportunityScore: validationById[p.id]?.agentScore ?? null,
       commercialScore: p.commercialScore ?? null,
-      aiState: aiStateFromScore(validationById[p.id]?.agentScore),
+      priorityScore: p.priorityScore ?? null,
+      opportunityScore: validationById[p.id]?.agentScore ?? null,
+      aiState: (() => {
+        const val = validationById[p.id];
+        const POST_APPROVAL_STATES = [
+          'LISTO_PROPUESTA', 'LISTO_OUTREACH', 'CONTACTADO',
+          'RESPONDIO', 'INTERESADO', 'REUNION_AGENDADA',
+          'PASO_A_PIPELINE', 'CONVERTIDO',
+        ];
+        if (POST_APPROVAL_STATES.includes(p.estado)) return 'APROBADO_IA';
+        if (val?.status === 'REJECTED') return 'DESCARTADO_IA';
+        return aiStateFromScore(val?.agentScore);
+      })(),
       state: ESTADO_LABEL[p.estado] ?? p.estado,
       estado: p.estado,
       last: fmtDate(p.ultimoContacto),
@@ -3470,74 +3849,550 @@ function Prospects({ onNav }) {
           <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--ink-500)" }}>IA · Google Maps · LinkedIn · 42 fuentes</span>
         </div>
         <div className="row gap-sm" style={{ marginBottom: 10 }}>
-          <button className="seg-btn active">🔍 Buscar con IA</button>
-          <button className="seg-btn">✋ Manual</button>
-          <button className="seg-btn">📥 Importar CSV</button>
-          <button className="seg-btn">🔗 Conectar fuente</button>
+          <button className={`seg-btn ${researchMode === 'ai' ? 'active' : ''}`} onClick={() => setResearchMode('ai')}>🔍 Buscar con IA</button>
+          <button className={`seg-btn ${researchMode === 'manual' ? 'active' : ''}`} onClick={() => setResearchMode('manual')}>✋ Manual</button>
+          <button className={`seg-btn ${researchMode === 'csv' ? 'active' : ''}`} onClick={() => setResearchMode('csv')}>📥 Importar CSV</button>
+          <button className={`seg-btn ${researchMode === 'url' ? 'active' : ''}`} onClick={() => setResearchMode('url')}>🔗 Conectar fuente</button>
         </div>
-        <div className="ai-input" style={{ background: "var(--bg-2)", borderRadius: "var(--r-md)", padding: "10px 14px" }}>
-          <Icon.sparkles size={16}/>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Describí qué empresas buscás…"
-            onKeyDown={(e) => e.key === 'Enter' && handleDescubrir()}
-            disabled={activeJob?.status === 'PENDING' || activeJob?.status === 'RUNNING'}
-          />
-          <button
-            className="btn btn-brand btn-sm"
-            onClick={handleDescubrir}
-            disabled={!hasToken || !query.trim() || activeJob?.status === 'PENDING' || activeJob?.status === 'RUNNING'}
-          >
-            <Icon.bolt size={13}/>
-            {activeJob?.status === 'RUNNING' ? ' Investigando…' : activeJob?.status === 'PENDING' ? ' Iniciando…' : ' Descubrir'}
-          </button>
-        </div>
+        {researchMode === 'ai' && (<>
+          <div className="ai-input" style={{ background: "var(--bg-2)", borderRadius: "var(--r-md)", padding: "10px 14px" }}>
+            <Icon.sparkles size={16}/>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Describí qué empresas buscás… o pegá una URL para auditar"
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+              disabled={activeJob?.status === 'PENDING' || activeJob?.status === 'RUNNING' || auditLoading}
+            />
+            {isURL(query) && (
+              <span style={{ fontSize:11, fontWeight:600, color:'#5B5BF7', background:'#5B5BF718', padding:'2px 8px', borderRadius:999, whiteSpace:'nowrap' }}>🌐 Website Audit</span>
+            )}
+            <button
+              className="btn btn-brand btn-sm"
+              onClick={handleSubmit}
+              disabled={!hasToken || !query.trim() || activeJob?.status === 'PENDING' || activeJob?.status === 'RUNNING' || auditLoading}
+            >
+              <Icon.bolt size={13}/>
+              {auditLoading ? ' Auditando…'
+                : isURL(query) ? ' Auditar'
+                : activeJob?.status === 'RUNNING' ? ' Investigando…'
+                : activeJob?.status === 'PENDING' ? ' Iniciando…'
+                : ' Descubrir'}
+            </button>
+          </div>
 
-        {/* Job status banner */}
-        {activeJob && (
-          <div style={{
-            marginTop: 10, padding: "10px 14px", borderRadius: 8,
-            background: activeJob.status === 'COMPLETED' ? "var(--success-soft, #ecfdf5)"
-              : activeJob.status === 'FAILED' ? "var(--danger-soft, #fff5f5)"
-              : "var(--primary-soft)",
-            border: `1px solid ${activeJob.status === 'COMPLETED' ? "var(--success)" : activeJob.status === 'FAILED' ? "var(--danger)" : "var(--primary)"}`,
-            display: "flex", alignItems: "center", gap: 10, fontSize: 13,
-          }}>
-            {(activeJob.status === 'PENDING' || activeJob.status === 'RUNNING') && (
-              <span style={{ display: "inline-block", width: 14, height: 14, borderRadius: "50%", border: "2px solid var(--primary)", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }}/>
-            )}
-            {activeJob.status === 'COMPLETED' && <span>✓</span>}
-            {activeJob.status === 'FAILED' && <span>✗</span>}
-            <span style={{ flex: 1, color: activeJob.status === 'FAILED' ? "var(--danger)" : "var(--ink-800)" }}>
-              {activeJob.status === 'PENDING' && 'Iniciando Research Agent…'}
-              {activeJob.status === 'RUNNING' && `Research Agent investigando: "${activeJob.query}"`}
-              {activeJob.status === 'COMPLETED' && `Investigación completa — ${activeJob.candidatesFound ?? activeJob.limit} empresas analizadas, ${activeJob.prospectsFound} promovidos a prospecto`}
-              {activeJob.status === 'FAILED' && `Error: ${activeJob.errorMessage ?? 'Investigación fallida'}`}
-            </span>
-            {activeJob.status === 'COMPLETED' && (
+          {/* Job status banner */}
+          {activeJob && (
+            <div style={{
+              marginTop: 10, padding: "10px 14px", borderRadius: 8,
+              background: activeJob.status === 'COMPLETED' ? "var(--success-soft, #ecfdf5)"
+                : activeJob.status === 'FAILED' ? "var(--danger-soft, #fff5f5)"
+                : "var(--primary-soft)",
+              border: `1px solid ${activeJob.status === 'COMPLETED' ? "var(--success)" : activeJob.status === 'FAILED' ? "var(--danger)" : "var(--primary)"}`,
+              display: "flex", alignItems: "center", gap: 10, fontSize: 13,
+            }}>
+              {(activeJob.status === 'PENDING' || activeJob.status === 'RUNNING') && (
+                <span style={{ display: "inline-block", width: 14, height: 14, borderRadius: "50%", border: "2px solid var(--primary)", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }}/>
+              )}
+              {activeJob.status === 'COMPLETED' && <span>✓</span>}
+              {activeJob.status === 'FAILED' && <span>✗</span>}
+              <span style={{ flex: 1, color: activeJob.status === 'FAILED' ? "var(--danger)" : "var(--ink-800)" }}>
+                {activeJob.status === 'PENDING' && 'Iniciando Research Agent…'}
+                {activeJob.status === 'RUNNING' && `Research Agent investigando: "${activeJob.query}"`}
+                {activeJob.status === 'COMPLETED' && `Investigación completa — ${activeJob.candidatesFound ?? activeJob.limit} empresas analizadas, ${activeJob.prospectsFound} promovidos a prospecto`}
+                {activeJob.status === 'FAILED' && `Error: ${activeJob.errorMessage ?? 'Investigación fallida'}`}
+              </span>
+              {activeJob.status === 'COMPLETED' && (
+                <button
+                  onClick={() => setJobDetailId(activeJob.id)}
+                  style={{ background: "none", border: "1px solid var(--success)", borderRadius: 6, cursor: "pointer", color: "var(--success-ink, #166534)", fontSize: 12, padding: "3px 10px", fontWeight: 600 }}
+                >Ver detalle</button>
+              )}
+              {(activeJob.status === 'COMPLETED' || activeJob.status === 'FAILED') && (
+                <button onClick={() => { setActiveJob(null); setActiveJobId(null); }}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink-400)", fontSize: 16, lineHeight: 1 }}>×</button>
+              )}
+            </div>
+          )}
+
+          {auditLoading && (
+            <div style={{ marginTop:10, padding:'10px 14px', borderRadius:8, background:'var(--primary-soft)', border:'1px solid var(--primary)', display:'flex', alignItems:'center', gap:10, fontSize:13 }}>
+              <span style={{ display:'inline-block', width:14, height:14, borderRadius:'50%', border:'2px solid var(--primary)', borderTopColor:'transparent', animation:'spin 0.8s linear infinite' }}/>
+              <span style={{ color:'var(--ink-800)' }}>Website Audit Agent analizando <strong>{auditUrl}</strong>…</span>
+            </div>
+          )}
+
+          <div className="ai-foot">
+            Probá:
+            {SUGGESTED.map((s, i) => (
+              <button key={i} className="ai-suggest" onClick={() => setQuery(s)}>
+                <Icon.sparkles size={11}/> {s}
+              </button>
+            ))}
+          </div>
+        </>)}
+
+        {/* ── MANUAL ──────────────────────────────────────────────────────── */}
+        {researchMode === 'manual' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:4 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              {[
+                ['Empresa *', 'nombreEmpresa', 'Nombre de la empresa', 'text'],
+                ['Rubro', 'rubro', 'Industria / sector', 'text'],
+                ['Ciudad', 'ciudad', 'Buenos Aires, Mendoza…', 'text'],
+                ['Website', 'website', 'https://empresa.com', 'text'],
+                ['Email', 'email', 'contacto@empresa.com', 'email'],
+                ['Teléfono', 'telefono', '+54 11 1234-5678', 'tel'],
+              ].map(([label, field, placeholder, type]) => (
+                <div key={field}>
+                  <label style={{ fontSize:11, color:'var(--ink-500)', display:'block', marginBottom:3 }}>{label}</label>
+                  <input
+                    className="input"
+                    type={type}
+                    value={manualForm[field]}
+                    onChange={(e) => setManualForm(f => ({ ...f, [field]: e.target.value }))}
+                    placeholder={placeholder}
+                  />
+                </div>
+              ))}
+            </div>
+            {manualError && <span style={{ fontSize:12, color:'var(--danger)' }}>{manualError}</span>}
+            <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+              <button className="btn" onClick={() => { setManualForm({ nombreEmpresa:'', rubro:'', ciudad:'', website:'', email:'', telefono:'' }); setManualError(''); }}>
+                Limpiar
+              </button>
               <button
-                onClick={() => setJobDetailId(activeJob.id)}
-                style={{ background: "none", border: "1px solid var(--success)", borderRadius: 6, cursor: "pointer", color: "var(--success-ink, #166534)", fontSize: 12, padding: "3px 10px", fontWeight: 600 }}
-              >Ver detalle</button>
-            )}
-          {(activeJob.status === 'COMPLETED' || activeJob.status === 'FAILED') && (
-              <button onClick={() => { setActiveJob(null); setActiveJobId(null); }}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink-400)", fontSize: 16, lineHeight: 1 }}>×</button>
+                className="btn btn-brand btn-sm"
+                disabled={!manualForm.nombreEmpresa.trim() || manualLoading}
+                onClick={handleManualCreate}
+              >
+                {manualLoading ? 'Guardando…' : '+ Agregar prospecto'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── CSV ─────────────────────────────────────────────────────────── */}
+        {researchMode === 'csv' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:4 }}>
+            <div style={{ fontSize:12, color:'var(--ink-500)' }}>
+              Columnas reconocidas: <code>nombreEmpresa</code>, <code>email</code>, <code>telefono</code>, <code>website</code>, <code>ciudad</code>, <code>rubro</code>, <code>instagram</code>, <code>linkedin</code>
+            </div>
+            {csvRows.length === 0 ? (
+              <label style={{ border:'2px dashed var(--border)', borderRadius:8, padding:'20px', cursor:'pointer', textAlign:'center', fontSize:13, color:'var(--ink-400)', display:'block' }}>
+                <div style={{ marginBottom:6 }}>📥 Arrastrá o seleccioná un archivo CSV</div>
+                <input type="file" accept=".csv,.txt" style={{ display:'none' }} onChange={handleCsvFile} />
+              </label>
+            ) : (
+              <>
+                <div style={{ fontSize:12, color:'var(--ink-600)', fontWeight:600 }}>{csvRows.length} filas cargadas</div>
+                <div style={{ maxHeight:140, overflow:'auto', fontSize:11, border:'1px solid var(--border)', borderRadius:6, padding:6 }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                    <thead>
+                      <tr>{Object.keys(csvRows[0]).map(k => <th key={k} style={{ textAlign:'left', padding:'2px 6px', borderBottom:'1px solid var(--border)', color:'var(--ink-500)', fontWeight:600 }}>{k}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {csvRows.slice(0,5).map((row, i) => (
+                        <tr key={i} style={{ background: i % 2 ? 'var(--bg-2)' : '' }}>
+                          {Object.values(row).map((v, j) => <td key={j} style={{ padding:'2px 6px', maxWidth:120, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{v}</td>)}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {csvRows.length > 5 && <div style={{ color:'var(--ink-400)', textAlign:'center', paddingTop:4 }}>+ {csvRows.length - 5} filas más</div>}
+                </div>
+                {csvResult && (
+                  <div style={{ padding:'8px 12px', borderRadius:6, fontSize:12, background: csvResult.errors?.length > 0 ? '#fffbeb' : 'var(--success-soft, #ecfdf5)', border:`1px solid ${csvResult.errors?.length > 0 ? '#d97706' : 'var(--success)'}` }}>
+                    ✓ <strong>{csvResult.created}</strong> importados · <strong>{csvResult.duplicates}</strong> duplicados · <strong>{csvResult.errors?.length ?? 0}</strong> errores
+                    {csvResult.errors?.length > 0 && <div style={{ marginTop:4, color:'var(--danger)' }}>{csvResult.errors.slice(0,3).map(e => `Fila ${e.row}: ${e.error}`).join(' · ')}</div>}
+                  </div>
+                )}
+                <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+                  <button className="btn" onClick={() => { setCsvRows([]); setCsvResult(null); }}>Cancelar</button>
+                  <button className="btn btn-brand btn-sm" disabled={csvImporting || !!csvResult} onClick={handleCsvImport}>
+                    {csvImporting ? 'Importando…' : `Importar ${csvRows.length} prospectos`}
+                  </button>
+                </div>
+              </>
             )}
           </div>
         )}
 
-        <div className="ai-foot">
-          Probá:
-          {SUGGESTED.map((s, i) => (
-            <button key={i} className="ai-suggest" onClick={() => setQuery(s)}>
-              <Icon.sparkles size={11}/> {s}
-            </button>
-          ))}
-        </div>
+        {/* ── CONECTAR FUENTE — Motor Comercial ───────────────────────── */}
+        {researchMode === 'url' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:4 }}>
+            {/* URL input */}
+            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+              <input
+                className="input"
+                style={{ flex:1 }}
+                value={urlInput}
+                onChange={(e) => { setUrlInput(e.target.value); setUrlPreview(null); }}
+                placeholder="Pegá una URL: Google Maps, Instagram, LinkedIn, Facebook, sitio web…"
+                onKeyDown={(e) => e.key === 'Enter' && handleUrlExtract()}
+                disabled={urlLoading}
+              />
+              <button className="btn btn-brand btn-sm" disabled={!urlInput.trim() || urlLoading} onClick={handleUrlExtract}>
+                {urlLoading ? 'Analizando…' : 'Analizar'}
+              </button>
+            </div>
+            <div style={{ fontSize:11, color:'var(--ink-400)' }}>
+              Analiza presencia digital y calcula oportunidades para todo el catálogo Inspyra ·
+              🗺️ Google Maps · 📸 Instagram · 💼 LinkedIn · 📘 Facebook · 🌐 Website
+            </div>
+            {urlInput.trim() && (() => {
+              const norm = urlInput.trim().startsWith('http') ? urlInput.trim() : `https://${urlInput.trim()}`;
+              if (/google\.com\/maps\/search|maps\.google\.com\/maps\/search/.test(norm))
+                return <div style={{ fontSize:11, color:'var(--primary)', fontWeight:500 }}>🗺️ Búsqueda de Google Maps — extraerá múltiples empresas para importar en bulk</div>;
+              return null;
+            })()}
+
+            {/* Loading state */}
+            {urlLoading && (
+              <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 14px', background:'var(--primary-soft)', borderRadius:8, border:'1px solid var(--primary)', fontSize:13 }}>
+                <span style={{ display:'inline-block', width:14, height:14, borderRadius:'50%', border:'2px solid var(--primary)', borderTopColor:'transparent', animation:'spin 0.8s linear infinite', flexShrink:0 }}/>
+                <span style={{ color:'var(--ink-800)' }}>
+                  {(() => {
+                    const norm = urlInput.trim().startsWith('http') ? urlInput.trim() : `https://${urlInput.trim()}`;
+                    return /google\.com\/maps\/search|maps\.google\.com\/maps\/search/.test(norm)
+                      ? <><b>Extrayendo empresas de Google Maps…</b> <span style={{ color:'var(--ink-500)' }}>(30-90 segundos)</span></>
+                      : <>Analizando empresa con IA… <span style={{ color:'var(--ink-500)' }}>(30-60 segundos)</span></>;
+                  })()}
+                </span>
+              </div>
+            )}
+
+            {/* Discovery mode — Google Maps Search returns multiple companies */}
+            {urlPreview?.sourceMode === 'DISCOVERY' && !urlLoading && (
+              <div style={{ border:'1px solid var(--border)', borderRadius:10, overflow:'hidden', background:'var(--surface)' }}>
+                <div style={{ padding:'12px 14px', borderBottom:'1px solid var(--border)', background:'var(--bg-2)', display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:14, fontWeight:700 }}>🗺️ {urlPreview.total} empresas encontradas</span>
+                  {urlPreview.query && <span style={{ fontSize:12, color:'var(--ink-500)' }}>· "{urlPreview.query}"</span>}
+                  {discoveryScores.length > 0 && (
+                    <span style={{ fontSize:11, marginLeft:'auto', display:'flex', gap:10 }}>
+                      <span style={{ color:'#10b981', fontWeight:600 }}>{discoveryScores.filter(s => s.action === 'PROMOTE').length} oportunidades</span>
+                      <span style={{ color:'var(--ink-400)' }}>{discoveryScores.filter(s => s.action === 'DISCARD').length} descartadas</span>
+                    </span>
+                  )}
+                </div>
+                <div style={{ maxHeight:340, overflowY:'auto' }}>
+                  {(urlPreview.companies ?? []).map((c, i) => {
+                    const sd = discoveryScores.find(s => s.index === i);
+                    const isPromote = sd?.action === 'PROMOTE';
+                    return (
+                      <div key={i}
+                        style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 14px', borderBottom:'1px solid var(--border)', cursor:'pointer', background: selectedDiscovery.has(i) ? 'var(--primary-soft)' : 'transparent', opacity: sd && !isPromote ? 0.55 : 1 }}
+                        onClick={() => setSelectedDiscovery(prev => { const next = new Set(prev); if (next.has(i)) next.delete(i); else next.add(i); return next; })}
+                      >
+                        <input type="checkbox" checked={selectedDiscovery.has(i)} readOnly style={{ flexShrink:0, pointerEvents:'none' }} />
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div>
+                            <span style={{ fontWeight:600, fontSize:13 }}>{c.nombreEmpresa}</span>
+                            {c.rubro && <span style={{ fontSize:11, color:'var(--ink-500)', marginLeft:6 }}>{c.rubro}</span>}
+                            {c.ciudad && <span style={{ fontSize:11, color:'var(--ink-400)', marginLeft:4 }}>· {c.ciudad}</span>}
+                          </div>
+                          {sd && (
+                            <div style={{ fontSize:10, color:'var(--ink-500)', marginTop:2 }}>
+                              {sd.services.join(' · ')}
+                              {sd.ticket > 0 && <span style={{ color:'var(--primary)', marginLeft:6, fontWeight:600 }}>~USD {sd.ticket.toLocaleString()}</span>}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                          {c.website && <span title={c.website} style={{ fontSize:12 }}>🌐</span>}
+                          {c.instagram && <span title={c.instagram} style={{ fontSize:12 }}>📸</span>}
+                          {c.telefono && <span title={c.telefono} style={{ fontSize:12 }}>📞</span>}
+                          {sd && (
+                            <span style={{ fontSize:11, fontWeight:700, padding:'1px 7px', borderRadius:10, background: isPromote ? '#10b98120' : '#6b728015', color: isPromote ? '#10b981' : '#9ca3af', minWidth:26, textAlign:'center' }}>
+                              {sd.score}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ padding:'10px 14px', borderTop:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+                  <div style={{ fontSize:12, color:'var(--ink-500)' }}>
+                    {discoveryScores.length > 0
+                      ? <>{selectedDiscovery.size} seleccionadas · score ≥ 60 = oportunidad</>
+                      : `${selectedDiscovery.size} de ${urlPreview.total} seleccionadas`}
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    {discoveryResult && (
+                      <span style={{ fontSize:12, color:'#10b981', fontWeight:500 }}>
+                        ✓ {discoveryResult.created} creadas · {discoveryResult.duplicates} duplicadas
+                      </span>
+                    )}
+                    <button className="btn" onClick={() => { setUrlPreview(null); setUrlInput(''); setSelectedDiscovery(new Set()); setDiscoveryResult(null); setDiscoveryScores([]); }}>Cancelar</button>
+                    <button
+                      className="btn btn-brand btn-sm"
+                      disabled={selectedDiscovery.size === 0 || discoveryImporting || discoveryScores.length === 0}
+                      onClick={handleDiscoveryImport}
+                    >
+                      {discoveryImporting ? 'Importando…' : `Importar ${selectedDiscovery.size} oportunidades`}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Company audit result — single business commercial analysis */}
+            {urlPreview && !urlLoading && (urlPreview.sourceMode === 'COMPANY_AUDIT' || !urlPreview.sourceMode) && (() => {
+              const ops = (urlPreview.oportunidades ?? []).slice().sort((a, b) => b.score - a.score);
+              const prioColor = urlPreview.prioridad === 'ALTA' ? '#10b981' : urlPreview.prioridad === 'MEDIA' ? '#f59e0b' : '#6b7280';
+              const scoreColor = (s) => s >= 80 ? '#10b981' : s >= 60 ? '#3b82f6' : s >= 40 ? '#f59e0b' : 'var(--ink-300)';
+              return (
+                <div style={{ border:'1px solid var(--border)', borderRadius:10, overflow:'hidden', background:'var(--surface)' }}>
+                  {/* Company header */}
+                  <div style={{ padding:'12px 14px', borderBottom:'1px solid var(--border)', background:'var(--bg-2)', display:'flex', alignItems:'flex-start', gap:12 }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginBottom:4 }}>
+                        <span style={{ fontWeight:700, fontSize:14 }}>{urlPreview.empresa ?? '—'}</span>
+                        <span style={{ fontSize:11, color:'var(--ink-500)' }}>{urlPreview.rubro}</span>
+                        {urlPreview.ciudad && <span style={{ fontSize:11, color:'var(--ink-400)' }}>· {urlPreview.ciudad}</span>}
+                      </div>
+                      {urlPreview.descripcion && (
+                        <p style={{ fontSize:12, color:'var(--ink-600)', margin:0, lineHeight:1.4 }}>{urlPreview.descripcion}</p>
+                      )}
+                      {urlPreview.oportunidadDetectada && (
+                        <p style={{ fontSize:12, color:'var(--primary)', margin:'6px 0 0', fontStyle:'italic', lineHeight:1.4 }}>
+                          💡 {urlPreview.oportunidadDetectada}
+                        </p>
+                      )}
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
+                      <span style={{ fontSize:12, fontWeight:700, color:prioColor, background:`${prioColor}18`, padding:'3px 10px', borderRadius:999 }}>
+                        {urlPreview.prioridad}
+                      </span>
+                      {urlPreview.ticketEstimado > 0 && (
+                        <span style={{ fontSize:13, fontWeight:700, color:'var(--ink-700)' }}>
+                          USD {urlPreview.ticketEstimado.toLocaleString()}
+                        </span>
+                      )}
+                      <span style={{ fontSize:10, color:'var(--ink-400)', background:'var(--canvas)', padding:'1px 6px', borderRadius:4 }}>{urlPreview.sourceType}</span>
+                    </div>
+                  </div>
+
+                  {/* Opportunities table */}
+                  <div style={{ padding:'10px 14px' }}>
+                    <div style={{ fontSize:11, fontWeight:600, color:'var(--ink-500)', marginBottom:8, textTransform:'uppercase', letterSpacing:'0.05em' }}>
+                      Oportunidades por servicio
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {ops.map((op) => (
+                        <div key={op.servicio} style={{ display:'grid', gridTemplateColumns:'160px 1fr 36px', alignItems:'center', gap:8 }}>
+                          <span style={{ fontSize:12, fontWeight: op.score >= 60 ? 600 : 400, color: op.score >= 60 ? 'var(--ink-800)' : 'var(--ink-400)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                            {op.servicio}
+                          </span>
+                          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                            <div style={{ flex:1, height:6, background:'var(--canvas)', borderRadius:999, overflow:'hidden' }}>
+                              <div style={{ width:`${op.score}%`, height:'100%', background:scoreColor(op.score), borderRadius:999, transition:'width 0.3s' }}/>
+                            </div>
+                            <span style={{ fontSize:11, color:'var(--ink-400)', maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                              {op.razon}
+                            </span>
+                          </div>
+                          <span style={{ fontSize:12, fontWeight:700, color:scoreColor(op.score), textAlign:'right' }}>{op.score}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Evidence links */}
+                  {(urlPreview.website || urlPreview.instagram || urlPreview.linkedin) && (
+                    <div style={{ padding:'8px 14px', borderTop:'1px solid var(--border)', display:'flex', gap:10, flexWrap:'wrap' }}>
+                      {urlPreview.website && <a href={urlPreview.website} target="_blank" rel="noopener" style={{ fontSize:11, color:'var(--primary)' }}>🌐 {urlPreview.website}</a>}
+                      {urlPreview.instagram && <a href={urlPreview.instagram} target="_blank" rel="noopener" style={{ fontSize:11, color:'var(--primary)' }}>📸 Instagram</a>}
+                      {urlPreview.linkedin && <a href={urlPreview.linkedin} target="_blank" rel="noopener" style={{ fontSize:11, color:'var(--primary)' }}>💼 LinkedIn</a>}
+                      {urlPreview.googleBusiness && <a href={urlPreview.googleBusiness} target="_blank" rel="noopener" style={{ fontSize:11, color:'var(--primary)' }}>🗺️ Google Business</a>}
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div style={{ padding:'10px 14px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
+                    <button className="btn" onClick={() => { setUrlPreview(null); setUrlInput(''); }}>Cancelar</button>
+                    <button
+                      className="btn btn-brand btn-sm"
+                      disabled={urlSaving || !urlPreview.empresa?.trim()}
+                      onClick={handleUrlSave}
+                    >
+                      {urlSaving ? 'Creando prospecto…' : `+ Crear prospecto · ${urlPreview.prioridad}`}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </div>
 
+      {/* Audit result — compact row */}
+      {auditResult && (
+        <div style={{ display:'flex', alignItems:'center', gap:12, padding:'9px 14px', marginBottom:12, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10, borderLeft:'3px solid var(--primary)' }}>
+          <Icon.globe size={13} color="var(--primary)" style={{ flexShrink:0 }}/>
+
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4, flexWrap:'wrap' }}>
+              <span style={{ fontWeight:700, fontSize:13 }}>{auditResult.empresa}</span>
+              <span style={{ fontSize:10, fontFamily:'monospace', color:'var(--ink-400)', background:'var(--canvas)', padding:'1px 6px', borderRadius:4 }}>{auditResult.dominio}</span>
+              <span style={{ fontSize:11, color:'var(--ink-500)' }}>{auditResult.rubroEstimado}</span>
+            </div>
+            <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+              {[
+                ...(auditResult.severidad?.critico ?? []),
+                ...(auditResult.severidad?.alto ?? []),
+              ].slice(0,3).map((issue, i) => (
+                <span key={i} style={{ fontSize:10, color:'#EF4444', background:'#EF444410', padding:'1px 7px', borderRadius:4 }}>⚠ {issue}</span>
+              ))}
+              {(auditResult.serviciosSugeridos ?? []).slice(0,2).map((s, i) => (
+                <span key={i} style={{ fontSize:10, fontWeight:600, color:'#5B5BF7', background:'#5B5BF710', padding:'1px 8px', borderRadius:999 }}>{s}</span>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display:'flex', gap:10, alignItems:'center', flexShrink:0 }}>
+            {[
+              { label:'Opp.', value: auditResult.commercialOpportunityScore, hi:70, mid:40 },
+              { label:'Sitio', value: auditResult.auditScore, hi:60, mid:30 },
+            ].map(({ label, value, hi, mid }) => (
+              <div key={label} style={{ textAlign:'center', minWidth:34 }}>
+                <div style={{ fontSize:18, fontWeight:800, lineHeight:1, color: value >= hi ? '#10B981' : value >= mid ? '#F59E0B' : '#EF4444' }}>{value}</div>
+                <div style={{ fontSize:8, color:'var(--ink-400)', textTransform:'uppercase' }}>{label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+            <button className="btn btn-ghost" style={{ fontSize:12, padding:'4px 10px' }} onClick={() => setAuditDrawerOpen(true)}>Ver auditoría</button>
+            <button className="btn btn-brand" style={{ fontSize:12, padding:'4px 10px' }} onClick={handleCreateProspectFromAudit}><Icon.plus size={11}/> Crear prospecto</button>
+            <button onClick={() => setAuditResult(null)} style={{ border:0, background:'transparent', cursor:'pointer', color:'var(--ink-400)', fontSize:16, padding:'0 3px', lineHeight:1 }}>×</button>
+          </div>
+        </div>
+      )}
+
+      {/* Audit detail drawer — position:fixed, no layout impact */}
+      {auditDrawerOpen && auditResult && (
+        <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex' }}>
+          <div style={{ flex:1, background:'rgba(0,0,0,0.35)' }} onClick={() => setAuditDrawerOpen(false)}/>
+          <div style={{ width:500, background:'var(--canvas)', borderLeft:'1px solid var(--border)', overflowY:'auto', padding:24, display:'flex', flexDirection:'column', gap:14 }}>
+
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+              <div>
+                <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:3 }}>
+                  <Icon.globe size={13} color="var(--primary)"/>
+                  <span style={{ fontWeight:700, fontSize:15 }}>{auditResult.empresa}</span>
+                  <span style={{ fontSize:11, fontFamily:'monospace', color:'var(--ink-400)' }}>{auditResult.dominio}</span>
+                </div>
+                <div style={{ fontSize:12, color:'var(--ink-500)' }}>{auditResult.rubroEstimado}</div>
+              </div>
+              <button onClick={() => setAuditDrawerOpen(false)} style={{ border:0, background:'transparent', cursor:'pointer', color:'var(--ink-400)', fontSize:20, lineHeight:1 }}>×</button>
+            </div>
+
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              {[
+                { label:'Opportunity Score', value: auditResult.commercialOpportunityScore, hi:70, mid:40 },
+                { label:'Website Score', value: auditResult.auditScore, hi:60, mid:30 },
+              ].map(({ label, value, hi, mid }) => {
+                const c = value >= hi ? '#10B981' : value >= mid ? '#F59E0B' : '#EF4444';
+                return (
+                  <div key={label} style={{ background:'var(--surface)', borderRadius:8, padding:'12px 14px', textAlign:'center', border:`2px solid ${c}22` }}>
+                    <div style={{ fontSize:34, fontWeight:800, color:c, lineHeight:1 }}>{value}</div>
+                    <div style={{ fontSize:11, color:'var(--ink-500)', marginTop:4 }}>{label}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Severity breakdown */}
+            {auditResult.severidad && (
+              <div style={{ background:'var(--surface)', borderRadius:8, padding:'12px 14px' }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--ink-600)', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10 }}>Hallazgos por severidad</div>
+                {([
+                  { key:'critico', label:'🔴 Crítico', color:'#EF4444' },
+                  { key:'alto',    label:'🟠 Alto',    color:'#F97316' },
+                  { key:'medio',   label:'🟡 Medio',   color:'#F59E0B' },
+                  { key:'bajo',    label:'🟢 Bajo',    color:'#10B981' },
+                ] as const).map(({ key, label, color }) => {
+                  const items = auditResult.severidad?.[key] ?? [];
+                  if (!items.length) return null;
+                  return (
+                    <div key={key} style={{ marginBottom:8 }}>
+                      <div style={{ fontSize:11, fontWeight:700, color, marginBottom:3 }}>{label}</div>
+                      {items.map((issue, i) => (
+                        <div key={i} style={{ fontSize:12, color:'var(--ink-600)', paddingLeft:12, marginBottom:2, wordBreak:'break-word' }}>· {issue}</div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* 4 scored layers */}
+            {(['seo','frontend','performance','seguridad'] as const).map(cat => {
+              const h = auditResult.hallazgos?.[cat] ?? { score:0, issues:[] };
+              const scored = h as { score: number; issues: string[] };
+              const c = scored.score >= 60 ? '#10B981' : scored.score >= 30 ? '#F59E0B' : '#EF4444';
+              const labels: Record<string, string> = { seo:'SEO', frontend:'Frontend', performance:'Performance', seguridad:'Seguridad' };
+              return (
+                <div key={cat} style={{ background:'var(--surface)', borderRadius:8, padding:'12px 14px', borderLeft:`3px solid ${c}` }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                    <span style={{ fontWeight:700, fontSize:11, textTransform:'uppercase', letterSpacing:'0.07em', color:'var(--ink-600)' }}>{labels[cat]}</span>
+                    <span style={{ fontWeight:800, fontSize:16, color:c }}>{scored.score}</span>
+                  </div>
+                  {(scored.issues ?? []).map((issue, i) => (
+                    <div key={i} style={{ fontSize:12, color:'var(--ink-600)', marginBottom:3, paddingLeft:6, wordBreak:'break-word' }}>· {issue}</div>
+                  ))}
+                </div>
+              );
+            })}
+
+            {/* Arquitectura */}
+            {auditResult.hallazgos?.arquitectura && (
+              <div style={{ background:'var(--surface)', borderRadius:8, padding:'12px 14px', borderLeft:'3px solid #8B5CF6' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                  <span style={{ fontWeight:700, fontSize:11, textTransform:'uppercase', letterSpacing:'0.07em', color:'var(--ink-600)' }}>Arquitectura</span>
+                  {auditResult.hallazgos.arquitectura.cms && (
+                    <span style={{ fontSize:11, fontWeight:700, color:'#8B5CF6', background:'#8B5CF610', padding:'1px 8px', borderRadius:6, maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', display:'inline-block' }}
+                      title={auditResult.hallazgos.arquitectura.cms}>
+                      {auditResult.hallazgos.arquitectura.cms.length > 30 ? auditResult.hallazgos.arquitectura.cms.slice(0,30)+'…' : auditResult.hallazgos.arquitectura.cms}
+                    </span>
+                  )}
+                </div>
+                <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:8 }}>
+                  {(auditResult.hallazgos.arquitectura.stack ?? []).map((s, i) => (
+                    <span key={i} style={{ fontSize:10, color:'var(--ink-600)', background:'var(--canvas)', padding:'1px 7px', borderRadius:4, border:'1px solid var(--border)', wordBreak:'break-word' }}>{s}</span>
+                  ))}
+                </div>
+                {(auditResult.hallazgos.arquitectura.issues ?? []).map((issue, i) => (
+                  <div key={i} style={{ fontSize:12, color:'var(--ink-600)', marginBottom:3, paddingLeft:6, wordBreak:'break-word' }}>· {issue}</div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ background:'var(--primary-soft)', borderRadius:8, padding:'12px 14px', borderLeft:'3px solid var(--primary)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--primary)', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6 }}>Outreach Brief</div>
+              <div style={{ fontSize:13, color:'var(--ink-700)', lineHeight:1.65, fontStyle:'italic' }}>"{auditResult.outreachBrief}"</div>
+            </div>
+
+            <div>
+              <div style={{ fontSize:11, fontWeight:700, color:'var(--ink-700)', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:8 }}>Servicios sugeridos</div>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {(auditResult.serviciosSugeridos ?? []).map((s, i) => (
+                  <span key={i} style={{ fontSize:12, fontWeight:600, color:'#5B5BF7', background:'#5B5BF718', padding:'4px 12px', borderRadius:999 }}>{s}</span>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display:'flex', gap:8, paddingTop:10, borderTop:'1px solid var(--border)' }}>
+              <button className="btn btn-brand" style={{ flex:1 }} onClick={() => { handleCreateProspectFromAudit(); setAuditDrawerOpen(false); }}>
+                <Icon.plus size={13}/> Crear prospecto
+              </button>
+              <button className="btn btn-ghost" onClick={() => setAuditDrawerOpen(false)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* KPIs — real data */}
       <div className="grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 10 }}>
@@ -3689,7 +4544,11 @@ function Prospects({ onNav }) {
           <div className="row gap-sm">
             <div className="topbar-search" style={{ width: 220, height: 30, padding: "4px 10px" }}>
               <Icon.search size={13}/>
-              <input placeholder="Filtrar empresa..."/>
+              <input
+                placeholder="Filtrar empresa..."
+                value={searchEmpresa}
+                onChange={e => { setSearchEmpresa(e.target.value); setPage(1); }}
+              />
             </div>
             <button className="btn btn-sm"><Icon.filter size={13}/> Filtros</button>
             <button
@@ -3755,13 +4614,20 @@ function Prospects({ onNav }) {
                   <td style={{ maxWidth: 200 }}><span style={{ fontSize: 12.5, color: "var(--ink-800)" }}>{p.opp}</span></td>
                   <td>{p.svc && p.svc !== "—" ? <Badge tone="brand">{p.svc}</Badge> : <span className="cell-muted">—</span>}</td>
                   <td style={{ textAlign: "center" }}>
-                    <Score v={p.score}/>
-                    {p.opportunityScore != null ? (
+                    {p.priorityScore != null ? (
+                      <>
+                        <Score v={p.priorityScore}/>
+                        <div style={{ fontSize: 10, color: "var(--ink-400)", marginTop: 1 }}>
+                          Pain {p.score}{p.commercialScore != null ? ` · BVS ${p.commercialScore}` : ""}
+                        </div>
+                      </>
+                    ) : (
+                      <Score v={p.score}/>
+                    )}
+                    {p.opportunityScore != null && (
                       <div style={{ fontSize: 10.5, fontWeight: 700, marginTop: 1, color: AI_STATE_COLOR[aiStateFromScore(p.opportunityScore)] }}>
                         Opp {p.opportunityScore}
                       </div>
-                    ) : (
-                      <div style={{ fontSize: 10, color: "var(--ink-300)", marginTop: 1 }}>Opp —</div>
                     )}
                   </td>
                   <td>
@@ -3860,6 +4726,7 @@ function Prospects({ onNav }) {
             validationById={validationById}
             onClose={() => { setSelectedId(null); setSelectedRow(null); }}
             onReviewEnrichment={selectedId && !selectedId.startsWith("demo-") ? () => setReviewingProspectId(selectedId) : undefined}
+            onNav={onNav}
           />
         </>
       )}
@@ -6841,98 +7708,1112 @@ const MAIL_THREADS = [
 
 const MAIL_TAG_COLORS = { Clientes: "#10B981", Comercial: "#5B5BF7", Soporte: "#EF4444", Proyectos: "#A78BFA", Facturación: "#F59E0B" };
 
+// Module-level draft store — bridge between ProspectDrawer and InspyraMail
+let _outreachDraft: {
+  id: string; prospectId: string; empresa: string;
+  to: string; subject: string; body: string; proposalId?: string;
+} | null = null;
+
 function InspyraMail() {
-  const [active, setActive] = useStateMail("m-01");
+  const [active, setActive] = useStateMail(null);
   const [folder, setFolder] = useStateMail("inbox");
-  const thread = MAIL_THREADS.find(t => t.id === active);
+  const [selectedMailbox, setSelectedMailbox] = useState('contacto@inspyra.cloud');
+
+  // ERP outreach draft (pre-loaded from ProspectDrawer)
+  const [erpDraft, setErpDraft] = useState(null);
+  const [draftSubject, setDraftSubject] = useState('');
+  const [draftBody, setDraftBody] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const COMPOSE_FROM_OPTIONS = [
+    { value: '"Inspyra Servicios" <contacto@inspyra.cloud>', label: 'contacto@inspyra.cloud — Inspyra Servicios' },
+    { value: '"Inspyra Soporte" <soporte@inspyra.cloud>',   label: 'soporte@inspyra.cloud — Inspyra Soporte' },
+    { value: '"Inspyra Hola" <hola@inspyra.cloud>',         label: 'hola@inspyra.cloud — Hola Inspyra' },
+  ];
+  const MAILBOX_OPTIONS = [
+    { email: 'contacto@inspyra.cloud' },
+    { email: 'soporte@inspyra.cloud' },
+    { email: 'hola@inspyra.cloud' },
+  ];
+  const FOLDERS = [
+    { id: "inbox",   label: "Bandeja de entrada", icon: "inbox" },
+    { id: "sent",    label: "Enviados",            icon: "send" },
+    { id: "drafts",  label: "Borradores",          icon: "doc" },
+    { id: "starred", label: "Destacados",          icon: "pin" },
+    { id: "spam",    label: "Spam",                icon: "shield" },
+    { id: "trash",   label: "Papelera",            icon: "x" },
+  ];
+
+  const [composing, setComposing] = useState(false);
+  const [composeFrom, setComposeFrom] = useState('contacto@inspyra.cloud');
+  const [composeTo, setComposeTo] = useState('');
+  const [composeSubject, setComposeSubject] = useState('');
+  const [composeHasContent, setComposeHasContent] = useState(false);
+  const [composeSending, setComposeSending] = useState(false);
+  const [composeSent, setComposeSent] = useState(false);
+  const composeEditorRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [draftSending, setDraftSending] = useState(false);
+  const [draftDeleting, setDraftDeleting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [replyBody, setReplyBody] = useState('');
+  const [replySending, setReplySending] = useState(false);
+  const [replySent, setReplySent] = useState(false);
+  const [hoveredMailId, setHoveredMailId] = useState<string | null>(null);
+  const [showMailboxMgmt, setShowMailboxMgmt] = useState(false);
+  const [mbNewEmail, setMbNewEmail] = useState('');
+  const [mbNewQuota, setMbNewQuota] = useState('500');
+  const [mbCreating, setMbCreating] = useState(false);
+  const [mbNewPassword, setMbNewPassword] = useState<string | null>(null);
+  const [mbResetResult, setMbResetResult] = useState<{ email: string; password: string } | null>(null);
+
+  const qc = useQueryClient();
+
+  const isDraftsFolder = folder === 'drafts';
+  const isSentFolder = folder === 'sent';
+
+  const { data: mailboxesData, isLoading: loadingMailboxes, refetch: refetchMailboxes } = useQuery({
+    queryKey: ['mail', 'mailboxes'],
+    queryFn: () => mailboxApi.list(),
+    enabled: showMailboxMgmt,
+    staleTime: 30_000,
+    retry: false,
+  });
+  const mailboxes = mailboxesData?.items ?? [];
+
+  const createMailbox = async () => {
+    if (!mbNewEmail.trim()) return;
+    setMbCreating(true);
+    setMbNewPassword(null);
+    try {
+      const localPart = mbNewEmail.trim().replace(/@.*$/, '');
+      const result = await mailboxApi.create({ localPart, quotaMB: parseInt(mbNewQuota) || 500 });
+      setMbNewPassword(result.password ?? null);
+      setMbNewEmail('');
+      setMbNewQuota('500');
+      refetchMailboxes();
+    } catch (e: any) {
+      alert('Error: ' + e.message);
+    } finally {
+      setMbCreating(false);
+    }
+  };
+
+  const deleteMailbox = async (email: string) => {
+    if (!confirm(`¿Eliminar el mailbox ${email}? Esta acción no se puede deshacer.`)) return;
+    try {
+      await mailboxApi.delete(email);
+      refetchMailboxes();
+    } catch (e: any) {
+      alert('Error: ' + e.message);
+    }
+  };
+
+  const resetMailboxPassword = async (email: string) => {
+    if (!confirm(`¿Resetear la contraseña de ${email}?`)) return;
+    setMbResetResult(null);
+    try {
+      const result = await mailboxApi.resetPassword(email);
+      setMbResetResult({ email, password: result.password });
+    } catch (e: any) {
+      alert('Error: ' + e.message);
+    }
+  };
+
+  useEffect(() => {
+    if (_outreachDraft) {
+      const d = _outreachDraft;
+      _outreachDraft = null;
+      setErpDraft(d);
+      setDraftSubject(d.subject);
+      setDraftBody(d.body);
+      setFolder('drafts');
+    }
+  }, []);
+
+  // Fetch messages list — sent/drafts use ERP APIs, rest via IMAP proxy
+  const { data: messagesRaw, isLoading: loadingMessages, error: messagesError } = useQuery({
+    queryKey: ['mail', 'messages', selectedMailbox, folder],
+    queryFn: () =>
+      isDraftsFolder ? mailApi.getDrafts() :
+      isSentFolder   ? mailApi.getSentEmails() :
+      mailApi.getMessages(selectedMailbox, folder, 50),
+    enabled: !erpDraft && !composing,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+
+  // Lazy-load full message body when user clicks an IMAP message
+  const activeUid = active ? parseInt(active, 10) : null;
+  const { data: messageDetail, isLoading: loadingDetail } = useQuery({
+    queryKey: ['mail', 'message', active, selectedMailbox, folder],
+    queryFn: () => mailApi.getMessage(activeUid, selectedMailbox, folder),
+    enabled: !!active && !erpDraft && !composing && !isDraftsFolder && !isSentFolder,
+    staleTime: 10 * 60_000,
+    retry: false,
+  });
+
+  // Normalize API response to display format
+  const rawArr = messagesRaw?.items ?? messagesRaw?.data ?? [];
+
+  const timeAgo = (raw: string) => {
+    if (!raw) return '';
+    try {
+      const diffMin = Math.floor((Date.now() - new Date(raw).getTime()) / 60000);
+      if (diffMin < 60) return `hace ${diffMin}m`;
+      if (diffMin < 1440) return `hace ${Math.floor(diffMin / 60)}h`;
+      return `hace ${Math.floor(diffMin / 1440)}d`;
+    } catch { return raw; }
+  };
+
+  const messages = rawArr.map((m, i) => {
+    if (isDraftsFolder) {
+      return {
+        id: String(m.id ?? i),
+        from: String(m.to ?? ''),
+        name: String(m.to ?? ''),
+        subject: String(m.subject ?? '(sin asunto)'),
+        preview: m.externalRef ? `Prospecto: ${m.externalRef}` : 'Sin referencia',
+        time: timeAgo(m.createdAt),
+        unread: false,
+        html: '',
+        isDraft: true,
+        isSent: false,
+        externalRef: m.externalRef ?? null,
+        toAddress: '',
+        activityType: null,
+      };
+    }
+    if (isSentFolder) {
+      const htmlBody = m.mensajeUtilizado
+        ? m.mensajeUtilizado.split('\n').map((l: string) => l.trim()).filter(Boolean).map((l: string) => `<p style="margin:0 0 10px">${l}</p>`).join('')
+        : '';
+      return {
+        id: String(m.id ?? i),
+        from: m.to ?? '',
+        name: m.empresa ?? m.toName ?? m.to ?? '',
+        subject: String(m.subject ?? '(sin asunto)'),
+        preview: String(m.preview ?? ''),
+        time: timeAgo(m.sentAt),
+        unread: false,
+        html: htmlBody,
+        isDraft: false,
+        isSent: true,
+        externalRef: m.prospectId ?? null,
+        toAddress: m.to ?? '',
+        activityType: m.type ?? null,
+      };
+    }
+    const fromRaw = String(m.from ?? m.sender ?? '');
+    const nameMatch = fromRaw.match(/^"?([^"<]+)"?\s*</);
+    const name = nameMatch ? nameMatch[1].trim() : (fromRaw.split('@')[0] || fromRaw);
+    const timeRaw = m.date ?? m.receivedAt ?? m.createdAt ?? m.sentAt ?? '';
+    return {
+      id: String(m.uid ?? m.id ?? i),
+      from: fromRaw,
+      name,
+      subject: String(m.subject ?? '(sin asunto)'),
+      preview: String(m.snippet ?? m.preview ?? (typeof m.text === 'string' ? m.text.substring(0, 80) : '') ?? ''),
+      time: timeAgo(timeRaw),
+      unread: m.seen === false || m.unread === true,
+      html: m.html ?? m.body ?? m.text ?? '',
+      isDraft: false,
+      isSent: false,
+      externalRef: null,
+      toAddress: '',
+      activityType: null,
+    };
+  });
+
+  const filteredMessages = searchQuery.trim()
+    ? messages.filter(m =>
+        m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.preview.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : messages;
+
+  const activeMessage = messages.find(m => m.id === active);
+
+  const sendReply = async () => {
+    if (!replyBody.trim() || !activeMessage) return;
+    setReplySending(true);
+    try {
+      const rawFrom = messageDetail?.from ?? activeMessage.from;
+      // Extract bare email from "Name <email@domain>" format
+      const replyTo = (rawFrom.match(/<([^>]+@[^>]+)>/) ?? [null, rawFrom])[1].trim();
+      const replyFrom = COMPOSE_FROM_OPTIONS.find(o => o.value.includes(selectedMailbox))?.value ?? COMPOSE_FROM_OPTIONS[0].value;
+      await mailApi.sendFree({
+        from: replyFrom,
+        to: replyTo,
+        subject: `Re: ${activeMessage.subject}`,
+        body: replyBody,
+      });
+      setReplySent(true);
+      setReplyBody('');
+      setTimeout(() => setReplySent(false), 3000);
+    } catch (e: any) {
+      alert('Error al enviar: ' + e.message);
+    } finally {
+      setReplySending(false);
+    }
+  };
+
+  const sendApiDraft = async (draftId: string, prospectId?: string | null) => {
+    setDraftSending(true);
+    try {
+      await mailApi.sendDraft(draftId, prospectId ?? undefined);
+      qc.invalidateQueries({ queryKey: ['mail', 'messages', selectedMailbox, 'drafts'] });
+      if (prospectId) {
+        qc.invalidateQueries({ queryKey: ['outreach', 'activities', prospectId] });
+        qc.invalidateQueries({ queryKey: ['prospects'] });
+      }
+      setActive(null);
+    } catch (e: any) {
+      alert('Error al enviar: ' + e.message);
+    } finally {
+      setDraftSending(false);
+    }
+  };
+
+  const deleteApiDraft = async (draftId: string) => {
+    if (!confirm('¿Eliminar este borrador?')) return;
+    setDraftDeleting(true);
+    try {
+      await mailApi.deleteDraft(draftId);
+      qc.invalidateQueries({ queryKey: ['mail', 'messages', selectedMailbox, 'drafts'] });
+      setActive(null);
+    } catch (e: any) {
+      alert('Error al eliminar: ' + e.message);
+    } finally {
+      setDraftDeleting(false);
+    }
+  };
+
+  const sendDraft = async () => {
+    if (!erpDraft) return;
+    setSending(true);
+    try {
+      await outreachApi.sendEmail(erpDraft.prospectId, {
+        subject: draftSubject,
+        proposalId: erpDraft.proposalId,
+        note: undefined,
+      });
+      qc.invalidateQueries({ queryKey: ['prospects'] });
+      qc.invalidateQueries({ queryKey: ['outreach', 'activities', erpDraft.prospectId] });
+      qc.invalidateQueries({ queryKey: ['outreach', 'funnel'] });
+      setSent(true);
+    } catch (e) {
+      alert('Error al enviar: ' + e.message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const execCmd = (cmd: string, value?: string) => {
+    document.execCommand(cmd, false, value ?? undefined);
+    composeEditorRef.current?.focus();
+  };
+
+  const setFontSize = (px: string) => {
+    document.execCommand('fontSize', false, '7');
+    composeEditorRef.current?.querySelectorAll('font[size="7"]').forEach(el => {
+      (el as HTMLElement).removeAttribute('size');
+      (el as HTMLElement).style.fontSize = px;
+    });
+    composeEditorRef.current?.focus();
+  };
+
+  const insertLink = () => {
+    const url = prompt('URL del enlace (ej: https://inspyra.cloud):');
+    if (url) { execCmd('createLink', url); }
+  };
+
+  const insertImageFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      composeEditorRef.current?.focus();
+      document.execCommand('insertImage', false, dataUrl);
+      // Make inserted image responsive by default
+      setTimeout(() => {
+        composeEditorRef.current?.querySelectorAll('img:not([data-sized])').forEach(img => {
+          const el = img as HTMLImageElement;
+          el.style.maxWidth = '100%';
+          el.style.borderRadius = '6px';
+          el.style.margin = '6px 0';
+          el.setAttribute('data-sized', '1');
+        });
+      }, 50);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const sendFree = async () => {
+    const bodyHtml = composeEditorRef.current?.innerHTML ?? '';
+    if (!composeTo || !composeSubject || !bodyHtml.trim()) return;
+    setComposeSending(true);
+    try {
+      await mailApi.sendFree({ from: composeFrom, to: composeTo, subject: composeSubject, bodyHtml });
+      setComposeSent(true);
+    } catch (e: any) {
+      alert('Error al enviar: ' + e.message);
+    } finally {
+      setComposeSending(false);
+    }
+  };
+
+  const openCompose = () => {
+    setComposing(true);
+    setComposeFrom('contacto@inspyra.cloud');
+    setComposeTo('');
+    setComposeSubject('');
+    setComposeHasContent(false);
+    setComposeSent(false);
+    setErpDraft(null);
+    setTimeout(() => { if (composeEditorRef.current) composeEditorRef.current.innerHTML = ''; }, 0);
+  };
+
+  const selectFolder = (fId) => { setFolder(fId); setActive(null); setSearchQuery(''); setReplyBody(''); setReplySent(false); };
+
+  const ML_BG        = '#080A12';
+  const ML_PANE      = '#0C0E1A';
+  const ML_ELEVATED  = '#111422';
+  const ML_BORDER    = '#1A1D2E';
+  const ML_T1        = '#DDE1F0';
+  const ML_T2        = '#8590A8';
+  const ML_T3        = '#4E546E';
+  const ML_ACCENT    = '#F5622A';
+  const ML_ACTIVE_BG = '#131625';
+
+  const avatarColors = ['#3B6FE8','#8B5CF6','#22C55E','#F59E0B','#EF4444','#F5622A'];
+  const getAvatar = (name: string) => ({
+    color: avatarColors[(name?.charCodeAt(0) ?? 0) % avatarColors.length],
+    letter: (name ?? '?').charAt(0).toUpperCase(),
+  });
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "220px 300px 1fr", height: "100%", overflow: "hidden" }}>
-      <div style={{ borderRight: "1px solid var(--border-soft)", padding: "16px 12px", display:"flex", flexDirection:"column", gap:2, overflowY:"auto" }}>
-        <button className="btn btn-brand" style={{marginBottom:12, justifyContent:"center"}}><Icon.plus size={14}/> Redactar</button>
-        {[
-          { id:"inbox", label:"Bandeja de entrada", icon:"inbox", count:3 },
-          { id:"sent", label:"Enviados", icon:"send" },
-          { id:"drafts", label:"Borradores", icon:"doc", count:2 },
-          { id:"starred", label:"Destacados", icon:"pin" },
-          { id:"spam", label:"Spam", icon:"shield" },
-          { id:"trash", label:"Papelera", icon:"x" },
-        ].map(f => {
-          const Ico2 = Icon[f.icon];
-          return (
-            <button key={f.id} onClick={() => setFolder(f.id)}
-              style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",border:0,background:folder===f.id?"var(--surface)":"transparent",
-                color:folder===f.id?"var(--ink-900)":"var(--ink-600)",fontSize:13,fontWeight:folder===f.id?600:500,borderRadius:6,cursor:"pointer",width:"100%"}}>
-              {Ico2 && <Ico2 size={14}/>} {f.label}
-              {f.count && <span className="badge danger" style={{marginLeft:"auto"}}>{f.count}</span>}
-            </button>
-          );
-        })}
-        <div style={{borderTop:"1px solid var(--border-soft)",marginTop:12,paddingTop:12}}>
-          <div className="section-title" style={{marginBottom:6}}>Etiquetas</div>
+    <div style={{ display:"flex", height:"100%", overflow:"hidden", fontFamily:"Inter, sans-serif", background: ML_BG }}>
+
+      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
+      <div style={{ width:220, flexShrink:0, background:ML_BG, borderRight:`1px solid ${ML_BORDER}`, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+
+        {/* Logo */}
+        <div style={{ padding:'18px 16px 14px', display:'flex', alignItems:'center', gap:10, borderBottom:`1px solid ${ML_BORDER}` }}>
+          <svg width={28} height={28} viewBox="0 0 32 32" fill="none">
+            <path d="M16 3L6 8v9c0 6.5 4.4 12.3 10 14 5.6-1.7 10-7.5 10-14V8L16 3z" fill="#5B5BF7"/>
+            <path d="M16 3L26 8v9c0 6.5-4.4 12.3-10 14V3z" fill="#3b3bb0" opacity="0.45"/>
+            <circle cx="16" cy="16" r="2.8" fill="white" opacity="0.95"/>
+            <path d="M16 13.2V9M12.5 14.8L9 13M12.5 17.2L9 19" stroke="white" strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+          <div>
+            <div style={{ fontSize:13, fontWeight:700, color:ML_T1, letterSpacing:'0.6px' }}>INSPYRA</div>
+            <div style={{ fontSize:10, color:ML_T3 }}>Mail Suite</div>
+          </div>
+        </div>
+
+        {/* Redactar */}
+        <div style={{ padding:'14px 12px 10px' }}>
+          <button onClick={openCompose}
+            style={{ width:'100%', padding:'9px 0', background:'#5B5BF7', color:'white', border:'none', borderRadius:10, fontSize:13, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:7, boxShadow:'0 2px 16px rgba(91,91,247,0.4)' }}>
+            <span style={{ fontSize:17, lineHeight:1, fontWeight:300 }}>+</span>
+            Redactar
+          </button>
+        </div>
+
+        {/* Mailbox selector */}
+        <div style={{ padding:'0 12px 12px' }}>
+          <div style={{ padding:'7px 10px', background:ML_ELEVATED, borderRadius:8, border:`1px solid ${ML_BORDER}`, display:'flex', alignItems:'center', gap:7, overflow:'hidden' }}>
+            <div style={{ width:18, height:18, borderRadius:'50%', flexShrink:0, background:'linear-gradient(135deg, #5B5BF7, #7c3aed)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700, color:'white' }}>IN</div>
+            <select value={selectedMailbox} onChange={e => { setSelectedMailbox(e.target.value); setActive(null); }}
+              style={{ flex:1, background:'transparent', border:'none', outline:'none', fontSize:11, color:ML_T2, cursor:'pointer', minWidth:0 }}>
+              {MAILBOX_OPTIONS.map(mb => (
+                <option key={mb.email} value={mb.email} style={{ background:ML_ELEVATED }}>{mb.email}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Gestionar buzones */}
+        <div style={{ padding:'0 12px 10px' }}>
+          <button onClick={() => { setShowMailboxMgmt(v => !v); setMbNewPassword(null); setMbResetResult(null); }}
+            style={{ width:'100%', padding:'6px 10px', background: showMailboxMgmt ? 'rgba(91,91,247,0.15)' : 'transparent', border:`1px solid ${showMailboxMgmt ? 'rgba(91,91,247,0.4)' : ML_BORDER}`, borderRadius:8, fontSize:11.5, fontWeight:500, color: showMailboxMgmt ? '#818cf8' : ML_T2, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+            <Icon.cog size={12}/> Gestionar buzones
+          </button>
+        </div>
+
+        {/* Nav folders */}
+        <nav style={{ flex:1, padding:'2px 8px', overflow:'hidden' }}>
+          {FOLDERS.map(f => {
+            const isActive = folder === f.id;
+            const Ico2 = Icon[f.icon];
+            return (
+              <button key={f.id} onClick={() => selectFolder(f.id)}
+                style={{ display:'flex', alignItems:'center', gap:9, padding:'7px 10px', borderRadius:8, cursor:'pointer', background: isActive ? ML_ACTIVE_BG : 'transparent', color: isActive ? ML_T1 : ML_T2, fontSize:13, fontWeight: isActive ? 500 : 400, marginBottom:1, border:0, width:'100%', userSelect:'none' }}>
+                {Ico2 && <Ico2 size={14} style={{ opacity: isActive ? 1 : 0.65 }}/>}
+                <span style={{ flex:1, textAlign:'left' }}>{f.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Labels */}
+        <div style={{ padding:'8px 8px 16px', borderTop:`1px solid ${ML_BORDER}` }}>
+          <div style={{ fontSize:10, fontWeight:600, color:ML_T3, letterSpacing:'0.8px', textTransform:'uppercase', padding:'6px 10px' }}>Etiquetas</div>
           {Object.entries(MAIL_TAG_COLORS).map(([tag, color]) => (
-            <button key={tag} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 10px",border:0,background:"transparent",
-              color:"var(--ink-600)",fontSize:12,borderRadius:6,cursor:"pointer",width:"100%"}}>
-              <span style={{width:8,height:8,borderRadius:50,background:color,flexShrink:0}}/>
+            <button key={tag}
+              style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 10px', border:0, background:'transparent', color:ML_T2, fontSize:12.5, borderRadius:6, cursor:'pointer', width:'100%' }}>
+              <span style={{ width:7, height:7, borderRadius:'50%', background:color as string, flexShrink:0 }}/>
               {tag}
             </button>
           ))}
         </div>
       </div>
 
-      <div style={{ borderRight: "1px solid var(--border-soft)", overflowY:"auto" }}>
-        <div style={{ padding:"12px", borderBottom:"1px solid var(--border-soft)", position:"sticky",top:0,background:"var(--bg)",zIndex:1 }}>
-          <div className="topbar-search" style={{width:"100%", padding:"6px 10px"}}>
-            <Icon.search size={13}/><input placeholder="Buscar emails..."/>
+      {/* ── Message list pane ────────────────────────────────────────────── */}
+      <div style={{ width:310, flexShrink:0, background:ML_PANE, borderRight:`1px solid ${ML_BORDER}`, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+
+        {/* Search */}
+        <div style={{ padding:'14px 12px 10px' }}>
+          <div style={{ position:'relative', display:'flex', alignItems:'center' }}>
+            <span style={{ position:'absolute', left:10, display:'flex', alignItems:'center', color:ML_T3, pointerEvents:'none' }}>
+              <Icon.search size={14}/>
+            </span>
+            <input type="text" placeholder="Buscar emails..."
+              value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              style={{ width:'100%', background:ML_ELEVATED, border:`1px solid ${ML_BORDER}`, borderRadius:8, padding:'8px 12px 8px 32px', fontSize:12.5, color:ML_T2, outline:'none', fontFamily:'inherit', boxSizing:'border-box' }}/>
           </div>
         </div>
-        {MAIL_THREADS.map(t => (
-          <div key={t.id} onClick={() => setActive(t.id)}
-            style={{padding:"12px 14px", cursor:"pointer", borderBottom:"1px solid var(--border-soft)",
-              background: active===t.id ? "var(--surface)" : "transparent",
-              borderLeft: active===t.id ? "3px solid var(--primary)" : "3px solid transparent"}}>
-            <div className="row between" style={{marginBottom:3}}>
-              <span style={{fontWeight: t.unread?700:500,fontSize:13}}>{t.name}</span>
-              <span style={{fontSize:11,color:"var(--ink-400)"}}>{t.time}</span>
-            </div>
-            <div style={{fontWeight:t.unread?600:500,fontSize:12.5,marginBottom:3,color:"var(--ink-800)"}}>{t.subject}</div>
-            <div style={{fontSize:12,color:"var(--ink-500)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.preview}</div>
-            <div style={{marginTop:5}}>
-              <span style={{fontSize:10.5,padding:"1px 7px",borderRadius:999,background:MAIL_TAG_COLORS[t.tag]+"22",color:MAIL_TAG_COLORS[t.tag],fontWeight:600}}>{t.tag}</span>
-            </div>
+
+        {/* Folder header */}
+        <div style={{ padding:'0 14px 10px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div style={{ display:'flex', alignItems:'baseline', gap:6 }}>
+            <span style={{ fontSize:13, fontWeight:600, color:ML_T1 }}>{FOLDERS.find(f2 => f2.id === folder)?.label ?? ''}</span>
+            {filteredMessages.length > 0 && <span style={{ fontSize:11, color:ML_T3 }}>{filteredMessages.length}</span>}
           </div>
-        ))}
+          <div style={{ display:'flex', gap:3 }}>
+            <button style={{ background:ML_ACTIVE_BG, border:`1px solid ${ML_BORDER}`, borderRadius:5, padding:'3px 7px', fontSize:10.5, color:ML_T2, cursor:'pointer' }}>Todo</button>
+            <button style={{ background:'none', border:`1px solid ${ML_BORDER}`, borderRadius:5, padding:'3px 7px', fontSize:10.5, color:ML_T3, cursor:'pointer' }}>No leídos</button>
+          </div>
+        </div>
+
+        <div style={{ height:1, background:ML_BORDER }}/>
+
+        {/* Messages scroll */}
+        <div style={{ flex:1, overflowY:'auto' }}>
+
+          {/* ERP outreach draft pinned */}
+          {erpDraft && (
+            <div style={{ position:'relative', padding:'12px 14px 12px 20px', borderLeft:'3px solid #5B5BF7', background:'#14172A', borderBottom:`1px solid ${ML_BORDER}`, cursor:'pointer' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:3 }}>
+                <span style={{ fontSize:12.5, fontWeight:600, color:ML_T1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{erpDraft.empresa}</span>
+                <span style={{ fontSize:10, fontWeight:600, color:'#5B5BF7', padding:'1px 6px', borderRadius:10, background:'rgba(91,91,247,0.15)', flexShrink:0 }}>ERP</span>
+              </div>
+              <div style={{ fontSize:12.5, fontWeight:500, color:'#B8BDD8', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:3 }}>{erpDraft.subject}</div>
+              <div style={{ fontSize:11.5, color:ML_T3 }}>Para: {erpDraft.to}</div>
+            </div>
+          )}
+
+          {loadingMessages && !erpDraft && (
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:200, color:ML_T3, fontSize:13 }}>Cargando mensajes…</div>
+          )}
+          {messagesError && !loadingMessages && (
+            <div style={{ padding:'24px 16px', textAlign:'center' }}>
+              <div style={{ fontSize:13, color:ML_T2, marginBottom:6 }}>No se pudo leer la bandeja</div>
+              <div style={{ fontSize:11, color:ML_T3, lineHeight:1.5 }}>La lectura IMAP requiere configuración adicional.<br/>El envío funciona con normalidad.</div>
+            </div>
+          )}
+          {!loadingMessages && !messagesError && filteredMessages.length === 0 && !erpDraft && (
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:200, color:ML_T3, fontSize:13, gap:8 }}>
+              <div style={{ fontSize:30, opacity:0.3 }}>✉</div>
+              {searchQuery ? 'Sin resultados' : 'No hay mensajes aquí'}
+            </div>
+          )}
+
+          {filteredMessages.map(m => {
+            const isSelected = active === m.id;
+            const isHovered = hoveredMailId === m.id;
+            return (
+              <div key={m.id}
+                onClick={() => setActive(m.id)}
+                onMouseEnter={() => setHoveredMailId(m.id)}
+                onMouseLeave={() => setHoveredMailId(null)}
+                style={{ position:'relative', padding:'12px 14px 12px 20px', borderLeft:`3px solid ${isSelected ? ML_ACCENT : 'transparent'}`, background: isSelected ? '#14172A' : isHovered ? '#101328' : 'transparent', borderBottom:`1px solid ${ML_BORDER}`, cursor:'pointer' }}>
+                {m.unread && <div style={{ position:'absolute', left:8, top:'50%', transform:'translateY(-50%)', width:5, height:5, borderRadius:'50%', background:ML_ACCENT }}/>}
+                <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                    <span style={{ fontSize:12.5, fontWeight: m.unread ? 600 : 400, color: m.unread ? ML_T1 : ML_T2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{m.name || m.from}</span>
+                    <span style={{ fontSize:10.5, color: isHovered ? ML_T2 : ML_T3, flexShrink:0 }}>{m.time}</span>
+                  </div>
+                  <div style={{ fontSize:12.5, fontWeight: m.unread ? 500 : 400, color: m.unread ? '#B8BDD8' : '#606580', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.subject}</div>
+                  <div style={{ fontSize:11.5, color:ML_T3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', opacity: isHovered ? 0 : 1, minHeight:17 }}>{m.preview}</div>
+                </div>
+                {/* Hover quick actions */}
+                {isHovered && (
+                  <div style={{ position:'absolute', bottom:9, right:10, display:'flex', gap:3 }}>
+                    {[
+                      { title:'Archivar', icon:<Icon.inbox size={12}/> },
+                      { title:'Destacar', icon:<Icon.pin size={12}/> },
+                      { title:'Eliminar', icon:<Icon.x size={12}/> },
+                    ].map(a => (
+                      <button key={a.title} title={a.title} onClick={e => e.stopPropagation()}
+                        style={{ background:'#1E2235', border:`1px solid #252840`, borderRadius:5, padding:'4px 6px', cursor:'pointer', display:'flex', alignItems:'center', color:ML_T2 }}>
+                        {a.icon}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {thread && (
-        <div style={{ padding:28, overflowY:"auto" }}>
-          <div className="row between" style={{marginBottom:20}}>
-            <div>
-              <h2 style={{margin:0,fontFamily:"var(--font-display)",fontWeight:700,fontSize:20,letterSpacing:"-0.02em"}}>{thread.subject}</h2>
-              <div style={{fontSize:13,color:"var(--ink-500)",marginTop:4}}>De: {thread.from} · {thread.time}</div>
-            </div>
-            <div className="row gap-sm">
-              <button className="btn btn-sm"><Icon.arrowRight size={13}/> Asignar</button>
-              <button className="btn btn-sm btn-ghost"><Icon.more size={14}/></button>
-            </div>
+      {/* ── Right panel ─────────────────────────────────────────────────── */}
+
+      {/* ERP draft compose */}
+      {erpDraft && !sent && (
+        <div style={{ flex:1, background:ML_PANE, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+          <div style={{ padding:'24px 28px 18px', borderBottom:`1px solid ${ML_BORDER}` }}>
+            <h1 style={{ fontSize:19, fontWeight:600, color:ML_T1, margin:'0 0 6px', letterSpacing:'-0.3px' }}>Borrador — {erpDraft.empresa}</h1>
+            <div style={{ fontSize:12, color:ML_T3 }}>Generado por ERP · Outreach Brief aprobado</div>
           </div>
-          <div className="card" style={{padding:24,marginBottom:20,fontSize:14,lineHeight:1.7,color:"var(--ink-700)"}}>
-            <p>Hola Mateo,</p>
-            <p>Espero que estés bien. Te escribo para dar seguimiento a lo que estuvimos conversando la semana pasada.</p>
-            <p>Adjunto los datos actualizados del mes. Nos gustaría poder revisar el dashboard juntos antes del cierre del trimestre.</p>
-            <p>¿Tienes disponibilidad esta semana?</p>
-            <p>Saludos,<br/><strong>{thread.name}</strong></p>
-          </div>
-          <div className="card" style={{padding:16}}>
-            <div style={{fontSize:12,color:"var(--ink-500)",marginBottom:8}}>Responder a {thread.name}</div>
-            <textarea rows={4} style={{width:"100%",background:"transparent",border:0,resize:"none",fontSize:13,color:"var(--ink-800)",outline:"none",fontFamily:"inherit",boxSizing:"border-box"}} placeholder="Escribe tu respuesta..."/>
-            <div className="row between" style={{marginTop:8,borderTop:"1px solid var(--border-soft)",paddingTop:8}}>
-              <div className="row gap-sm">
-                <button className="btn btn-sm btn-ghost"><Icon.paperclip size={13}/></button>
-                <button className="btn btn-sm btn-ghost"><Icon.sparkles size={13}/> IA</button>
+          <div style={{ flex:1, overflowY:'auto', padding:'24px 28px' }}>
+            <div style={{ background:ML_ELEVATED, borderRadius:12, border:`1px solid ${ML_BORDER}`, overflow:'hidden', marginBottom:20 }}>
+              {[
+                { label:'Para', content: <span style={{ fontSize:13.5, color:ML_T1 }}>{erpDraft.to}</span>, readOnly:true },
+                { label:'Asunto', content: (
+                  <input value={draftSubject} onChange={e => setDraftSubject(e.target.value)}
+                    style={{ flex:1, background:'transparent', border:'none', outline:'none', fontSize:13.5, color:ML_T1, fontFamily:'inherit' }}/>
+                )},
+              ].map(({ label, content }, idx, arr) => (
+                <div key={label} style={{ padding:'14px 18px', borderBottom: idx < arr.length-1 ? `1px solid ${ML_BORDER}` : '0', display:'flex', alignItems:'center', gap:12 }}>
+                  <div style={{ fontSize:10, fontWeight:600, color:ML_T3, letterSpacing:'0.8px', textTransform:'uppercase', width:52, flexShrink:0 }}>{label}</div>
+                  {content}
+                </div>
+              ))}
+              <div style={{ padding:'14px 18px', borderTop:`1px solid ${ML_BORDER}` }}>
+                <textarea value={draftBody} onChange={e => setDraftBody(e.target.value)} rows={10}
+                  style={{ width:'100%', background:'transparent', border:'none', outline:'none', resize:'none', fontSize:13.5, color:'#AAB0CC', lineHeight:1.7, fontFamily:'inherit', boxSizing:'border-box' }}/>
               </div>
-              <button className="btn btn-brand btn-sm"><Icon.send size={13}/> Enviar</button>
+            </div>
+            <div style={{ fontSize:12, color:ML_T3, padding:'10px 14px', background:'#090B17', borderRadius:8, border:`1px solid ${ML_BORDER}`, marginBottom:20 }}>
+              Al enviar, <strong style={{ color:ML_T2 }}>{erpDraft.empresa}</strong> pasará al estado <strong style={{ color:ML_T1 }}>CONTACTADO</strong>.
+            </div>
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={sendDraft} disabled={sending || !draftSubject || !draftBody}
+                style={{ flex:1, padding:'11px 0', background: (sending || !draftSubject || !draftBody) ? '#1A1D2E' : 'linear-gradient(135deg, #5B5BF7, #7c3aed)', color: (sending || !draftSubject || !draftBody) ? ML_T3 : 'white', border:'none', borderRadius:10, fontSize:13.5, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:7, boxShadow: (sending || !draftSubject || !draftBody) ? 'none' : '0 4px 20px rgba(91,91,247,0.35)' }}>
+                <Icon.send size={14}/> {sending ? 'Enviando…' : 'Enviar email'}
+              </button>
+              <button onClick={() => setErpDraft(null)}
+                style={{ padding:'11px 18px', background:'transparent', border:`1px solid #2A1A1A`, borderRadius:10, fontSize:13, color:'#EF4444', cursor:'pointer' }}>
+                Descartar
+              </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ERP draft sent */}
+      {erpDraft && sent && (
+        <div style={{ flex:1, background:ML_PANE, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', textAlign:'center', padding:40 }}>
+          <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
+          <div style={{ fontWeight:700, fontSize:18, color:ML_T1, marginBottom:8 }}>Email enviado</div>
+          <div style={{ fontSize:13, color:ML_T2, maxWidth:300, lineHeight:1.6 }}>
+            Mensaje enviado a <strong>{erpDraft.to}</strong>.<br/><strong>{erpDraft.empresa}</strong> ahora está en estado <strong>CONTACTADO</strong>.
+          </div>
+          <button onClick={() => { setErpDraft(null); setSent(false); }}
+            style={{ marginTop:24, padding:'8px 18px', background:ML_ELEVATED, border:`1px solid ${ML_BORDER}`, borderRadius:8, fontSize:13, color:ML_T2, cursor:'pointer' }}>
+            Volver a la bandeja
+          </button>
+        </div>
+      )}
+
+      {/* Free compose */}
+      {composing && !erpDraft && !composeSent && (
+        <div style={{ flex:1, display:'flex', flexDirection:'column', background:'#111422', overflow:'hidden' }}>
+
+          {/* Header */}
+          <div style={{ padding:'12px 14px', background:'#181B2E', borderBottom:`1px solid #1E2235`, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <span style={{ fontSize:13, fontWeight:600, color:ML_T1 }}>Nuevo mensaje</span>
+            <div style={{ display:'flex', gap:5 }}>
+              <button onClick={() => setComposing(false)}
+                style={{ background:'#1E2235', border:'none', borderRadius:4, padding:'4px 8px', cursor:'pointer', color:ML_T2, fontSize:12 }}>−</button>
+              <button onClick={() => { setComposing(false); setComposeSent(false); }}
+                style={{ background:'#1E2235', border:'none', borderRadius:4, padding:'4px 8px', cursor:'pointer', color:ML_T2, fontSize:12 }}>✕</button>
+            </div>
+          </div>
+
+          {/* Fields */}
+          <div style={{ borderBottom:`1px solid #1E2235` }}>
+            <div style={{ padding:'9px 14px', borderBottom:`1px solid #1E2235`, display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:10.5, fontWeight:600, color:ML_T3, letterSpacing:'0.8px', textTransform:'uppercase', width:38, flexShrink:0 }}>De</span>
+              <input type="text" value={composeFrom} onChange={e => setComposeFrom(e.target.value)}
+                placeholder="remitente@inspyra.cloud"
+                style={{ flex:1, background:'none', border:'none', outline:'none', fontSize:13, color:ML_T1, fontFamily:'inherit' }}/>
+            </div>
+            <div style={{ padding:'8px 14px', borderBottom:`1px solid #1E2235`, display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:10.5, fontWeight:600, color:ML_T3, letterSpacing:'0.8px', textTransform:'uppercase', width:38, flexShrink:0 }}>Para</span>
+              <input type="text" placeholder="destinatario@empresa.com" value={composeTo} onChange={e => setComposeTo(e.target.value)}
+                style={{ flex:1, background:'none', border:'none', outline:'none', fontSize:13, color:ML_T1, fontFamily:'inherit' }}/>
+            </div>
+            <div style={{ padding:'8px 14px', display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:10.5, fontWeight:600, color:ML_T3, letterSpacing:'0.8px', textTransform:'uppercase', width:38, flexShrink:0 }}>Asunto</span>
+              <input type="text" placeholder="Asunto del mensaje" value={composeSubject} onChange={e => setComposeSubject(e.target.value)}
+                style={{ flex:1, background:'none', border:'none', outline:'none', fontSize:13, color:ML_T1, fontWeight:500, fontFamily:'inherit' }}/>
+            </div>
+          </div>
+
+          {/* Toolbar row 1 */}
+          <div style={{ padding:'6px 10px', background:'#0D0F1C', borderBottom:`1px solid #1E2235`, display:'flex', alignItems:'center', gap:1, flexWrap:'wrap' }}>
+            {/* Text formatting */}
+            {[
+              { label:<b style={{ fontSize:12 }}>B</b>, cmd:'bold', title:'Negrita (Ctrl+B)' },
+              { label:<i style={{ fontSize:12 }}>I</i>, cmd:'italic', title:'Cursiva (Ctrl+I)' },
+              { label:<u style={{ fontSize:12 }}>U</u>, cmd:'underline', title:'Subrayado (Ctrl+U)' },
+              { label:<s style={{ fontSize:12 }}>S</s>, cmd:'strikeThrough', title:'Tachado' },
+            ].map(({ label, cmd, title }) => (
+              <button key={cmd} title={title} onMouseDown={e => { e.preventDefault(); execCmd(cmd); }}
+                style={{ background:'none', border:'none', borderRadius:4, padding:'4px 7px', cursor:'pointer', color:ML_T2, minWidth:26, textAlign:'center', lineHeight:1 }}>
+                {label}
+              </button>
+            ))}
+            <div style={{ width:1, height:16, background:'#1E2235', margin:'0 4px' }}/>
+            {/* Superscript / subscript */}
+            <button title="Superíndice" onMouseDown={e => { e.preventDefault(); execCmd('superscript'); }}
+              style={{ background:'none', border:'none', borderRadius:4, padding:'4px 7px', cursor:'pointer', color:ML_T2, fontSize:11 }}>
+              X<sup style={{ fontSize:8 }}>2</sup>
+            </button>
+            <button title="Subíndice" onMouseDown={e => { e.preventDefault(); execCmd('subscript'); }}
+              style={{ background:'none', border:'none', borderRadius:4, padding:'4px 7px', cursor:'pointer', color:ML_T2, fontSize:11 }}>
+              X<sub style={{ fontSize:8 }}>2</sub>
+            </button>
+            <div style={{ width:1, height:16, background:'#1E2235', margin:'0 4px' }}/>
+            {/* Alignment */}
+            {[
+              { label:'⬱', cmd:'justifyLeft', title:'Alinear izquierda' },
+              { label:'☰', cmd:'justifyCenter', title:'Centrar' },
+              { label:'⬲', cmd:'justifyRight', title:'Alinear derecha' },
+            ].map(({ label, cmd, title }) => (
+              <button key={cmd} title={title} onMouseDown={e => { e.preventDefault(); execCmd(cmd); }}
+                style={{ background:'none', border:'none', borderRadius:4, padding:'4px 7px', cursor:'pointer', color:ML_T2, fontSize:13 }}>
+                {label}
+              </button>
+            ))}
+            <div style={{ width:1, height:16, background:'#1E2235', margin:'0 4px' }}/>
+            {/* Lists */}
+            {[
+              { label:'≡•', cmd:'insertUnorderedList', title:'Lista con viñetas' },
+              { label:'1.', cmd:'insertOrderedList', title:'Lista numerada' },
+            ].map(({ label, cmd, title }) => (
+              <button key={cmd} title={title} onMouseDown={e => { e.preventDefault(); execCmd(cmd); }}
+                style={{ background:'none', border:'none', borderRadius:4, padding:'4px 7px', cursor:'pointer', color:ML_T2, fontSize:12 }}>
+                {label}
+              </button>
+            ))}
+            {/* Indent / outdent */}
+            <button title="Aumentar sangría" onMouseDown={e => { e.preventDefault(); execCmd('indent'); }}
+              style={{ background:'none', border:'none', borderRadius:4, padding:'4px 7px', cursor:'pointer', color:ML_T2, fontSize:12 }}>→</button>
+            <button title="Reducir sangría" onMouseDown={e => { e.preventDefault(); execCmd('outdent'); }}
+              style={{ background:'none', border:'none', borderRadius:4, padding:'4px 7px', cursor:'pointer', color:ML_T2, fontSize:12 }}>←</button>
+            <div style={{ width:1, height:16, background:'#1E2235', margin:'0 4px' }}/>
+            {/* Quote + Code block */}
+            <button title="Cita" onMouseDown={e => { e.preventDefault(); execCmd('formatBlock', 'blockquote'); }}
+              style={{ background:'none', border:'none', borderRadius:4, padding:'4px 7px', cursor:'pointer', color:ML_T2, fontSize:13 }}>&ldquo;</button>
+            <button title="Bloque de código" onMouseDown={e => { e.preventDefault(); execCmd('formatBlock', 'pre'); }}
+              style={{ background:'none', border:'none', borderRadius:4, padding:'4px 7px', cursor:'pointer', color:ML_T2, fontSize:10, fontFamily:'monospace', letterSpacing:'-0.5px' }}>&lt;/&gt;</button>
+            {/* Horizontal rule */}
+            <button title="Línea horizontal" onMouseDown={e => { e.preventDefault(); execCmd('insertHorizontalRule'); }}
+              style={{ background:'none', border:'none', borderRadius:4, padding:'4px 7px', cursor:'pointer', color:ML_T2, fontSize:13, letterSpacing:'-2px' }}>—</button>
+            {/* Link */}
+            <button title="Insertar enlace" onMouseDown={e => { e.preventDefault(); insertLink(); }}
+              style={{ background:'none', border:'none', borderRadius:4, padding:'4px 7px', cursor:'pointer', color:ML_T2, fontSize:13 }}>🔗</button>
+            <button title="Quitar enlace" onMouseDown={e => { e.preventDefault(); execCmd('unlink'); }}
+              style={{ background:'none', border:'none', borderRadius:4, padding:'4px 7px', cursor:'pointer', color:ML_T2, fontSize:10 }}>✕🔗</button>
+            {/* Image insert */}
+            <button title="Insertar imagen desde PC" onMouseDown={e => { e.preventDefault(); imageInputRef.current?.click(); }}
+              style={{ background:'none', border:'none', borderRadius:4, padding:'4px 7px', cursor:'pointer', color:'#60a5fa', fontSize:13 }}>🖼</button>
+            <div style={{ flex:1 }}/>
+            <button title="Limpiar formato" onMouseDown={e => { e.preventDefault(); execCmd('removeFormat'); }}
+              style={{ background:'none', border:'none', cursor:'pointer', fontSize:10.5, color:ML_T3, padding:'4px 6px' }}>Limpiar</button>
+          </div>
+
+          {/* Toolbar row 2 — colors + font size */}
+          <div style={{ padding:'5px 10px', background:'#0D0F1C', borderBottom:`1px solid #1E2235`, display:'flex', alignItems:'center', gap:6 }}>
+            {/* Font size */}
+            <span style={{ fontSize:10, color:ML_T3, marginRight:2 }}>Tamaño:</span>
+            {[
+              { label:'S', px:'11px', title:'Pequeño' },
+              { label:'M', px:'13px', title:'Normal' },
+              { label:'L', px:'16px', title:'Grande' },
+              { label:'XL', px:'20px', title:'Muy grande' },
+              { label:'XXL', px:'26px', title:'Título' },
+            ].map(({ label, px, title }) => (
+              <button key={px} title={title} onMouseDown={e => { e.preventDefault(); setFontSize(px); }}
+                style={{ background:'none', border:`1px solid #1E2235`, borderRadius:4, padding:'2px 6px', cursor:'pointer', color:ML_T2, fontSize:10, fontWeight:600 }}>
+                {label}
+              </button>
+            ))}
+            <div style={{ width:1, height:16, background:'#1E2235', margin:'0 2px' }}/>
+            {/* Text colors */}
+            <span style={{ fontSize:10, color:ML_T3, marginRight:2 }}>Texto:</span>
+            {[
+              { color:'#818cf8', title:'Violeta' }, { color:'#34d399', title:'Verde' },
+              { color:'#f87171', title:'Rojo' }, { color:'#fbbf24', title:'Amarillo' },
+              { color:'#60a5fa', title:'Azul' }, { color:'#fb923c', title:'Naranja' },
+            ].map(({ color, title }) => (
+              <button key={color} title={title} onMouseDown={e => { e.preventDefault(); execCmd('foreColor', color); }}
+                style={{ width:14, height:14, borderRadius:'50%', background:color, border:'2px solid transparent', cursor:'pointer', padding:0 }}/>
+            ))}
+            <button title="Color normal" onMouseDown={e => { e.preventDefault(); execCmd('foreColor', ML_T1); }}
+              style={{ background:'transparent', border:`1px solid #252840`, color:ML_T1, padding:'2px 6px', borderRadius:4, cursor:'pointer', fontSize:10, fontWeight:700, marginLeft:1 }}>A</button>
+            <div style={{ width:1, height:16, background:'#1E2235', margin:'0 2px' }}/>
+            {/* Highlight colors */}
+            <span style={{ fontSize:10, color:ML_T3, marginRight:2 }}>Resaltar:</span>
+            {[
+              { color:'rgba(251,191,36,0.35)', title:'Amarillo' },
+              { color:'rgba(52,211,153,0.3)', title:'Verde' },
+              { color:'rgba(96,165,250,0.3)', title:'Azul' },
+              { color:'rgba(248,113,113,0.3)', title:'Rojo' },
+            ].map(({ color, title }) => (
+              <button key={color} title={title} onMouseDown={e => { e.preventDefault(); execCmd('hiliteColor', color); }}
+                style={{ width:14, height:14, borderRadius:3, background:color, border:`1px solid #252840`, cursor:'pointer', padding:0 }}/>
+            ))}
+            <button title="Sin resaltado" onMouseDown={e => { e.preventDefault(); execCmd('hiliteColor', 'transparent'); }}
+              style={{ background:'transparent', border:`1px solid #252840`, color:ML_T3, padding:'2px 5px', borderRadius:4, cursor:'pointer', fontSize:9 }}>✕</button>
+          </div>
+
+          {/* Hidden image file picker */}
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display:'none' }}
+            onChange={e => {
+              const file = e.target.files?.[0];
+              if (file) insertImageFile(file);
+              e.target.value = '';
+            }}
+          />
+
+          {/* Editor */}
+          <div style={{ flex:1, position:'relative', overflow:'hidden' }}>
+            {!composeHasContent && (
+              <div style={{ position:'absolute', top:16, left:16, color:ML_T3, fontSize:13.5, pointerEvents:'none', userSelect:'none' }}>
+                Escribe tu mensaje aquí...
+              </div>
+            )}
+            <div ref={composeEditorRef} contentEditable suppressContentEditableWarning
+              onInput={() => setComposeHasContent(!!composeEditorRef.current?.textContent?.trim())}
+              style={{ height:'100%', overflowY:'auto', padding:'14px 16px', outline:'none', color:ML_T1, fontSize:13.5, lineHeight:1.7, fontFamily:'inherit' }}/>
+          </div>
+
+          {/* Footer */}
+          <div style={{ padding:'10px 12px', borderTop:`1px solid #1E2235`, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+              <button onClick={sendFree}
+                disabled={composeSending || !composeTo || !composeSubject || !composeHasContent}
+                style={{ padding:'8px 18px', background: (composeSending || !composeTo || !composeSubject || !composeHasContent) ? '#1E2235' : 'linear-gradient(135deg, #5B5BF7, #7c3aed)', color: (composeSending || !composeTo || !composeSubject || !composeHasContent) ? ML_T3 : 'white', border:'none', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:6, boxShadow: (composeSending || !composeTo || !composeSubject || !composeHasContent) ? 'none' : '0 2px 12px rgba(91,91,247,0.35)' }}>
+                <Icon.send size={13}/> {composeSending ? 'Enviando…' : 'Enviar email'}
+              </button>
+            </div>
+            <button onClick={() => setComposing(false)}
+              style={{ background:'none', border:'none', cursor:'pointer', fontSize:12, color:ML_T3, padding:'4px 8px' }}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {/* Free compose sent */}
+      {composing && !erpDraft && composeSent && (
+        <div style={{ flex:1, background:ML_PANE, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', textAlign:'center', padding:40 }}>
+          <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
+          <div style={{ fontWeight:700, fontSize:18, color:ML_T1, marginBottom:8 }}>Email enviado</div>
+          <div style={{ fontSize:13, color:ML_T2, maxWidth:300, lineHeight:1.6 }}>Mensaje enviado a <strong>{composeTo}</strong>.</div>
+          <div style={{ display:'flex', gap:10, marginTop:24 }}>
+            <button onClick={openCompose}
+              style={{ padding:'8px 18px', background:'#5B5BF7', color:'white', border:'none', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
+              <span>+</span> Nuevo mensaje
+            </button>
+            <button onClick={() => { setComposing(false); setComposeSent(false); }}
+              style={{ padding:'8px 18px', background:ML_ELEVATED, border:`1px solid ${ML_BORDER}`, borderRadius:8, fontSize:13, color:ML_T2, cursor:'pointer' }}>
+              Volver a la bandeja
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Message viewer */}
+      {!erpDraft && !composing && !showMailboxMgmt && activeMessage && (
+        <div style={{ flex:1, background:ML_PANE, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+
+          {/* Header */}
+          <div style={{ padding:'24px 28px 18px', borderBottom:`1px solid ${ML_BORDER}` }}>
+            <h1 style={{ fontSize:19, fontWeight:600, color:ML_T1, margin:'0 0 14px', letterSpacing:'-0.3px', lineHeight:1.3 }}>{activeMessage.subject}</h1>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                {(() => { const av = getAvatar(activeMessage.name || activeMessage.from); return (
+                  <div style={{ width:34, height:34, borderRadius:'50%', background:`${av.color}28`, border:`1px solid ${av.color}50`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:600, color:av.color, flexShrink:0 }}>{av.letter}</div>
+                ); })()}
+                <div>
+                  <div style={{ fontSize:13.5, fontWeight:500, color:ML_T1 }}>
+                    {activeMessage.isDraft ? 'Borrador' : activeMessage.isSent ? 'Enviado' : activeMessage.name || activeMessage.from}
+                  </div>
+                  <div style={{ fontSize:11.5, color:ML_T3, marginTop:2 }}>
+                    {activeMessage.isDraft
+                      ? <>Para: {activeMessage.from} · {activeMessage.time}</>
+                      : activeMessage.isSent
+                      ? <><span style={{ marginRight:5, fontSize:10, fontWeight:600, color:'#5B5BF7', padding:'1px 6px', borderRadius:10, background:'rgba(91,91,247,0.15)' }}>{activeMessage.activityType?.replace(/_/g,' ')}</span>Para: {activeMessage.toAddress} · {activeMessage.time}</>
+                      : <>{messageDetail?.from ?? activeMessage.from}<span style={{ margin:'0 5px', color:'#2A2E42' }}>→</span>contacto@inspyra.cloud · {activeMessage.time}</>
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action bar — only for IMAP messages */}
+          {!activeMessage.isDraft && !activeMessage.isSent && (
+            <div style={{ padding:'10px 28px', borderBottom:`1px solid ${ML_BORDER}`, display:'flex', gap:5, alignItems:'center' }}>
+              {[
+                { label:'Responder', icon:<Icon.inbox size={13}/>, primary:true, onClick:() => {} },
+                { label:'Reenviar', icon:<Icon.send size={13}/>, primary:false, onClick:() => {} },
+                { label:'Archivar', icon:<Icon.inbox size={13}/>, primary:false, onClick:() => {} },
+                { label:'Destacar', icon:<Icon.pin size={13}/>, primary:false, onClick:() => {} },
+                { label:'Eliminar', icon:<Icon.x size={13}/>, primary:false, onClick:() => {} },
+              ].map(a => (
+                <button key={a.label} onClick={a.onClick}
+                  style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 11px', background: a.primary ? 'rgba(91,91,247,0.1)' : 'transparent', border:`1px solid ${a.primary ? 'rgba(91,91,247,0.3)' : ML_BORDER}`, borderRadius:7, color: a.primary ? '#5B5BF7' : ML_T2, fontSize:12, fontWeight: a.primary ? 500 : 400, cursor:'pointer' }}>
+                  {a.icon} {a.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Scrollable body */}
+          <div style={{ flex:1, overflowY:'auto' }}>
+
+            {/* API draft viewer */}
+            {activeMessage.isDraft && (
+              <div style={{ padding:'24px 28px' }}>
+                <div style={{ background:ML_ELEVATED, borderRadius:12, border:`1px solid ${ML_BORDER}`, overflow:'hidden', marginBottom:20 }}>
+                  {[
+                    { label:'Para', value: activeMessage.from },
+                    { label:'Asunto', value: activeMessage.subject },
+                    ...(activeMessage.externalRef ? [{ label:'Referencia', value: activeMessage.externalRef }] : []),
+                  ].map(({ label, value }, idx, arr) => (
+                    <div key={label} style={{ padding:'14px 18px', borderBottom: idx < arr.length-1 ? `1px solid ${ML_BORDER}` : '0' }}>
+                      <div style={{ fontSize:10, fontWeight:600, color:ML_T3, letterSpacing:'0.8px', textTransform:'uppercase', marginBottom:4 }}>{label}</div>
+                      <div style={{ fontSize:13.5, color:ML_T1, fontFamily: label==='Referencia' ? 'monospace' : 'inherit' }}>{value}</div>
+                    </div>
+                  ))}
+                  <div style={{ padding:'14px 18px', borderTop:`1px solid ${ML_BORDER}` }}>
+                    <div style={{ fontSize:13, color:ML_T3, fontStyle:'italic', padding:'10px 14px', background:'#090B17', borderRadius:8, border:`1px solid ${ML_BORDER}`, lineHeight:1.6 }}>
+                      El contenido del borrador está disponible en INSPYRA Mail. Desde aquí podés enviarlo o eliminarlo.
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:10 }}>
+                  <button onClick={() => sendApiDraft(activeMessage.id, activeMessage.externalRef)}
+                    disabled={draftSending || draftDeleting}
+                    style={{ flex:1, padding:'11px 0', background: (draftSending||draftDeleting) ? ML_BORDER : 'linear-gradient(135deg, #5B5BF7, #7c3aed)', color: (draftSending||draftDeleting) ? ML_T3 : 'white', border:'none', borderRadius:10, fontSize:13.5, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:7, boxShadow: (draftSending||draftDeleting) ? 'none' : '0 4px 20px rgba(91,91,247,0.35)' }}>
+                    <Icon.send size={14}/> {draftSending ? 'Enviando…' : 'Enviar borrador'}
+                  </button>
+                  <button onClick={() => deleteApiDraft(activeMessage.id)}
+                    disabled={draftSending || draftDeleting}
+                    style={{ padding:'11px 18px', background:'transparent', border:`1px solid #2A1A1A`, borderRadius:10, fontSize:13, color:'#EF4444', cursor:'pointer' }}>
+                    {draftDeleting ? 'Eliminando…' : 'Eliminar'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Sent email viewer */}
+            {activeMessage.isSent && (
+              <div style={{ padding:'28px 32px' }}>
+                <div style={{ fontSize:14, lineHeight:1.8, color:'#AAB0CC', fontWeight:300, maxWidth:640, letterSpacing:'0.1px' }}>
+                  {activeMessage.html
+                    ? <div dangerouslySetInnerHTML={{ __html: activeMessage.html }}/>
+                    : <div>{activeMessage.preview || '(sin contenido)'}</div>
+                  }
+                </div>
+              </div>
+            )}
+
+            {/* IMAP message + reply */}
+            {!activeMessage.isDraft && !activeMessage.isSent && (
+              <div style={{ padding:'28px 32px' }}>
+                <div style={{ fontSize:14, lineHeight:1.8, color:'#AAB0CC', fontWeight:300, maxWidth:640, letterSpacing:'0.1px', marginBottom:24 }}>
+                  {loadingDetail && <div style={{ color:ML_T3 }}>Cargando mensaje…</div>}
+                  {!loadingDetail && messageDetail?.html && <div dangerouslySetInnerHTML={{ __html: messageDetail.html }}/>}
+                  {!loadingDetail && !messageDetail?.html && messageDetail?.plainText && <div style={{ whiteSpace:'pre-wrap' }}>{messageDetail.plainText}</div>}
+                  {!loadingDetail && !messageDetail?.html && !messageDetail?.plainText && <div style={{ color:ML_T3 }}>{activeMessage.preview || '(sin contenido)'}</div>}
+                </div>
+
+                {/* Reply box */}
+                <div style={{ background:ML_ELEVATED, borderRadius:12, border:`1px solid ${ML_BORDER}`, overflow:'hidden', maxWidth:640 }}>
+                  {replySent ? (
+                    <div style={{ padding:'16px 20px', textAlign:'center', color:'#22C55E', fontSize:13, fontWeight:600 }}>✓ Respuesta enviada</div>
+                  ) : (
+                    <>
+                      <div style={{ padding:'12px 16px 0', fontSize:12, color:ML_T3 }}>Responder a {activeMessage.name || activeMessage.from}</div>
+                      <textarea rows={4} value={replyBody} onChange={e => setReplyBody(e.target.value)}
+                        placeholder="Escribe tu respuesta..."
+                        style={{ width:'100%', background:'transparent', border:'none', outline:'none', resize:'none', padding:'10px 16px', fontSize:13.5, color:ML_T1, lineHeight:1.7, fontFamily:'inherit', boxSizing:'border-box' }}/>
+                      <div style={{ padding:'10px 12px', borderTop:`1px solid ${ML_BORDER}`, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                        <button style={{ background:'none', border:`1px solid ${ML_BORDER}`, borderRadius:7, padding:'5px 10px', cursor:'pointer', color:ML_T2, display:'flex', alignItems:'center', gap:4, fontSize:11.5 }}>
+                          <Icon.sparkles size={12}/> IA
+                        </button>
+                        <button onClick={sendReply} disabled={replySending || !replyBody.trim()}
+                          style={{ padding:'7px 16px', background: (replySending||!replyBody.trim()) ? ML_BORDER : 'linear-gradient(135deg, #5B5BF7, #7c3aed)', color: (replySending||!replyBody.trim()) ? ML_T3 : 'white', border:'none', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
+                          <Icon.send size={12}/> {replySending ? 'Enviando…' : 'Enviar'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Mailbox management panel */}
+      {showMailboxMgmt && !composing && !erpDraft && (
+        <div style={{ flex:1, background:ML_PANE, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+          {/* Header */}
+          <div style={{ padding:'24px 28px 18px', borderBottom:`1px solid ${ML_BORDER}`, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div>
+              <h1 style={{ fontSize:18, fontWeight:600, color:ML_T1, margin:'0 0 4px', letterSpacing:'-0.3px' }}>Gestión de buzones</h1>
+              <div style={{ fontSize:12, color:ML_T3 }}>Administrá los mailboxes de INSPYRA Mail</div>
+            </div>
+            <button onClick={() => setShowMailboxMgmt(false)}
+              style={{ background:ML_ELEVATED, border:`1px solid ${ML_BORDER}`, borderRadius:7, padding:'6px 12px', fontSize:12, color:ML_T2, cursor:'pointer' }}>
+              Cerrar
+            </button>
+          </div>
+
+          <div style={{ flex:1, overflowY:'auto', padding:'24px 28px' }}>
+
+            {/* Create form */}
+            <div style={{ background:ML_ELEVATED, borderRadius:12, border:`1px solid ${ML_BORDER}`, padding:'20px', marginBottom:24 }}>
+              <div style={{ fontSize:12, fontWeight:600, color:ML_T3, letterSpacing:'0.8px', textTransform:'uppercase', marginBottom:14 }}>Crear nuevo mailbox</div>
+              <div style={{ display:'flex', gap:10, alignItems:'flex-end', flexWrap:'wrap' }}>
+                <div style={{ flex:1, minWidth:180 }}>
+                  <div style={{ fontSize:10.5, color:ML_T3, marginBottom:5, textTransform:'uppercase', letterSpacing:'0.6px' }}>Email</div>
+                  <div style={{ display:'flex', alignItems:'center', background:'#090B17', border:`1px solid ${ML_BORDER}`, borderRadius:8, overflow:'hidden' }}>
+                    <input
+                      type="text"
+                      placeholder="nombre"
+                      value={mbNewEmail}
+                      onChange={e => setMbNewEmail(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && createMailbox()}
+                      style={{ flex:1, background:'transparent', border:'none', outline:'none', padding:'9px 12px', fontSize:13, color:ML_T1, fontFamily:'inherit' }}
+                    />
+                    <span style={{ padding:'0 12px 0 4px', fontSize:12, color:ML_T3, flexShrink:0 }}>@inspyra.cloud</span>
+                  </div>
+                </div>
+                <div style={{ width:100 }}>
+                  <div style={{ fontSize:10.5, color:ML_T3, marginBottom:5, textTransform:'uppercase', letterSpacing:'0.6px' }}>Cuota (MB)</div>
+                  <input
+                    type="number"
+                    value={mbNewQuota}
+                    onChange={e => setMbNewQuota(e.target.value)}
+                    min={100}
+                    style={{ width:'100%', background:'#090B17', border:`1px solid ${ML_BORDER}`, borderRadius:8, padding:'9px 12px', fontSize:13, color:ML_T1, outline:'none', fontFamily:'inherit', boxSizing:'border-box' }}
+                  />
+                </div>
+                <button onClick={createMailbox} disabled={mbCreating || !mbNewEmail.trim()}
+                  style={{ padding:'9px 20px', background: (mbCreating || !mbNewEmail.trim()) ? ML_BORDER : '#5B5BF7', color: (mbCreating || !mbNewEmail.trim()) ? ML_T3 : 'white', border:'none', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', flexShrink:0, boxShadow: (mbCreating || !mbNewEmail.trim()) ? 'none' : '0 2px 12px rgba(91,91,247,0.3)' }}>
+                  {mbCreating ? 'Creando…' : '+ Crear'}
+                </button>
+              </div>
+
+              {/* Password reveal after create */}
+              {mbNewPassword && (
+                <div style={{ marginTop:14, padding:'12px 16px', background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.25)', borderRadius:8 }}>
+                  <div style={{ fontSize:11, fontWeight:600, color:'#22C55E', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.6px' }}>✓ Mailbox creado — Contraseña inicial (solo se muestra una vez)</div>
+                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <code style={{ flex:1, fontSize:14, fontFamily:'monospace', color:ML_T1, background:'#090B17', padding:'8px 12px', borderRadius:6, letterSpacing:'0.5px' }}>{mbNewPassword}</code>
+                    <button onClick={() => navigator.clipboard.writeText(mbNewPassword)}
+                      style={{ padding:'7px 12px', background:'rgba(34,197,94,0.15)', border:'1px solid rgba(34,197,94,0.3)', borderRadius:7, fontSize:11, color:'#22C55E', cursor:'pointer' }}>
+                      Copiar
+                    </button>
+                    <button onClick={() => setMbNewPassword(null)}
+                      style={{ padding:'7px 10px', background:'transparent', border:`1px solid ${ML_BORDER}`, borderRadius:7, fontSize:11, color:ML_T3, cursor:'pointer' }}>✕</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Reset password result */}
+            {mbResetResult && (
+              <div style={{ marginBottom:20, padding:'12px 16px', background:'rgba(251,191,36,0.08)', border:'1px solid rgba(251,191,36,0.25)', borderRadius:8 }}>
+                <div style={{ fontSize:11, fontWeight:600, color:'#FBBF24', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.6px' }}>Nueva contraseña para {mbResetResult.email} (solo se muestra una vez)</div>
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <code style={{ flex:1, fontSize:14, fontFamily:'monospace', color:ML_T1, background:'#090B17', padding:'8px 12px', borderRadius:6, letterSpacing:'0.5px' }}>{mbResetResult.password}</code>
+                  <button onClick={() => navigator.clipboard.writeText(mbResetResult.password)}
+                    style={{ padding:'7px 12px', background:'rgba(251,191,36,0.15)', border:'1px solid rgba(251,191,36,0.3)', borderRadius:7, fontSize:11, color:'#FBBF24', cursor:'pointer' }}>
+                    Copiar
+                  </button>
+                  <button onClick={() => setMbResetResult(null)}
+                    style={{ padding:'7px 10px', background:'transparent', border:`1px solid ${ML_BORDER}`, borderRadius:7, fontSize:11, color:ML_T3, cursor:'pointer' }}>✕</button>
+                </div>
+              </div>
+            )}
+
+            {/* Mailboxes list */}
+            <div style={{ fontSize:12, fontWeight:600, color:ML_T3, letterSpacing:'0.8px', textTransform:'uppercase', marginBottom:12 }}>
+              Buzones activos {mailboxes.length > 0 && <span style={{ color:ML_T3, fontWeight:400 }}>({mailboxes.length})</span>}
+            </div>
+
+            {loadingMailboxes && (
+              <div style={{ color:ML_T3, fontSize:13, padding:'20px 0' }}>Cargando buzones…</div>
+            )}
+
+            {!loadingMailboxes && mailboxes.length === 0 && (
+              <div style={{ color:ML_T3, fontSize:13, padding:'20px 0' }}>No hay buzones configurados todavía.</div>
+            )}
+
+            {mailboxes.map((mb: any) => (
+              <div key={mb.email ?? mb.id}
+                style={{ background:ML_ELEVATED, borderRadius:10, border:`1px solid ${ML_BORDER}`, padding:'14px 18px', marginBottom:10, display:'flex', alignItems:'center', gap:14 }}>
+                <div style={{ width:36, height:36, borderRadius:'50%', background:'linear-gradient(135deg, #5B5BF7, #7c3aed)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, color:'white', flexShrink:0 }}>
+                  {(mb.email ?? '?').charAt(0).toUpperCase()}
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13.5, fontWeight:500, color:ML_T1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{mb.email}</div>
+                  <div style={{ fontSize:11.5, color:ML_T3, marginTop:2 }}>
+                    {mb.quotaMB ? `${mb.quotaMB} MB` : '—'}
+                    {mb.usedMB != null && <span style={{ marginLeft:6 }}>· usado: {mb.usedMB} MB</span>}
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                  <button onClick={() => resetMailboxPassword(mb.email)}
+                    title="Resetear contraseña"
+                    style={{ padding:'6px 11px', background:'transparent', border:`1px solid ${ML_BORDER}`, borderRadius:7, fontSize:11.5, color:ML_T2, cursor:'pointer' }}>
+                    🔑 Resetear
+                  </button>
+                  <button onClick={() => deleteMailbox(mb.email)}
+                    title="Eliminar mailbox"
+                    style={{ padding:'6px 11px', background:'transparent', border:'1px solid #2A1A1A', borderRadius:7, fontSize:11.5, color:'#EF4444', cursor:'pointer' }}>
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Empty viewer */}
+      {!erpDraft && !composing && !activeMessage && !loadingMessages && !showMailboxMgmt && (
+        <div style={{ flex:1, background:ML_PANE, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', color:ML_T3, gap:10 }}>
+          <svg width={48} height={48} viewBox="0 0 24 24" fill="none" stroke="#1E2235" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+          <div style={{ fontSize:13, color:'#3A3E52' }}>Seleccioná un mensaje para leerlo</div>
         </div>
       )}
     </div>

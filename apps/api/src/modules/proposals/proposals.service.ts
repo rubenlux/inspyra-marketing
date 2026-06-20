@@ -49,6 +49,22 @@ interface CommercialProposalData {
 
 type ProposalData = OutreachBriefData | CommercialProposalData;
 
+export interface ReplyAgentResult {
+  intentAnalysis: 'POSITIVE' | 'NEUTRAL' | 'OBJECTION' | 'NOT_NOW' | 'NEGATIVE';
+  sentiment: string;
+  followUpMessage: string;
+  suggestMeeting: boolean;
+  recommendedAction: 'MARK_INTERESTED' | 'CONTINUE_CONVERSATION' | 'MARK_LOST' | 'SUGGEST_MEETING';
+  prospectIntel?: {
+    budgetTiming?: string;         // e.g. "Q1 2027", "next quarter"
+    competitorPresent?: boolean;
+    competitorName?: string;
+    painPoint?: string;            // specific pain mentioned in reply
+    contactPreference?: string;    // "WhatsApp", "email only", "call me"
+    decisionMakerEngaged?: boolean;
+  };
+}
+
 // ── Estrategias por mercado ──────────────────────────────────────────────────
 
 const MARKET_CONFIG: Record<string, {
@@ -151,6 +167,47 @@ const INDUSTRY_CONFIG: Record<IndustryKey, {
     tone: 'consultivo y profesional',
   },
 };
+
+// ── SIR opportunity helpers ──────────────────────────────────────────────────
+
+function extractSirOpportunities(validation: any): Array<{
+  serviceId: string; serviceName: string; category: string;
+  opportunityScore: number; signals: string[]; pitchLine: string;
+  estimatedTicketUsd: [number, number];
+}> {
+  const df = validation?.decisionFactors as Record<string, any> | null;
+  if (!df || !Array.isArray(df.sirOpportunities)) return [];
+  return df.sirOpportunities;
+}
+
+function formatSirBlock(validation: any, lang: 'EN' | string = 'ES'): string {
+  const sirOps = extractSirOpportunities(validation);
+  const df = validation?.decisionFactors as Record<string, any> | null;
+  const sector = df?.sector ?? null;
+  const businessModel = df?.businessModel ?? null;
+
+  if (sirOps.length === 0 && !sector) return '';
+
+  const header = lang === 'EN'
+    ? 'COMMERCIAL INTELLIGENCE (SIR)'
+    : 'INTELIGENCIA COMERCIAL (SIR)';
+
+  const lines: string[] = [`${header}:`];
+  if (sector) lines.push(`Sector: ${sector}${businessModel ? ` | Business Model: ${businessModel}` : ''}`);
+  if (sirOps.length > 0) {
+    lines.push('');
+    sirOps.slice(0, 4).forEach((o, i) => {
+      lines.push(`${i + 1}. ${o.serviceName} (score: ${o.opportunityScore}/100)`);
+      lines.push(`   Hook: "${o.pitchLine}"`);
+      lines.push(`   Ticket est.: USD ${o.estimatedTicketUsd[0]}–${o.estimatedTicketUsd[1]}`);
+    });
+    lines.push('');
+    lines.push(lang === 'EN'
+      ? 'USE the hooks above to make the outreach specific and relevant. Pick the top 1-2 services as the narrative anchor.'
+      : 'USÁ los hooks anteriores para hacer el mensaje específico y relevante. Anclar la narrativa en los 1-2 servicios con mayor score.');
+  }
+  return lines.join('\n');
+}
 
 function detectIndustryProfile(rubro?: string): IndustryKey {
   if (!rubro) return 'GENERIC';
@@ -451,9 +508,51 @@ export class ProposalsService {
     const langLabel = LANGUAGE_LABELS[communicationLanguage] ?? communicationLanguage;
     const isEN = communicationLanguage === 'EN';
 
+    // Build verified presence from enrichment (authoritative — overrides import-time assumptions)
+    const verifiedPresence = {
+      website: e?.website ?? prospect.website ?? null,
+      instagram: e?.instagram ?? prospect.instagram ?? null,
+      facebook: e?.facebook ?? prospect.facebook ?? null,
+      googleBusiness: e?.googleBusiness ?? prospect.googleBusiness ?? null,
+      linkedin: e?.linkedin ?? prospect.linkedin ?? null,
+      email: e?.email ?? prospect.email ?? null,
+      telefono: e?.telefono ?? prospect.telefono ?? null,
+    };
+    const hasAnySocial = !!(verifiedPresence.instagram || verifiedPresence.facebook || verifiedPresence.linkedin);
+    const hasContactChannel = !!(verifiedPresence.email || verifiedPresence.telefono);
+    const verifiedPresenceBlock = [
+      `- Website: ${verifiedPresence.website ?? 'Not found'}`,
+      `- Google Business Profile: ${verifiedPresence.googleBusiness ?? 'Not found'}`,
+      `- Instagram: ${verifiedPresence.instagram ?? 'Not found'}`,
+      `- Facebook: ${verifiedPresence.facebook ?? 'Not found'}`,
+      `- LinkedIn: ${verifiedPresence.linkedin ?? 'Not found'}`,
+      `- Email: ${verifiedPresence.email ?? 'Not found'}`,
+      `- Phone: ${verifiedPresence.telefono ?? 'Not found'}`,
+    ].join('\n');
+
+    // Use currentProblems (post-enrichment, verified) when available; fall back to raw snapshot
+    const baseProblems: string[] = (prospect.currentProblems?.length > 0
+      ? prospect.currentProblems
+      : prospect.problemasEncontrados) ?? [];
+
+    // Safety filter: remove any remaining contradictions (e.g. for prospects enriched before ERP-051)
+    const filteredProblems = baseProblems.filter(p => {
+      const pl = p.toLowerCase();
+      if (hasAnySocial && /sin.*redes|sin.*instagram|sin.*social|no.*social|no.*instagram/i.test(pl)) return false;
+      if (verifiedPresence.facebook && /sin.*facebook/i.test(pl)) return false;
+      if (verifiedPresence.googleBusiness && /sin.*gbp|sin.*google.*business|sin.*ficha|perfil gbp sin reclamar/i.test(pl)) return false;
+      if (verifiedPresence.website && /sin.*web|sin.*sitio/i.test(pl)) return false;
+      if (hasContactChannel && /sin.*canal|sin.*contacto|sin.*email.*visible/i.test(pl)) return false;
+      return true;
+    });
+
     return `You are a B2B outreach specialist for a digital marketing agency.
 Your task: generate an Outreach Brief for a cold prospect.
-GOAL: get ONE response. Not a sale. Not a meeting request.
+
+FUNNEL STAGE: First contact — cold prospect, no prior relationship.
+GOAL: Generate ONE reply. Not a sale. Not a meeting. Not a demo.
+The funnel is: Oportunidad → Conversación → Interés → Propuesta → Reunión.
+This email is step 1. Success = prospect replies. Nothing more.
 
 MARKET: ${marketProfile} — ${market.strategy}
 INDUSTRY: ${industryKey} — focus on: ${industry.focos.join(', ')}
@@ -463,13 +562,18 @@ PROSPECT:
 - Company: ${prospect.nombreEmpresa}
 - Industry: ${prospect.rubro ?? 'Not specified'}
 - Location: ${[prospect.ciudad, prospect.pais].filter(Boolean).join(', ') || 'Not specified'}
-- Website: ${prospect.website ?? 'No website'}
+- Website: ${verifiedPresence.website ?? 'No website'}
+
+VERIFIED DIGITAL PRESENCE (confirmed by enrichment — treat as ground truth):
+${verifiedPresenceBlock}
 
 DETECTED OPPORTUNITY:
 ${prospect.oportunidadDetectada ?? 'Not specified'}
 
-IDENTIFIED PROBLEMS:
-${(prospect.problemasEncontrados ?? []).map((p: string) => `- ${p}`).join('\n') || '- Not specified'}
+${formatSirBlock(v, 'EN')}
+
+IDENTIFIED PROBLEMS (after cross-checking against verified presence):
+${filteredProblems.map((p: string) => `- ${p}`).join('\n') || '- Not specified'}
 
 QUALITY SCORE: ${v?.agentScore ?? 'N/A'} / 100
 RECOMMENDED SERVICES: ${v?.servicesRecommended?.join(', ') ?? prospect.servicioSugerido ?? 'N/A'}
@@ -478,6 +582,12 @@ AGENT REASONING: ${v?.reasoning ?? 'Not available'}
 DECISION MAKER: ${e?.nombreDecidsor ?? 'Not identified'}${e?.rolDecidsor ? ` (${e.rolDecidsor})` : ''}
 
 ═══ CRITICAL RULES ═══
+
+VERIFIED PRESENCE — ABSOLUTE RULE:
+NEVER make claims that contradict the VERIFIED DIGITAL PRESENCE block above.
+If Instagram is listed as found, NEVER write "they have no social media" or similar.
+If a website is listed, NEVER write "they have no website".
+The verified presence data is the ground truth. Use it to anchor your analysis accurately.
 
 TONE — HOW TO DESCRIBE THE ANALYSIS:
 The analysis was performed using publicly available information (website, social media, Google).
@@ -508,12 +618,12 @@ analysisType:
 - MIXED: both
 
 outreachMessage — LANGUAGE: MUST be written entirely in ${langLabel.toUpperCase()} (${communicationLanguage})
-Format: short message (80-120 words MAX) ready to send via WhatsApp, email, or DM.
+Format: short, low-friction message (60-90 words MAX) ready to send via email or WhatsApp.
 Structure:
-- Line 1: greeting + company name
-- Paragraph 1 (2-3 sentences): what we found — specific to this company, no generic marketing speak
-- Paragraph 2 (1-2 sentences): why it matters for their business
-- CTA (1 sentence): invite to receive the complete analysis
+- Opening (1 sentence): specific observation about this company — no greeting formula, no "Hope this finds you well"
+- Body (2-3 sentences): what we found + why it matters for their specific business
+- CTA (1 sentence): invite to receive the existing analysis. NO meeting, NO call, NO demo.
+The message should read like a colleague sharing a useful finding, not a salesperson pitching.
 No bullet points. No asterisks. Plain prose.
 ${isEN ? '' : `IMPORTANT: the outreachMessage must be written in ${langLabel}, NOT in Spanish, even though this prompt is in English.`}
 
@@ -568,8 +678,10 @@ DATOS DEL PROSPECTO:
 OPORTUNIDAD:
 ${prospect.oportunidadDetectada ?? 'No especificada'}
 
+${formatSirBlock(v, communicationLanguage)}
+
 PROBLEMAS IDENTIFICADOS:
-${(prospect.problemasEncontrados ?? []).map((p: string) => `- ${p}`).join('\n') || '- No especificados'}
+${((prospect.currentProblems?.length > 0 ? prospect.currentProblems : prospect.problemasEncontrados) ?? []).map((p: string) => `- ${p}`).join('\n') || '- No especificados'}
 
 EVALUACIÓN DE OPORTUNIDAD:
 - Score: ${v?.agentScore ?? 'N/A'} / 100
@@ -779,12 +891,182 @@ ${!isHighValueMarket ? '5. Incluir 2-3 preguntas de calificación para el siguie
     return lines.join('\n');
   }
 
+  // ── Reply Agent ───────────────────────────────────────────────────────────────
+
+  async runReplyAgent(
+    prospectId: string,
+    tenantId: string,
+    replyText: string,
+  ): Promise<ReplyAgentResult> {
+    const prospect = await this.prisma.prospect.findFirst({
+      where: { id: prospectId, tenantId, deletedAt: null },
+      include: { validation: true, enrichmentResult: true },
+    });
+    if (!prospect) throw new NotFoundException(`Prospecto ${prospectId} no encontrado`);
+
+    // Load last approved outreach message for context
+    const lastOutreach = await this.prisma.proposal.findFirst({
+      where: { prospectId, tenantId, proposalType: 'OUTREACH', status: 'APPROVED' },
+      orderBy: { createdAt: 'desc' },
+      select: { proposalMarkdown: true },
+    });
+
+    let outreachMessage = '';
+    if (lastOutreach?.proposalMarkdown) {
+      const match = lastOutreach.proposalMarkdown.match(
+        /## Mensaje Outreach[^\n]*\n\n([\s\S]*?)(?:\n---|\n##|$)/,
+      );
+      outreachMessage = match?.[1]?.trim() ?? '';
+    }
+
+    // Load conversation history (MAIL-002D)
+    const conversationHistory = await this.loadConversationHistory(prospectId, tenantId);
+
+    const langLabel = LANGUAGE_LABELS[prospect.communicationLanguage ?? 'ES'] ?? 'español';
+    const v = prospect.validation as any;
+    const sirBlock = formatSirBlock(v, prospect.communicationLanguage ?? 'ES');
+    const servicesRecommended = v?.servicesRecommended?.join(', ') ?? prospect.servicioSugerido ?? '';
+
+    const prompt = this.buildReplyAgentPrompt(
+      prospect, outreachMessage, replyText, langLabel, sirBlock, servicesRecommended, conversationHistory,
+    );
+
+    this.logger.log(`[ReplyAgent] ${prospect.nombreEmpresa} — analyzing reply (history: ${conversationHistory ? 'yes' : 'none'})`);
+    const raw = await this.spawnClaude(prompt, 'claude-sonnet-4-6', 60_000);
+
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new BadRequestException('Reply Agent no devolvió JSON válido');
+
+    try {
+      return JSON.parse(jsonMatch[0]) as ReplyAgentResult;
+    } catch {
+      throw new BadRequestException('Reply Agent: error al parsear JSON');
+    }
+  }
+
+  private async loadConversationHistory(prospectId: string, tenantId: string): Promise<string> {
+    const activities = await this.prisma.outreachActivity.findMany({
+      where: {
+        prospectId,
+        tenantId,
+        type: { in: ['CONTACTADO', 'RESPUESTA_RECIBIDA', 'SEGUIMIENTO'] },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 10,
+      select: { type: true, note: true, mensajeUtilizado: true, createdAt: true },
+    });
+
+    if (activities.length === 0) return '';
+
+    return activities.map(a => {
+      const date = a.createdAt.toISOString().split('T')[0];
+      const role = a.type === 'RESPUESTA_RECIBIDA' ? 'PROSPECT' : 'INSPYRA';
+      const text = (a.mensajeUtilizado ?? a.note ?? '').slice(0, 500);
+      return `[${date}] ${role}: ${text}`;
+    }).join('\n\n---\n\n');
+  }
+
+  private buildReplyAgentPrompt(
+    prospect: any,
+    outreachMessage: string,
+    replyText: string,
+    langLabel: string,
+    sirBlock: string,
+    servicesRecommended: string,
+    conversationHistory: string,
+  ): string {
+    const historyBlock = conversationHistory
+      ? `CONVERSATION HISTORY (most recent last):\n${conversationHistory}\n`
+      : '';
+
+    return `You are Inspyra's Reply Agent. A prospect has responded in an ongoing email conversation.
+Your task: analyze their latest reply, classify intent, and draft the appropriate follow-up.
+
+FUNNEL STAGE: Email conversation in progress.
+GOAL: Keep the conversation alive. Build genuine interest through email.
+The funnel is: Oportunidad → Conversación → Interés → Propuesta → Reunión.
+Meetings and proposals come LATER — not now. Your job is the conversation.
+
+PROSPECT CONTEXT:
+- Company: ${prospect.nombreEmpresa}
+- Industry: ${prospect.rubro ?? 'Not specified'}
+- Location: ${[prospect.ciudad, prospect.pais].filter(Boolean).join(', ') || 'Not specified'}
+- Opportunity detected: ${prospect.oportunidadDetectada ?? 'Not specified'}
+- Services recommended: ${servicesRecommended || 'Not specified'}
+
+INITIAL OUTREACH MESSAGE:
+${outreachMessage || '(Not available)'}
+
+${historyBlock}
+PROSPECT'S LATEST REPLY:
+"${replyText}"
+
+${sirBlock}
+
+INTENT CLASSIFICATION (choose exactly one):
+- POSITIVE: clear interest — asks for more info, wants to see the analysis, says yes, wants details
+- NEUTRAL: polite but non-committal — "Thanks", "Interesting", "Tell me more" without clear commitment
+- OBJECTION: specific concern — already has a provider, not relevant, timing issue, not their priority
+- NOT_NOW: deferred — "Contact me in X months", "We're busy right now", "maybe later"
+- NEGATIVE: no interest — "Not interested", "Please stop contacting me"
+
+RESPONSE RULES BY INTENT:
+- POSITIVE: Share 2-3 specific findings from the analysis. Keep it conversational and concrete. No generic promises. No meeting invitation. End with a question or offer to share more.
+- NEUTRAL: Provide one specific insight tailored to their industry. End with ONE qualifying question. Conversational, no pitch.
+- OBJECTION: Address their specific concern directly. Acknowledge their situation. Keep the door open without pushing. No pressure.
+- NOT_NOW: Respect the timing. Offer to send the full analysis by email for when they're ready. Brief and warm.
+- NEGATIVE: Thank them briefly. Close professionally. One sentence.
+
+═══ CRITICAL: MEETING / CALL RULE ═══
+suggestMeeting = true ONLY when the prospect's message EXPLICITLY contains:
+  "presupuesto" | "propuesta" | "quiero hablar" | "llamame" | "reunión" | "agenda" |
+  "cuándo podemos" | "me interesa contratar" | "quote" | "pricing" | "proposal" | "call me" | "let's talk"
+In ALL other cases: suggestMeeting = false.
+NEVER suggest a meeting proactively. Let the prospect ask for it.
+════════════════════════════════════════
+
+USE CONVERSATION HISTORY: Do not repeat what was already said. Advance the conversation naturally.
+LANGUAGE: Write followUpMessage entirely in ${langLabel}.
+AVOID: "¿Agendamos?", "¿Tenés 15 minutos?", "¿Te llamo?", marketing speak, ROI promises, pressure tactics.
+
+PROSPECT INTEL EXTRACTION: From the latest reply, extract any signals present:
+- budgetTiming: specific timing mentioned (e.g. "Q2", "next year", "after the holidays")
+- competitorPresent: true if they mention having a current provider/agency/tool
+- competitorName: name of the competitor if mentioned
+- painPoint: the specific operational pain they expressed
+- contactPreference: if they suggest another channel (WhatsApp, phone, etc.)
+- decisionMakerEngaged: true if the respondent is clearly the decision maker
+
+recommendedAction mapping:
+- "SUGGEST_MEETING": prospect explicitly asked to talk, meet, or get a quote
+- "MARK_INTERESTED": prospect showed clear buying intent but didn't ask for meeting yet
+- "CONTINUE_CONVERSATION": anything else — keep the email thread alive
+- "MARK_LOST": NEGATIVE intent only
+
+Respond ONLY with valid JSON:
+{
+  "intentAnalysis": "POSITIVE" | "NEUTRAL" | "OBJECTION" | "NOT_NOW" | "NEGATIVE",
+  "sentiment": "string — 1 sentence explaining what the prospect communicated",
+  "followUpMessage": "string — plain prose in ${langLabel}. 80-150 words for POSITIVE, 60-100 for NEUTRAL/OBJECTION/NOT_NOW, 30-50 for NEGATIVE. No bullet points.",
+  "suggestMeeting": boolean,
+  "recommendedAction": "MARK_INTERESTED" | "CONTINUE_CONVERSATION" | "MARK_LOST" | "SUGGEST_MEETING",
+  "prospectIntel": {
+    "budgetTiming": "string or null",
+    "competitorPresent": boolean or null,
+    "competitorName": "string or null",
+    "painPoint": "string or null",
+    "contactPreference": "string or null",
+    "decisionMakerEngaged": boolean or null
+  }
+}`;
+  }
+
   // ── Claude spawner ────────────────────────────────────────────────────────────
 
   private spawnClaude(prompt: string, model: string, timeoutMs: number): Promise<string> {
     return new Promise((resolve, reject) => {
       const args = [
-        '-p', prompt,
+        '-p', '-',
         '--output-format', 'text',
         '--dangerously-skip-permissions',
         '--model', model,
@@ -796,6 +1078,8 @@ ${!isHighValueMarket ? '5. Incluir 2-3 preguntas de calificación para el siguie
         env: { ...process.env },
         stdio: ['pipe', 'pipe', 'pipe'],
       });
+      child.stdin.write(prompt, 'utf8');
+      child.stdin.end();
 
       let stdout = '';
       let stderr = '';

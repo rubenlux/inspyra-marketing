@@ -52,6 +52,19 @@ export class ProspectsController {
     return this.service.create(user.tenantId, userId, dto);
   }
 
+  @Post('bulk')
+  @ApiOperation({ summary: 'Bulk create prospects from CSV import' })
+  bulkCreate(@Body() dto: { prospects: CreateProspectDto[] }, @CurrentUser() user: JwtPayload) {
+    const userId = user.type === 'service' ? null : user.sub;
+    return this.service.bulkCreate(user.tenantId, userId, dto.prospects);
+  }
+
+  @Post('from-url')
+  @ApiOperation({ summary: 'Detect source type and extract prospect data from URL (preview only)' })
+  extractFromUrl(@Body() dto: { url: string }, @CurrentUser() user: JwtPayload) {
+    return this.service.extractFromUrl(dto.url);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update prospect (including state transitions)' })
   update(

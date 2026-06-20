@@ -12,6 +12,54 @@ import * as path from 'path';
 
 const SCORE_THRESHOLD = 75; // only APROBADO_IA (75-89) and PRIORIDAD_MAXIMA (90+)
 
+// Recomputes problems that can be verified from enrichment data.
+// Non-verifiable problems (e.g., SEO, site speed) are carried over from the original snapshot.
+function recomputeCurrentProblems(
+  prospectSnapshot: {
+    website?: string | null;
+    instagram?: string | null;
+    facebook?: string | null;
+    googleBusiness?: string | null;
+    fuente?: string | null;
+    problemasEncontrados: string[];
+  },
+  enrichment: {
+    instagram?: string | null;
+    facebook?: string | null;
+    googleBusiness?: string | null;
+  },
+): string[] {
+  const foundViaGoogleMaps = prospectSnapshot.fuente === 'GOOGLE_MAPS';
+
+  const hasWeb = !!prospectSnapshot.website;
+  const hasSocial = !!(
+    enrichment.instagram ?? enrichment.facebook ??
+    prospectSnapshot.instagram ?? prospectSnapshot.facebook
+  );
+  // GBP URL confirmed by enrichment = fully claimed/optimized profile
+  const hasGBPUrl = !!(enrichment.googleBusiness ?? prospectSnapshot.googleBusiness);
+
+  const verifiableProblems: string[] = [];
+  if (!hasWeb)    verifiableProblems.push('Sin sitio web');
+  if (!hasSocial) verifiableProblems.push('Sin redes sociales');
+
+  if (!hasGBPUrl) {
+    if (foundViaGoogleMaps) {
+      // Being found on Google Maps = has some Maps presence; gap is about profile quality, not existence
+      verifiableProblems.push('Perfil GBP sin reclamar');
+    } else {
+      verifiableProblems.push('Sin Google Business Profile');
+    }
+  }
+  // If hasGBPUrl = true: no GBP problem at all (profile is confirmed and reachable)
+
+  // Carry over non-verifiable problems (SEO, speed, agenda, etc.) from the original snapshot
+  const verifiablePattern = /sin.*web|sin.*sitio|sin.*redes|sin.*instagram|sin.*social|sin.*gbp|sin.*google.*business|sin.*ficha|perfil gbp/i;
+  const nonVerifiable = (prospectSnapshot.problemasEncontrados ?? []).filter(p => !verifiablePattern.test(p));
+
+  return [...new Set([...verifiableProblems, ...nonVerifiable])];
+}
+
 interface EnrichmentData {
   email?: string;
   telefono?: string;
@@ -60,12 +108,16 @@ export class EnrichmentService {
         `Revisá y aprobá el análisis en la pestaña Validación antes de iniciar el enriquecimiento.`,
       );
     }
-    // Gate 3: Score threshold — only APROBADO_IA or PRIORIDAD_MAXIMA.
-    if (prospect.validation.agentScore < SCORE_THRESHOLD) {
-      throw new BadRequestException(
-        `Opportunity Score ${prospect.validation.agentScore} por debajo del umbral (${SCORE_THRESHOLD}). ` +
-        `Solo APROBADO_IA o PRIORIDAD_MAXIMA pueden ser enriquecidos.`,
-      );
+    // Gate 3: Score threshold — bypassed when a human explicitly validated (VALIDATED).
+    // The score gate prevents auto-enrichment of low-quality prospects; human approval overrides it.
+    if (prospect.validation.status !== 'VALIDATED') {
+      const effectiveScore = prospect.validation.humanScore ?? prospect.validation.agentScore;
+      if (effectiveScore < SCORE_THRESHOLD) {
+        throw new BadRequestException(
+          `Opportunity Score ${effectiveScore} por debajo del umbral (${SCORE_THRESHOLD}). ` +
+          `Solo APROBADO_IA o PRIORIDAD_MAXIMA pueden ser enriquecidos, o aprobá manualmente el análisis.`,
+        );
+      }
     }
 
     // Gate 4: Idempotency — prevent duplicate enrichment agents running in parallel.
@@ -82,6 +134,13 @@ export class EnrichmentService {
 
     const job = await this.prisma.enrichmentJob.create({
       data: { tenantId, prospectId: dto.prospectId, createdBy: userId, status: 'PENDING' },
+    });
+
+    // NUEVO prospects (imported from Google Maps) must reach INVESTIGADO before enrichment
+    // advances them to ENRIQUECIDO. VALID_TRANSITIONS allows NUEVO → INVESTIGADO.
+    await this.prisma.prospect.updateMany({
+      where: { id: dto.prospectId, tenantId, estado: 'NUEVO' },
+      data: { estado: 'INVESTIGADO' },
     });
 
     setImmediate(() =>
@@ -252,8 +311,12 @@ export class EnrichmentService {
       pais?: string | null;
       website?: string | null;
       instagram?: string | null;
+      facebook?: string | null;
+      googleBusiness?: string | null;
       linkedin?: string | null;
+      fuente?: string | null;
       oportunidadDetectada?: string | null;
+      problemasEncontrados: string[];
     },
   ) {
     await this.prisma.enrichmentJob.update({
@@ -267,10 +330,17 @@ export class EnrichmentService {
       await this.updateOutput(jobId, `Buscando datos de contacto para "${prospect.nombreEmpresa}"…`);
 
       const raw = await this.enrichWithSonnet(prospect);
+
+      this.logger.log(`[BUG-004B] RAW ENRICHMENT OUTPUT:\n${raw}`);
+
       const data = this.parseEnrichmentOutput(raw);
+
+      this.logger.log(`[BUG-004B] PARSED ENRICHMENT:\n${JSON.stringify(data, null, 2)}`);
 
       const contactable = Boolean(data.email || data.telefono || data.whatsapp || data.formularioWeb);
       const contactabilityScore = this.computeContactabilityScore(data);
+
+      this.logger.log(`[BUG-004B] CONTACTABILITY:\n${JSON.stringify({ email: data.email, telefono: data.telefono, whatsapp: data.whatsapp, linkedin: data.linkedin, facebook: data.facebook, instagram: data.instagram, score: contactabilityScore }, null, 2)}`);
 
       await this.prisma.enrichmentResult.upsert({
         where: { prospectId: prospect.id },
@@ -299,6 +369,14 @@ export class EnrichmentService {
         where: { id: prospect.id, tenantId, estado: 'INVESTIGADO' },
         data: { estado: 'ENRIQUECIDO' },
       });
+
+      // Recompute currentProblems from verified enrichment data — agents read this field
+      const currentProblems = recomputeCurrentProblems(prospect, data);
+      await this.prisma.prospect.update({
+        where: { id: prospect.id },
+        data: { currentProblems },
+      });
+      this.logger.log(`[EnrichJob ${jobId}] currentProblems: [${currentProblems.join(', ')}]`);
 
       await this.prisma.enrichmentJob.update({
         where: { id: jobId },
@@ -359,50 +437,28 @@ export class EnrichmentService {
     const instagram = prospect.instagram ?? null;
     const linkedin = prospect.linkedin ?? null;
 
-    const prompt = `Eres un agente de enriquecimiento de leads B2B especializado en encontrar datos de contacto reales de empresas latinoamericanas.
+    const prompt = `Eres un agente de enriquecimiento de leads B2B. Encontrá datos de contacto reales de esta empresa latinoamericana.
 
-EMPRESA A ENRIQUECER:
+EMPRESA:
 - Nombre: ${prospect.nombreEmpresa}
 - Rubro: ${prospect.rubro ?? 'Desconocido'}
 - Ubicación: ${[prospect.ciudad, prospect.pais].filter(Boolean).join(', ') || 'Desconocida'}
 - Website: ${website ?? 'Sin web conocida'}
 - Instagram: ${instagram ?? 'Desconocido'}
 - LinkedIn: ${linkedin ?? 'Desconocido'}
-- Oportunidad detectada: ${prospect.oportunidadDetectada ?? 'N/A'}
+- Oportunidad: ${prospect.oportunidadDetectada ?? 'N/A'}
 
-OBJETIVO: Encontrar datos de contacto REALES y verificados de esta empresa para iniciar contacto comercial.
+INSTRUCCIONES — MÁXIMO 4 herramientas en total:
+1. Si hay website: WebFetch para extraer email, teléfono, formulario, redes sociales
+2. Si no hay suficiente info: WebSearch "${prospect.nombreEmpresa} ${prospect.ciudad ?? ''} contacto"
+3. Solo si no encontraste nada: buscar LinkedIn o Google Business
+4. Identificar decisor (dueño, fundador, gerente) si aparece en los resultados anteriores
+confianza: ALTA=datos reales del sitio, MEDIA=redes sociales, BAJA=inferido
 
-INSTRUCCIONES:
-1. Usa WebFetch para visitar el website si está disponible y extrae emails, teléfonos, formularios de contacto, links a redes sociales
-2. Busca en Google: "${prospect.nombreEmpresa} ${prospect.ciudad ?? ''} contacto"
-3. Busca su perfil en Google Business / Google Maps
-4. Busca su perfil de LinkedIn empresarial
-5. Identifica al decisor clave: dueño, fundador, gerente comercial o director
-6. Prioriza datos VERIFICADOS sobre inferidos
-7. Para el campo "confianza": usa ALTA si encontraste datos reales, MEDIA si son de redes sociales, BAJA si solo son inferencias
+Responde SOLO con JSON válido, sin texto adicional:
+{"email":null,"telefono":null,"whatsapp":null,"formularioWeb":null,"googleBusiness":null,"linkedin":null,"facebook":null,"instagram":null,"direccion":null,"anioFundacion":null,"empleadosReal":null,"nombreDecidsor":null,"rolDecidsor":null,"linkedinDecidsor":null,"confianza":"BAJA"}`;
 
-Responde SOLO con un JSON válido (sin texto adicional, sin markdown):
-
-{
-  "email": "string o null",
-  "telefono": "string o null (con código de país, ej: +54911XXXXXXXX)",
-  "whatsapp": "string o null (número con código de país)",
-  "formularioWeb": "URL completa del formulario de contacto o null",
-  "googleBusiness": "URL de Google Maps/Business o null",
-  "linkedin": "URL LinkedIn empresa o null",
-  "facebook": "URL Facebook o null",
-  "instagram": "handle @empresa o URL Instagram o null",
-  "direccion": "dirección física o null",
-  "anioFundacion": número_entero o null,
-  "empleadosReal": número_estimado o null,
-  "nombreDecidsor": "nombre completo del decisor o null",
-  "rolDecidsor": "Dueño|Fundador|Gerente Comercial|Director|CEO o null",
-  "linkedinDecidsor": "URL LinkedIn del decisor o null",
-  "confianza": "ALTA|MEDIA|BAJA",
-  "fuentesDatos": ["lista de URLs o fuentes consultadas"]
-}`;
-
-    return this.spawnClaudeText(prompt, 'claude-sonnet-4-6', 180_000);
+    return this.spawnClaudeAgentic(prompt, 'claude-sonnet-4-6', 60_000, 240_000);
   }
 
   private parseEnrichmentOutput(raw: string): EnrichmentData {
@@ -440,44 +496,88 @@ Responde SOLO con un JSON válido (sin texto adicional, sin markdown):
     await this.prisma.enrichmentJob.update({ where: { id: jobId }, data: { agentOutput: msg } });
   }
 
-  private spawnClaudeText(prompt: string, model: string, timeoutMs: number): Promise<string> {
+  // Stream-json mode: stdout receives one JSON event per line as tool calls happen.
+  // idleTimeoutMs kills the process if no output arrives for that duration (detects stuck WebFetch).
+  // totalTimeoutMs is a hard ceiling regardless of activity.
+  private spawnClaudeAgentic(
+    prompt: string,
+    model: string,
+    idleTimeoutMs: number,
+    totalTimeoutMs: number,
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
       const args = [
-        '-p', prompt,
-        '--output-format', 'text',
+        '-p', '-',
+        '--output-format', 'stream-json',
+        '--verbose',
         '--dangerously-skip-permissions',
+        '--strict-mcp-config',
         '--model', model,
         '--allowedTools', 'WebFetch,WebSearch',
       ];
-      this.logger.log(`Spawning claude | model: ${model}`);
+      this.logger.log(`Spawning claude agentic | model: ${model} | idle: ${idleTimeoutMs / 1000}s | total: ${totalTimeoutMs / 1000}s`);
 
       const child = spawn('claude', args, {
         cwd: this.projectRoot,
         env: { ...process.env },
         stdio: ['pipe', 'pipe', 'pipe'],
       });
+      child.stdin.write(prompt, 'utf8');
+      child.stdin.end();
 
-      let stdout = '';
       let stderr = '';
+      let lineBuffer = '';
       let settled = false;
 
-      const done = (err?: Error) => {
+      const done = (err?: Error, result?: string) => {
         if (settled) return;
         settled = true;
-        clearTimeout(timer);
+        clearTimeout(totalTimer);
+        clearTimeout(idleTimer);
         if (err) reject(err);
-        else resolve(stdout);
+        else resolve(result!);
       };
 
-      const timer = setTimeout(() => {
+      const totalTimer = setTimeout(() => {
         child.kill('SIGTERM');
-        done(new Error(`Timeout ${model} after ${timeoutMs / 60000}min`));
-      }, timeoutMs);
+        done(new Error(`Timeout ${model} after ${totalTimeoutMs / 60000}min`));
+      }, totalTimeoutMs);
 
-      child.stdout.on('data', (c: Buffer) => { stdout += c.toString(); });
+      let idleTimer = setTimeout(() => {
+        child.kill('SIGTERM');
+        done(new Error(`Idle timeout ${model}: no output for ${idleTimeoutMs / 1000}s`));
+      }, idleTimeoutMs);
+
+      child.stdout.on('data', (chunk: Buffer) => {
+        // Reset idle timer on every stdout byte (tool calls generate events continuously)
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          child.kill('SIGTERM');
+          done(new Error(`Idle timeout ${model}: no output for ${idleTimeoutMs / 1000}s`));
+        }, idleTimeoutMs);
+
+        lineBuffer += chunk.toString();
+        const lines = lineBuffer.split('\n');
+        lineBuffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+            if (event.type === 'result') {
+              if (event.subtype === 'success') {
+                done(undefined, event.result ?? '');
+              } else {
+                done(new Error(`claude result error: ${JSON.stringify(event).slice(0, 200)}`));
+              }
+            }
+          } catch { /* partial or non-JSON line */ }
+        }
+      });
+
       child.stderr.on('data', (c: Buffer) => { stderr += c.toString(); });
-      child.on('close', code => {
-        if (code === 0) done();
+      child.on('close', (code) => {
+        if (settled) return;
+        if (code === 0) done(new Error('claude closed without result event'));
         else done(new Error(`claude exited ${code}. stderr: ${stderr.slice(-400)}`));
       });
       child.on('error', done);

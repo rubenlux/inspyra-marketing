@@ -26,5 +26,5 @@ export class CreateValidationDto {
 
   @IsOptional()
   @IsObject()
-  decisionFactors?: Record<string, number>;
+  decisionFactors?: Record<string, unknown>;
 }

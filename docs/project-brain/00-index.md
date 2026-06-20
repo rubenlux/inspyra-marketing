@@ -1,4 +1,4 @@
-# Project Brain — Índice
+cd# Project Brain — Índice
 
 **Última actualización:** 2026-06-07  
 **Mantenedor:** Equipo Inspyra

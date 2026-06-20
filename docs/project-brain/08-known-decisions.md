@@ -153,3 +153,39 @@ Estado: ACTIVA | OBSOLETA
 **Impacto:** Antes de implementar cualquier cosa, Claude debe leer `CLAUDE_PROJECT_CONTEXT.md` y los documentos de Project Brain relevantes.
 
 **Estado:** ACTIVA
+
+---
+
+## 2026-06-18 — ERP-051: problemasEncontrados inmutable / currentProblems fuente de verdad
+
+**Decisión:** El campo `problemasEncontrados` en `Prospect` es un snapshot inmutable del momento del discovery y nunca se modifica. El campo `currentProblems` (`String[]`) se recalcula después de cada enrichment y es la fuente de verdad para todos los agentes.
+
+**Motivo:** `problemasEncontrados` era usado como snapshot histórico y estado actual simultáneamente. Esto causaba que el Outreach Agent generara afirmaciones falsas (ej: "no tienen redes sociales") cuando el enrichment ya había encontrado Instagram/Facebook.
+
+**Impacto:** `recomputeCurrentProblems()` corre al completar cada job de enrichment. Todos los agentes (Outreach, Commercial, Opportunity) leen `currentProblems ?? problemasEncontrados`. Backfill en migración 20260618180000. Habilita métricas de precisión del Discovery en el futuro.
+
+**Estado:** ACTIVA
+
+---
+
+## 2026-06-18 — Outreach Agent no puede contradecir datos verificados por enrichment
+
+**Decisión:** El prompt del Outreach Agent siempre incluye un bloque VERIFIED DIGITAL PRESENCE con datos reales del enrichment. Los `problemasEncontrados` son filtrados para eliminar contradicciones. Tres capas de protección: `currentProblems` + bloque VERIFIED PRESENCE + filtro runtime.
+
+**Motivo:** Un prospecto que recibe un email diciendo "no tienen redes sociales" cuando tiene Instagram activo detecta inmediatamente que el mensaje es automático e incorrecto. Destruye la credibilidad del outreach.
+
+**Impacto:** `buildOutreachPrompt()` en `proposals.service.ts`. No afecta Commercial Proposal (es post-interés).
+
+**Estado:** ACTIVA
+
+---
+
+## 2026-06-18 — Arquitectura de scoring futura: Pain / Commercial Potential / Contactability
+
+**Decisión (pendiente):** El Opportunity Score actual es poco discriminante para empresas del mismo rubro con los mismos gaps (ej: todos Opp=80). La arquitectura correcta separa tres dimensiones: Pain Score, Commercial Potential (reviews, sucursales, antigüedad), Contactability. Priority Score = combinación ponderada.
+
+**Motivo:** El sistema ya tiene datos confiables. El cuello de botella es la priorización, no la detección.
+
+**Impacto:** Requiere señales adicionales en enrichment. No implementar antes de validar outreach en producción.
+
+**Estado:** PENDIENTE

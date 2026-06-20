@@ -67,4 +67,11 @@ export class ProspectValidationController {
   recalculate(@Param('prospectId') prospectId: string, @CurrentUser() user: JwtPayload) {
     return this.service.recalculate(prospectId, user.tenantId);
   }
+
+  @Patch(':id/reactivate')
+  @UseGuards(NoServiceAccountGuard)
+  @ApiOperation({ summary: 'Reactivate discarded validation — DISCARDED → PENDING (manual human action)' })
+  reactivate(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.service.reactivate(id, user.tenantId);
+  }
 }

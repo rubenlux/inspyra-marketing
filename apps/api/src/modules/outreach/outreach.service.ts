@@ -1,6 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { ContactChannel, OutreachActivityType, ProspectEstado, ResponseType } from '@prisma/client';
+import { ContactChannel, ProspectEstado, ResponseType } from '@prisma/client';
+import { createMailApiClient } from './mail-api.client';
+import { ProposalsService, ReplyAgentResult } from '../proposals/proposals.service';
 
 const CONTACTABLE_FROM: ProspectEstado[] = ['LISTO_OUTREACH'];
 const RESPOND_FROM: ProspectEstado[] = ['CONTACTADO'];
@@ -13,7 +15,10 @@ const ACTIVITY_STATES: ProspectEstado[] = [
 
 @Injectable()
 export class OutreachService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly proposalsService: ProposalsService,
+  ) {}
 
   // ── Contact ───────────────────────────────────────────────────────────────────
 
@@ -244,17 +249,12 @@ export class OutreachService {
     const enrichmentResult = await this.prisma.enrichmentResult.findFirst({
       where: { prospectId, tenantId },
     });
-    const recipientEmail = prospect.email ?? enrichmentResult?.email;
+    const recipientEmail = enrichmentResult?.email ?? prospect.email;
 
     if (!recipientEmail) {
       throw new BadRequestException(
         'El prospecto no tiene email registrado (ni en el perfil ni en el resultado de enriquecimiento)',
       );
-    }
-
-    const resendApiKey = process.env.RESEND_API_KEY;
-    if (!resendApiKey) {
-      throw new BadRequestException('Email no configurado: RESEND_API_KEY no está definido en el servidor');
     }
 
     // Load outreachMessage from approved OUTREACH proposal
@@ -270,11 +270,6 @@ export class OutreachService {
     const outreachMessage: string | undefined = (proposal.proposalData as any)?.outreachMessage;
     if (!outreachMessage) throw new BadRequestException('La propuesta no contiene outreachMessage');
 
-    const mailFrom = process.env.MAIL_FROM || 'outreach@inspyra.agency';
-
-    const { Resend } = await import('resend');
-    const resend = new Resend(resendApiKey);
-
     const htmlBody = outreachMessage
       .split('\n')
       .map(line => line.trim())
@@ -282,17 +277,15 @@ export class OutreachService {
       .map(line => `<p style="margin:0 0 12px">${line}</p>`)
       .join('');
 
-    const { error } = await resend.emails.send({
-      from: mailFrom,
+    // Send via MAIL-001 API — only transition to CONTACTADO on confirmed delivery (messageId present)
+    const mailClient = createMailApiClient();
+    const mailResult = await mailClient.send({
       to: recipientEmail,
       subject,
-      text: outreachMessage,
       html: `<div style="font-family:sans-serif;font-size:15px;line-height:1.6;color:#1a1a1a;max-width:600px">${htmlBody}</div>`,
+      externalReference: prospectId,
+      externalType: 'PROSPECT_OUTREACH',
     });
-
-    if (error) {
-      throw new BadRequestException(`Error al enviar email: ${(error as any).message ?? JSON.stringify(error)}`);
-    }
 
     const now = new Date();
     const [updated] = await this.prisma.$transaction([
@@ -306,10 +299,456 @@ export class OutreachService {
           note: note ?? null, createdById: userId,
           mensajeUtilizado: outreachMessage,
           proposalId: proposal.id,
+          provider: 'MAIL_001',
+          messageId: mailResult.messageId,
+          providerMessageId: mailResult.sesMessageId ?? null,
+          fechaEnvio: now,
         },
       }),
     ]);
     return updated;
+  }
+
+  // ── Send Free Email (no prospectId — Inspyra Mail libre) ─────────────────────
+
+  async sendFreeEmail(
+    to: string,
+    subject: string,
+    body: string,
+    from?: string,
+    bodyHtml?: string,
+  ): Promise<{ messageId: string }> {
+    const htmlBody = bodyHtml ?? body
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .map(line => `<p style="margin:0 0 12px">${line}</p>`)
+      .join('');
+
+    const mailClient = createMailApiClient(from);
+    const result = await mailClient.send({
+      to,
+      subject,
+      html: `<div style="font-family:sans-serif;font-size:15px;line-height:1.6;color:#1a1a1a;max-width:600px">${htmlBody}</div>`,
+    });
+    return { messageId: result.messageId };
+  }
+
+  // ── Sent Emails — ERP-native view ────────────────────────────────────────────
+
+  async getSentEmails(tenantId: string) {
+    const activities = await this.prisma.outreachActivity.findMany({
+      where: {
+        tenantId,
+        channel: 'EMAIL',
+        type: { in: ['CONTACTADO', 'FOLLOWUP_1', 'FOLLOWUP_2', 'FOLLOWUP_3'] as any },
+      },
+      include: {
+        prospect: { select: { nombreEmpresa: true, nombreContacto: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    return {
+      items: activities.map(a => ({
+        id: a.id,
+        prospectId: a.prospectId,
+        to: (a.prospect as any)?.email ?? '',
+        toName: (a.prospect as any)?.nombreContacto ?? (a.prospect as any)?.nombreEmpresa ?? '',
+        empresa: (a.prospect as any)?.nombreEmpresa ?? '',
+        subject: `Outreach — ${(a.prospect as any)?.nombreEmpresa ?? a.prospectId}`,
+        preview: a.mensajeUtilizado ? a.mensajeUtilizado.substring(0, 100) : (a.note ?? ''),
+        mensajeUtilizado: a.mensajeUtilizado ?? null,
+        sentAt: (a.fechaEnvio ?? a.createdAt).toISOString(),
+        type: a.type,
+        messageId: a.messageId ?? null,
+      })),
+    };
+  }
+
+  // ── Mail Draft CRUD (ERP-044A) ────────────────────────────────────────────────
+
+  async createMailDraft(body: {
+    to: string;
+    subject: string;
+    html: string;
+    externalRef?: string;
+  }): Promise<any> {
+    return this.mailFetch('/v1/public/mail/drafts', {}, 'POST', body);
+  }
+
+  async getMailDrafts(): Promise<any> {
+    return this.mailFetch('/v1/public/mail/drafts');
+  }
+
+  async sendMailDraft(
+    draftId: string,
+    tenantId: string,
+    userId: string,
+    prospectId?: string,
+  ): Promise<any> {
+    const result = await this.mailFetch(`/v1/public/mail/drafts/${draftId}/send`, {}, 'POST', {});
+
+    if (prospectId) {
+      const prospect = await this.prisma.prospect.findFirst({
+        where: { id: prospectId, tenantId, deletedAt: null },
+      });
+      if (prospect) {
+        const existingFollowUps = await this.prisma.outreachActivity.count({
+          where: { tenantId, prospectId, type: { in: ['FOLLOWUP_1', 'FOLLOWUP_2', 'FOLLOWUP_3'] } },
+        });
+        const followUpType =
+          existingFollowUps === 0 ? 'FOLLOWUP_1' :
+          existingFollowUps === 1 ? 'FOLLOWUP_2' : 'FOLLOWUP_3';
+
+        await this.prisma.outreachActivity.create({
+          data: {
+            tenantId,
+            prospectId,
+            type: followUpType as any,
+            channel: 'EMAIL',
+            note: `Follow-up enviado (draft ${draftId})`,
+            createdById: userId,
+            provider: 'MAIL_DRAFT',
+            messageId: result?.sesMessageId ?? draftId,
+            fechaEnvio: new Date(),
+          },
+        });
+      }
+    }
+
+    return result;
+  }
+
+  async deleteMailDraft(draftId: string): Promise<void> {
+    await this.mailFetch(`/v1/public/mail/drafts/${draftId}`, {}, 'DELETE');
+  }
+
+  // ── Mailbox Management ────────────────────────────────────────────────────────
+
+  async getMailboxes(): Promise<any> {
+    return this.mailFetch('/v1/public/mail/mailboxes');
+  }
+
+  async createMailbox(body: { localPart: string; quotaMB?: number }): Promise<any> {
+    return this.mailFetch('/v1/public/mail/mailboxes', {}, 'POST', body);
+  }
+
+  async deleteMailbox(email: string): Promise<void> {
+    await this.mailFetch(`/v1/public/mail/mailboxes/${encodeURIComponent(email)}`, {}, 'DELETE');
+  }
+
+  async resetMailboxPassword(email: string): Promise<any> {
+    return this.mailFetch(`/v1/public/mail/mailboxes/${encodeURIComponent(email)}/reset-password`, {}, 'POST');
+  }
+
+  // ── Mail Read Proxy ───────────────────────────────────────────────────────────
+
+  private readonly logger = new Logger(OutreachService.name);
+
+  async getMailFolders(email: string): Promise<any> {
+    return this.mailFetch(`/v1/public/mail/folders?email=${encodeURIComponent(email)}`);
+  }
+
+  async getMailMessages(email: string, folder: string, limit: number, offset = 0): Promise<any> {
+    return this.mailFetch(
+      `/v1/public/mail/messages?email=${encodeURIComponent(email)}&folder=${encodeURIComponent(folder)}&limit=${limit}&offset=${offset}`,
+    );
+  }
+
+  async getMailMessage(uid: number, email: string, folder: string): Promise<any> {
+    return this.mailFetch(
+      `/v1/public/mail/messages/${uid}?email=${encodeURIComponent(email)}&folder=${encodeURIComponent(folder)}`,
+    );
+  }
+
+  private async mailFetch(
+    path: string,
+    extraHeaders: Record<string, string> = {},
+    method = 'GET',
+    body?: unknown,
+  ): Promise<any> {
+    const base = this.getMailApiBase();
+    const apiKey = process.env.MAIL_API_KEY;
+    if (!apiKey) throw new BadRequestException('MAIL_API_KEY no está configurado');
+
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${apiKey}`,
+      ...extraHeaders,
+    };
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
+
+    let response: Response;
+    try {
+      response = await fetch(`${base}${path}`, {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+    } catch (err) {
+      throw new BadRequestException('Error de red al contactar INSPYRA Mail: ' + (err as Error).message);
+    }
+
+    if (response.status === 204) return null;
+
+    const text = await response.text().catch(() => '');
+    if (!response.ok) {
+      this.logger.warn(`[Mail proxy] ${method} ${response.status} ${path} — ${text.substring(0, 200)}`);
+      throw new BadRequestException(`INSPYRA Mail ${response.status}: ${text.substring(0, 120)}`);
+    }
+
+    if (!text) return null;
+    try { return JSON.parse(text); } catch { return { raw: text }; }
+  }
+
+  private getMailApiBase(): string {
+    const url = process.env.MAIL_API_URL ?? 'https://api.inspyra.cloud/v1/public/mail/send';
+    try {
+      const parsed = new URL(url);
+      return `${parsed.protocol}//${parsed.host}`;
+    } catch {
+      return 'https://api.inspyra.cloud';
+    }
+  }
+
+  // ── Mail Webhook — MAIL-002 (full autonomous conversation flow) ──────────────
+
+  async handleMailWebhook(event: string, data: any): Promise<void> {
+    if (event !== 'mail.reply_received') return;
+
+    const prospectId: string | undefined = data?.externalReference ?? data?.correlationId;
+    if (!prospectId) {
+      this.logger.warn('[MAIL-002] mail.reply_received: no externalReference/correlationId');
+      return;
+    }
+
+    const prospect = await this.prisma.prospect.findFirst({
+      where: { id: prospectId, deletedAt: null },
+    });
+    if (!prospect) {
+      this.logger.warn(`[MAIL-002] prospect ${prospectId} not found`);
+      return;
+    }
+
+    const processableStates: ProspectEstado[] = ['CONTACTADO', 'RESPONDIO', 'INTERESADO'];
+    if (!processableStates.includes(prospect.estado)) {
+      this.logger.log(`[MAIL-002] prospect ${prospectId} in ${prospect.estado} — skip`);
+      return;
+    }
+
+    const replyText: string = data?.text ?? data?.body ?? data?.bodyText ?? '';
+    const fromEmail: string = data?.from ?? '';
+    const subject: string = data?.subject ?? '';
+    const messageId: string | null = data?.messageId ?? null;
+    const now = new Date();
+
+    // Step 1: Record incoming reply + transition CONTACTADO → RESPONDIO
+    const nextEstado: ProspectEstado = prospect.estado === 'CONTACTADO' ? 'RESPONDIO' : prospect.estado;
+    await this.prisma.$transaction([
+      this.prisma.prospect.update({
+        where: { id: prospect.id },
+        data: { estado: nextEstado, ultimoContacto: now },
+      }),
+      this.prisma.outreachActivity.create({
+        data: {
+          tenantId: prospect.tenantId,
+          prospectId: prospect.id,
+          type: 'RESPUESTA_RECIBIDA',
+          channel: 'EMAIL',
+          note: replyText
+            ? `Respuesta de ${fromEmail}:\n\n${replyText.slice(0, 1000)}`
+            : `Respuesta de ${fromEmail} (sin cuerpo de texto)`,
+          provider: 'MAIL_WEBHOOK',
+          messageId,
+          fechaEnvio: now,
+        },
+      }),
+    ]);
+    this.logger.log(`[MAIL-002] ${prospectId} → ${nextEstado}`);
+
+    // Step 2: Escalation check — human review required for negotiation/legal/complaints
+    if (this.requiresEscalation(replyText)) {
+      await this.prisma.outreachActivity.create({
+        data: {
+          tenantId: prospect.tenantId,
+          prospectId: prospect.id,
+          type: 'NOTA',
+          note: '⚠️ Escalación requerida — respuesta contiene negociación de precios, temas legales o reclamos. Revisión humana antes de responder.',
+          fechaEnvio: now,
+        },
+      });
+      this.logger.warn(`[MAIL-002] ${prospectId} → escalation required`);
+      return;
+    }
+
+    if (!replyText) {
+      this.logger.log(`[MAIL-002] ${prospectId} — empty reply body, no auto-reply`);
+      return;
+    }
+
+    // Step 3: Run Reply Agent
+    let replyResult: ReplyAgentResult;
+    try {
+      replyResult = await this.proposalsService.runReplyAgent(
+        prospect.id,
+        prospect.tenantId,
+        replyText,
+      );
+    } catch (err) {
+      this.logger.error(`[MAIL-002] Reply Agent failed for ${prospectId}: ${(err as Error).message}`);
+      await this.prisma.outreachActivity.create({
+        data: {
+          tenantId: prospect.tenantId,
+          prospectId: prospect.id,
+          type: 'NOTA',
+          note: `Reply Agent falló — respuesta recibida de ${fromEmail} pendiente de respuesta manual.`,
+          fechaEnvio: now,
+        },
+      });
+      return;
+    }
+
+    const { intentAnalysis, followUpMessage, recommendedAction, prospectIntel } = replyResult;
+    this.logger.log(`[MAIL-002] ${prospectId} — intent: ${intentAnalysis} | action: ${recommendedAction}`);
+
+    // Step 4: Store prospect intel extracted from the reply
+    if (prospectIntel) {
+      await this.storeProspectIntel(prospect.tenantId, prospect.id, prospectIntel, now);
+    }
+
+    // Step 5: Auto-send or escalate to human draft
+    const AUTO_SEND_INTENTS: ReplyAgentResult['intentAnalysis'][] = ['POSITIVE', 'NEUTRAL', 'NOT_NOW'];
+
+    if (AUTO_SEND_INTENTS.includes(intentAnalysis) && followUpMessage) {
+      await this.autoSendReply(prospect, fromEmail, subject, followUpMessage, intentAnalysis, recommendedAction, now);
+    } else {
+      // OBJECTION / NEGATIVE / agent unsure → draft for human review
+      await this.prisma.outreachActivity.create({
+        data: {
+          tenantId: prospect.tenantId,
+          prospectId: prospect.id,
+          type: 'NOTA',
+          note: `Reply Agent [${intentAnalysis}] — draft para revisión humana:\n\n${followUpMessage}`,
+          fechaEnvio: now,
+        },
+      });
+      this.logger.log(`[MAIL-002] ${prospectId} → ${intentAnalysis} — draft created, awaiting human review`);
+    }
+  }
+
+  // ── MAIL-002 Helpers ──────────────────────────────────────────────────────────
+
+  private requiresEscalation(text: string): boolean {
+    if (!text) return false;
+    return /precio|presupuesto|cotizaci[oó]n|descuento|contrato|cl[aá]usula|legal|reclamo|demanda|factura|cobro|pago\s+a\s+cuenta|comisi[oó]n|penalidad|reembolso|price|quote|discount|contract|legal|dispute|complaint|invoice|billing|refund|lawsuit/i.test(text);
+  }
+
+  private async autoSendReply(
+    prospect: { id: string; tenantId: string; estado: ProspectEstado },
+    toEmail: string,
+    originalSubject: string,
+    followUpMessage: string,
+    intent: string,
+    recommendedAction: string,
+    now: Date,
+  ) {
+    const subject = originalSubject.toLowerCase().startsWith('re:')
+      ? originalSubject
+      : `Re: ${originalSubject}`;
+
+    const html = followUpMessage
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 0)
+      .map(l => `<p style="margin:0 0 12px">${l}</p>`)
+      .join('');
+
+    let messageId: string | null = null;
+    try {
+      const mailClient = createMailApiClient();
+      const result = await mailClient.send({
+        to: toEmail,
+        subject,
+        html: `<div style="font-family:sans-serif;font-size:15px;line-height:1.6;color:#1a1a1a;max-width:600px">${html}</div>`,
+        externalReference: prospect.id,
+        externalType: 'PROSPECT_REPLY',
+      });
+      messageId = result.messageId;
+      this.logger.log(`[MAIL-002] auto-reply sent to ${toEmail} (${intent}) — msgId: ${messageId}`);
+    } catch (err) {
+      this.logger.error(`[MAIL-002] auto-send failed for ${prospect.id}: ${(err as Error).message}`);
+      // Store as draft note on send failure
+      await this.prisma.outreachActivity.create({
+        data: {
+          tenantId: prospect.tenantId,
+          prospectId: prospect.id,
+          type: 'NOTA',
+          note: `Auto-send falló [${intent}] — envío manual pendiente:\n\n${followUpMessage}`,
+          fechaEnvio: now,
+        },
+      });
+      return;
+    }
+
+    // Transition to INTERESADO only when prospect explicitly showed buying intent
+    // (asked for quote, proposal, or to meet) — NOT just because of POSITIVE sentiment
+    const shouldMarkInterested =
+      recommendedAction === 'MARK_INTERESTED' || recommendedAction === 'SUGGEST_MEETING';
+    const nextEstado: ProspectEstado | null = shouldMarkInterested && prospect.estado !== 'INTERESADO'
+      ? 'INTERESADO'
+      : null;
+
+    await this.prisma.$transaction([
+      ...(nextEstado ? [
+        this.prisma.prospect.update({
+          where: { id: prospect.id },
+          data: { estado: nextEstado, ultimoContacto: now },
+        }),
+      ] : []),
+      this.prisma.outreachActivity.create({
+        data: {
+          tenantId: prospect.tenantId,
+          prospectId: prospect.id,
+          type: 'SEGUIMIENTO',
+          channel: 'EMAIL',
+          note: `Auto-reply [${intent}]${nextEstado ? ` → ${nextEstado}` : ''}: ${followUpMessage.slice(0, 300)}`,
+          mensajeUtilizado: followUpMessage,
+          messageId,
+          fechaEnvio: now,
+        },
+      }),
+    ]);
+
+    if (nextEstado) {
+      this.logger.log(`[MAIL-002] ${prospect.id} → ${nextEstado}`);
+    }
+  }
+
+  private async storeProspectIntel(
+    tenantId: string,
+    prospectId: string,
+    intel: NonNullable<ReplyAgentResult['prospectIntel']>,
+    now: Date,
+  ) {
+    const parts: string[] = [];
+    if (intel.budgetTiming)          parts.push(`Timing presupuesto: ${intel.budgetTiming}`);
+    if (intel.competitorPresent)     parts.push(`Proveedor actual: ${intel.competitorName ?? 'sí'}`);
+    if (intel.painPoint)             parts.push(`Pain point detectado: ${intel.painPoint}`);
+    if (intel.contactPreference)     parts.push(`Preferencia de contacto: ${intel.contactPreference}`);
+    if (intel.decisionMakerEngaged)  parts.push('Decisor involucrado en la conversación');
+
+    if (parts.length === 0) return;
+
+    await this.prisma.outreachActivity.create({
+      data: {
+        tenantId,
+        prospectId,
+        type: 'NOTA',
+        note: `Intel extraído por Reply Agent:\n${parts.join('\n')}`,
+        fechaEnvio: now,
+      },
+    });
   }
 
   // ── Private ───────────────────────────────────────────────────────────────────

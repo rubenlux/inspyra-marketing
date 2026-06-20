@@ -43,9 +43,16 @@ const PRODUCTION_RULES = [
   },
   {
     id: 'rule-gbp', tenantId: TENANT, activo: true,
-    problemPattern: 'sin google business, sin ficha google, google business inexistente, gbp',
-    impactoDescripcion: 'No aparece en Google Maps — pierde clientes en búsquedas locales',
-    serviciosRecomendados: ['SEO Mensual'],
+    problemPattern: 'sin google business, sin ficha google, google business inexistente',
+    impactoDescripcion: 'Invisible en búsquedas locales de Google Maps — pierde clientes que buscan su rubro en la zona',
+    serviciosRecomendados: ['Gestión de Google Business Profile'],
+    prioridad: 'ALTA', ticketEstimadoUsd: '600', bundleSugerido: null,
+  },
+  {
+    id: 'rule-gbp-unclaimed', tenantId: TENANT, activo: true,
+    problemPattern: 'perfil gbp sin reclamar, gbp sin reclamar, ficha sin reclamar',
+    impactoDescripcion: 'Perfil en Google Maps existe pero no está siendo gestionado — la competencia con perfiles optimizados aparece primero',
+    serviciosRecomendados: ['Gestión de Google Business Profile'],
     prioridad: 'ALTA', ticketEstimadoUsd: '600', bundleSugerido: null,
   },
   {
@@ -218,8 +225,9 @@ describe('Service Intelligence Regression — Golden Fixtures', () => {
     it('when problem matches CRITICA and ALTA rules, CRITICA wins', async () => {
       // Both 'sin ssl' (CRITICA) and 'ssl' (ALTA) match "Sin SSL expirado"
       // CRITICA must always win
+      const sslRule = PRODUCTION_RULES.find((r) => r.id === 'rule-ssl')!;
       prisma.serviceIntelligenceRule.findMany.mockResolvedValue([
-        { ...PRODUCTION_RULES[3], prioridad: 'CRITICA' }, // ssl → CRITICA
+        { ...sslRule, prioridad: 'CRITICA' }, // ssl → CRITICA
         { id: 'rule-ssl-alta', tenantId: TENANT, activo: true, problemPattern: 'ssl', prioridad: 'ALTA', serviciosRecomendados: ['Generic SSL'], impactoDescripcion: 'SSL issue', ticketEstimadoUsd: '100', bundleSugerido: null },
       ] as never);
 

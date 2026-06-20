@@ -4,22 +4,37 @@ import { ServiceIntelligenceService } from '../service-intelligence/service-inte
 import { PricingService } from '../pricing/pricing.service';
 import { CreateValidationDto } from './dto/create-validation.dto';
 import { ReviewValidationDto } from './dto/review-validation.dto';
+import {
+  buildProspectContext,
+  SIR_CATALOG,
+  INSPYRA_SERVICE_IDS,
+  findAllServiceMatches,
+  findBestServiceMatch,
+  calcContactability,
+  MATCH_TYPE_SCORE,
+  IMPACT_SCORE,
+  type ServiceMatchResult,
+} from '../service-intelligence/catalog';
 
-const PRIORITY_WEIGHT: Record<string, number> = { CRITICA: 4, ALTA: 3, MEDIA: 2, BAJA: 1 };
-
-function calcOpportunityScore(
-  problems: string[],
-  analysis: { prioridad: string }[],
-  estimatedTicket: number,
-  serviceFit: number,
+// ERP-052 — Service Match First
+// Score = Service Match Fit (40) + Business Impact (40) + Contactability (20)
+// No ticket, no problem count, no SIR opportunityScore.
+function calcServiceMatchScore(
+  bestMatch: ServiceMatchResult,
+  ctx: { hasWebsite: boolean; hasInstagram: boolean; hasLinkedIn: boolean },
 ): number {
-  const problemScore = problems.length >= 5 ? 25 : problems.length >= 3 ? 15 : 10;
-  const maxPriority = Math.max(...analysis.map((r) => PRIORITY_WEIGHT[r.prioridad] ?? 0), 0);
-  const priorityScore = Math.round((maxPriority / 4) * 25);
-  const fitScore = serviceFit > 0.75 ? 25 : serviceFit > 0.5 ? 15 : serviceFit > 0.25 ? 8 : 0;
-  const ticketScore = estimatedTicket > 3000 ? 25 : estimatedTicket > 2000 ? 20 : estimatedTicket > 1000 ? 12 : estimatedTicket > 500 ? 5 : 0;
-  return Math.min(problemScore + priorityScore + fitScore + ticketScore, 100);
+  const matchFitScore = MATCH_TYPE_SCORE[bestMatch.matchType];
+  const impactScore   = IMPACT_SCORE[bestMatch.businessImpact];
+  const contactScore  = calcContactability({ ...ctx, hasContactPoint: true });
+  return Math.min(matchFitScore + impactScore + contactScore, 100);
 }
+
+const IMPACT_TO_PRIORIDAD: Record<string, 'BAJA' | 'MEDIA' | 'ALTA'> = {
+  CRITICAL: 'ALTA',
+  HIGH:     'ALTA',
+  MEDIUM:   'MEDIA',
+  LOW:      'BAJA',
+};
 
 @Injectable()
 export class ProspectValidationService {
@@ -49,7 +64,7 @@ export class ProspectValidationService {
         estimatedTicketUsd: dto.estimatedTicketUsd,
         prioridad: dto.prioridad,
         reasoning: dto.reasoning,
-        decisionFactors: dto.decisionFactors ?? undefined,
+        decisionFactors: (dto.decisionFactors as never) ?? undefined,
       },
     });
   }
@@ -230,65 +245,113 @@ export class ProspectValidationService {
       where: { id: prospectId, tenantId, deletedAt: null },
     });
     if (!prospect) throw new NotFoundException(`Prospect ${prospectId} not found`);
-    if (prospect.estado !== 'INVESTIGADO') {
+
+    if ((prospect as unknown as { isLegacy: boolean }).isLegacy) {
+      throw new BadRequestException('Cannot run Opportunity Agent on legacy prospects (isLegacy = true)');
+    }
+
+    const ELIGIBLE_FOR_OPP = ['NUEVO', 'INVESTIGADO'];
+    if (!ELIGIBLE_FOR_OPP.includes(prospect.estado)) {
       throw new BadRequestException(
-        `Prospect must be in INVESTIGADO state to run Opportunity Agent (current: ${prospect.estado})`,
+        `Prospect must be in NUEVO or INVESTIGADO state to run Opportunity Agent (current: ${prospect.estado})`,
       );
     }
 
     const existing = await this.prisma.prospectValidation.findUnique({ where: { prospectId } });
     if (existing) throw new ConflictException('Opportunity Agent already ran for this prospect');
 
-    const problems: string[] = prospect.problemasEncontrados ?? [];
+    // Use currentProblems (post-enrichment, verified) when available; fall back to discovery snapshot
+    const problems: string[] = (
+      (prospect as unknown as { currentProblems?: string[] }).currentProblems?.length ?? 0) > 0
+      ? (prospect as unknown as { currentProblems: string[] }).currentProblems
+      : (prospect.problemasEncontrados ?? []);
+
+    const ctx = buildProspectContext(prospect);
+
+    // ── ERP-052: Service Match First ──────────────────────────────────────────
+
+    // Gate 1: datos suficientes
     if (problems.length === 0) {
-      throw new BadRequestException('No problems detected — Research Agent must run first');
+      return this.createDiscardedValidation(tenantId, prospectId, 'INSUFFICIENT_DATA', problems);
     }
 
-    // Step 1: Service Intelligence — map problems to services
-    const analysis = await this.intel.analyze(tenantId, problems);
+    // Gate 2: buscar match entre problemas verificados y servicios INSPYRA
+    const allMatches = findAllServiceMatches(problems, INSPYRA_SERVICE_IDS);
 
-    // Step 2: Find catalog items by recommended service names
-    const recommendedNames = [...new Set(analysis.flatMap((r) => r.serviciosRecomendados))];
-    const catalogItems = await this.prisma.serviceCatalogItem.findMany({
-      where: { tenantId, activo: true, nombre: { in: recommendedNames } },
-      select: { id: true, nombre: true },
-    });
-
-    // Step 3: Pricing
-    let estimatedTicketUsd = 0;
-    if (catalogItems.length > 0) {
-      const pricingResult = await this.pricing.calculate(tenantId, {
-        items: catalogItems.map((i) => ({ catalogItemId: i.id, cantidad: 1 })),
-      }) as unknown as Record<string, number>;
-      estimatedTicketUsd = pricingResult['total'] ?? 0;
+    if (allMatches.length === 0) {
+      return this.createDiscardedValidation(tenantId, prospectId, 'NO_SERVICE_MATCH', problems);
     }
 
-    // Step 4: Score
-    const serviceFit = recommendedNames.length > 0 ? catalogItems.length / recommendedNames.length : 0;
-    const agentScore = calcOpportunityScore(problems, analysis, estimatedTicketUsd, serviceFit);
+    // ── Scoring ───────────────────────────────────────────────────────────────
 
-    const topPrioridad = analysis.reduce((best, r) => {
-      return (PRIORITY_WEIGHT[r.prioridad] ?? 0) > (PRIORITY_WEIGHT[best] ?? 0) ? r.prioridad : best;
-    }, 'BAJA');
+    const bestMatch  = findBestServiceMatch(allMatches);
+    const agentScore = calcServiceMatchScore(bestMatch, ctx);
 
-    const prioridadMap: Record<string, 'BAJA' | 'MEDIA' | 'ALTA'> = {
-      BAJA: 'BAJA', MEDIA: 'MEDIA', ALTA: 'ALTA', CRITICA: 'ALTA',
-    };
+    const matchFitScore = MATCH_TYPE_SCORE[bestMatch.matchType];
+    const impactScore   = IMPACT_SCORE[bestMatch.businessImpact];
+    const contactScore  = calcContactability({ ...ctx, hasContactPoint: true });
+
+    // Ticket estimado desde el catálogo SIR (referencial, no determina el score)
+    const matchedServiceIds = [...new Set(allMatches.map(m => m.serviceId))];
+    const estimatedTicketUsd = matchedServiceIds.reduce((sum, id) => {
+      const svc = SIR_CATALOG.find(s => s.id === id);
+      return sum + (svc?.avgTicketUsd[0] ?? 0);
+    }, 0);
+
+    // Nombres de servicios recomendados
+    const servicesRecommended = matchedServiceIds
+      .map(id => SIR_CATALOG.find(s => s.id === id)?.name)
+      .filter(Boolean) as string[];
+
+    // Reasoning — formato VERIFICACIÓN → SERVICE MATCH → OPORTUNIDAD
+    const verificationBlock = [
+      `Sitio web: ${ctx.hasWebsite ? 'SÍ' : 'NO'}`,
+      `Instagram: ${ctx.hasInstagram ? 'SÍ' : 'NO'}`,
+      `LinkedIn: ${ctx.hasLinkedIn ? 'SÍ' : 'NO'}`,
+    ].join(' · ');
+
+    const matchBlock = allMatches.slice(0, 3)
+      .map(m => {
+        const svcName = SIR_CATALOG.find(s => s.id === m.serviceId)?.name ?? m.serviceId;
+        return `"${m.problema}" → ${svcName} [${m.matchType} / ${m.businessImpact}]`;
+      })
+      .join('; ');
+
+    const reasoning = [
+      `VERIFICACIÓN: ${verificationBlock}.`,
+      `PROBLEMAS: ${problems.length} detectados, ${allMatches.length} con match INSPYRA.`,
+      `SERVICE MATCH: ${matchBlock}.`,
+      `SCORE: ${agentScore}/100 (Fit: ${matchFitScore} · Impact: ${impactScore} · Contactabilidad: ${contactScore}).`,
+    ].join(' ');
 
     return this.create(tenantId, {
       prospectId,
       agentScore,
-      servicesRecommended: recommendedNames,
+      servicesRecommended,
       estimatedTicketUsd,
-      prioridad: prioridadMap[topPrioridad] ?? 'MEDIA',
-      reasoning: `Evaluador: ${problems.length} problemas detectados, score ${agentScore}/100.`,
+      prioridad: IMPACT_TO_PRIORIDAD[bestMatch.businessImpact] ?? 'MEDIA',
+      reasoning,
       decisionFactors: {
-        problemScore: problems.length >= 5 ? 25 : problems.length >= 3 ? 15 : 10,
-        priorityScore: Math.round(
-          (Math.max(...analysis.map((r) => PRIORITY_WEIGHT[r.prioridad] ?? 0), 0) / 4) * 25,
-        ),
-        fitScore: serviceFit > 0.75 ? 25 : serviceFit > 0.5 ? 15 : serviceFit > 0.25 ? 8 : 0,
-        ticketScore: estimatedTicketUsd > 3000 ? 25 : estimatedTicketUsd > 2000 ? 20 : estimatedTicketUsd > 1000 ? 12 : estimatedTicketUsd > 500 ? 5 : 0,
+        matchFitScore,
+        impactScore,
+        contactScore,
+        bestMatch: {
+          problema:       bestMatch.problema,
+          serviceId:      bestMatch.serviceId,
+          matchType:      bestMatch.matchType,
+          businessImpact: bestMatch.businessImpact,
+        },
+        allMatches: allMatches.map(m => ({
+          problema:       m.problema,
+          serviceId:      m.serviceId,
+          matchType:      m.matchType,
+          businessImpact: m.businessImpact,
+        })),
+        hasWebsite:    ctx.hasWebsite,
+        hasInstagram:  ctx.hasInstagram,
+        hasLinkedIn:   ctx.hasLinkedIn,
+        sector:        ctx.sector,
+        businessModel: ctx.businessModel,
       },
     });
   }
@@ -304,56 +367,168 @@ export class ProspectValidationService {
     });
     if (!prospect) throw new NotFoundException(`Prospect ${prospectId} not found`);
 
-    const problems: string[] = prospect.problemasEncontrados ?? [];
-    if (problems.length === 0) throw new BadRequestException('No problems to score');
+    const problems: string[] = (
+      (prospect as unknown as { currentProblems?: string[] }).currentProblems?.length ?? 0) > 0
+      ? (prospect as unknown as { currentProblems: string[] }).currentProblems
+      : (prospect.problemasEncontrados ?? []);
 
-    const analysis = await this.intel.analyze(tenantId, problems);
-    const recommendedNames = [...new Set(analysis.flatMap((r) => r.serviciosRecomendados))];
-    const catalogItems = await this.prisma.serviceCatalogItem.findMany({
-      where: { tenantId, activo: true, nombre: { in: recommendedNames } },
-      select: { id: true, nombre: true },
-    });
-
-    let estimatedTicketUsd = 0;
-    if (catalogItems.length > 0) {
-      const pricingResult = await this.pricing.calculate(tenantId, {
-        items: catalogItems.map((i) => ({ catalogItemId: i.id, cantidad: 1 })),
-      }) as unknown as Record<string, number>;
-      estimatedTicketUsd = pricingResult['total'] ?? 0;
-    }
-
-    const serviceFit = recommendedNames.length > 0 ? catalogItems.length / recommendedNames.length : 0;
-    const agentScore = calcOpportunityScore(problems, analysis, estimatedTicketUsd, serviceFit);
-    const topPrioridad = analysis.reduce((best, r) =>
-      (PRIORITY_WEIGHT[r.prioridad] ?? 0) > (PRIORITY_WEIGHT[best] ?? 0) ? r.prioridad : best, 'BAJA');
-    const prioridadMap: Record<string, 'BAJA' | 'MEDIA' | 'ALTA'> = { BAJA: 'BAJA', MEDIA: 'MEDIA', ALTA: 'ALTA', CRITICA: 'ALTA' };
-
-    // Bump version: v1 → v2 → v3 ...
+    const ctx = buildProspectContext(prospect);
     const match = existing.validationVersion?.match(/^v(\d+)$/);
     const nextVersion = match ? `v${parseInt(match[1]) + 1}` : 'v2';
+
+    // ── ERP-052: Service Match First ──────────────────────────────────────────
+
+    if (problems.length === 0) {
+      return this.prisma.prospectValidation.update({
+        where: { id: existing.id },
+        data: {
+          agentScore: 0, status: 'DISCARDED', discardReason: 'INSUFFICIENT_DATA',
+          servicesRecommended: [], estimatedTicketUsd: 0, prioridad: 'BAJA',
+          reasoning: `[${nextVersion}] DISCARD: INSUFFICIENT_DATA — sin problemas detectados.`,
+          validationVersion: nextVersion, humanScore: null, validatedBy: null, validatedAt: null,
+        },
+      });
+    }
+
+    const allMatches = findAllServiceMatches(problems, INSPYRA_SERVICE_IDS);
+
+    if (allMatches.length === 0) {
+      return this.prisma.prospectValidation.update({
+        where: { id: existing.id },
+        data: {
+          agentScore: 0, status: 'DISCARDED', discardReason: 'NO_SERVICE_MATCH',
+          servicesRecommended: [], estimatedTicketUsd: 0, prioridad: 'BAJA',
+          reasoning: `[${nextVersion}] DISCARD: NO_SERVICE_MATCH — ${problems.length} problema(s) sin match con servicios INSPYRA.`,
+          validationVersion: nextVersion, humanScore: null, validatedBy: null, validatedAt: null,
+        },
+      });
+    }
+
+    const bestMatch  = findBestServiceMatch(allMatches);
+    const agentScore = calcServiceMatchScore(bestMatch, ctx);
+
+    const matchFitScore = MATCH_TYPE_SCORE[bestMatch.matchType];
+    const impactScore   = IMPACT_SCORE[bestMatch.businessImpact];
+    const contactScore  = calcContactability({ ...ctx, hasContactPoint: true });
+
+    const matchedServiceIds  = [...new Set(allMatches.map(m => m.serviceId))];
+    const estimatedTicketUsd = matchedServiceIds.reduce((sum, id) => {
+      const svc = SIR_CATALOG.find(s => s.id === id);
+      return sum + (svc?.avgTicketUsd[0] ?? 0);
+    }, 0);
+
+    const servicesRecommended = matchedServiceIds
+      .map(id => SIR_CATALOG.find(s => s.id === id)?.name)
+      .filter(Boolean) as string[];
+
+    const verificationBlock = [
+      `Sitio web: ${ctx.hasWebsite ? 'SÍ' : 'NO'}`,
+      `Instagram: ${ctx.hasInstagram ? 'SÍ' : 'NO'}`,
+      `LinkedIn: ${ctx.hasLinkedIn ? 'SÍ' : 'NO'}`,
+    ].join(' · ');
+
+    const matchBlock = allMatches.slice(0, 3)
+      .map(m => {
+        const svcName = SIR_CATALOG.find(s => s.id === m.serviceId)?.name ?? m.serviceId;
+        return `"${m.problema}" → ${svcName} [${m.matchType} / ${m.businessImpact}]`;
+      })
+      .join('; ');
+
+    const reasoning = [
+      `[${nextVersion}] VERIFICACIÓN: ${verificationBlock}.`,
+      `PROBLEMAS: ${problems.length} detectados, ${allMatches.length} con match INSPYRA.`,
+      `SERVICE MATCH: ${matchBlock}.`,
+      `SCORE: ${agentScore}/100 (Fit: ${matchFitScore} · Impact: ${impactScore} · Contactabilidad: ${contactScore}).`,
+    ].join(' ');
 
     return this.prisma.prospectValidation.update({
       where: { id: existing.id },
       data: {
         agentScore,
-        servicesRecommended: recommendedNames,
+        servicesRecommended,
         estimatedTicketUsd,
-        prioridad: prioridadMap[topPrioridad] ?? 'MEDIA',
-        reasoning: `Evaluador ${nextVersion}: ${problems.length} problemas detectados, score ${agentScore}/100.`,
-        decisionFactors: {
-          problemScore: problems.length >= 5 ? 25 : problems.length >= 3 ? 15 : 10,
-          priorityScore: Math.round(
-            (Math.max(...analysis.map((r) => PRIORITY_WEIGHT[r.prioridad] ?? 0), 0) / 4) * 25,
-          ),
-          fitScore: serviceFit > 0.75 ? 25 : serviceFit > 0.5 ? 15 : serviceFit > 0.25 ? 8 : 0,
-          ticketScore: estimatedTicketUsd > 3000 ? 25 : estimatedTicketUsd > 2000 ? 20 : estimatedTicketUsd > 1000 ? 12 : estimatedTicketUsd > 500 ? 5 : 0,
-        },
-        validationVersion: nextVersion,
-        // Reset human review so the new score gets fresh human validation
+        prioridad: IMPACT_TO_PRIORIDAD[bestMatch.businessImpact] ?? 'MEDIA',
+        reasoning,
         status: 'PENDING',
+        discardReason: null,
         humanScore: null,
         validatedBy: null,
         validatedAt: null,
+        validationVersion: nextVersion,
+        decisionFactors: {
+          matchFitScore,
+          impactScore,
+          contactScore,
+          bestMatch: {
+            problema:       bestMatch.problema,
+            serviceId:      bestMatch.serviceId,
+            matchType:      bestMatch.matchType,
+            businessImpact: bestMatch.businessImpact,
+          },
+          allMatches: allMatches.map(m => ({
+            problema:       m.problema,
+            serviceId:      m.serviceId,
+            matchType:      m.matchType,
+            businessImpact: m.businessImpact,
+          })),
+          hasWebsite:    ctx.hasWebsite,
+          hasInstagram:  ctx.hasInstagram,
+          hasLinkedIn:   ctx.hasLinkedIn,
+          sector:        ctx.sector,
+          businessModel: ctx.businessModel,
+        } as never,
+      },
+    });
+  }
+
+  private async createDiscardedValidation(
+    tenantId: string,
+    prospectId: string,
+    discardReason: 'NO_SERVICE_MATCH' | 'ALREADY_SOLVED' | 'LOW_IMPACT' | 'INSUFFICIENT_DATA',
+    problemsAnalyzed: string[],
+  ) {
+    const existing = await this.prisma.prospectValidation.findUnique({ where: { prospectId } });
+    if (existing) throw new ConflictException('Validation already exists for this prospect');
+
+    const descReason: Record<string, string> = {
+      NO_SERVICE_MATCH:   'ningún problema detectado corresponde a un servicio INSPYRA',
+      ALREADY_SOLVED:     'el prospecto ya tiene resuelto lo que INSPYRA ofrece',
+      LOW_IMPACT:         'todos los matches son detalles cosméticos sin impacto comercial real',
+      INSUFFICIENT_DATA:  'datos insuficientes para evaluar la oportunidad',
+    };
+
+    return this.prisma.prospectValidation.create({
+      data: {
+        tenantId,
+        prospectId,
+        agentScore:           0,
+        status:               'DISCARDED',
+        discardReason:        discardReason as never,
+        servicesRecommended:  [],
+        estimatedTicketUsd:   0,
+        prioridad:            'BAJA',
+        reasoning: `DISCARD: ${discardReason} — ${descReason[discardReason] ?? ''}. Problemas analizados (${problemsAnalyzed.length}): ${problemsAnalyzed.slice(0, 5).join('; ')}.`,
+        decisionFactors: {
+          discardReason,
+          problemsAnalyzed: problemsAnalyzed.slice(0, 10),
+        },
+      },
+    });
+  }
+
+  async reactivate(id: string, tenantId: string) {
+    const v = await this.prisma.prospectValidation.findFirst({ where: { id, tenantId } });
+    if (!v) throw new NotFoundException('Validation not found');
+    if (v.status !== 'DISCARDED') {
+      throw new BadRequestException('Solo se pueden reactivar validaciones en estado DISCARDED');
+    }
+
+    return this.prisma.prospectValidation.update({
+      where: { id },
+      data: {
+        status:       'PENDING',
+        discardReason: null,
+        reasoning:    `[Reactivado manualmente] ${v.reasoning}`,
       },
     });
   }

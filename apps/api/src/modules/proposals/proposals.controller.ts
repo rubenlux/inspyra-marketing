@@ -62,4 +62,13 @@ export class ProposalsController {
     const translation = await this.proposalsService.translate(body.text ?? '', body.sourceLang ?? 'EN');
     return { translation };
   }
+
+  @Post('reply-agent/:prospectId')
+  replyAgent(
+    @Param('prospectId') prospectId: string,
+    @Body() body: { replyText: string },
+    @Request() req: AuthRequest,
+  ) {
+    return this.proposalsService.runReplyAgent(prospectId, req.user.tenantId, body.replyText);
+  }
 }

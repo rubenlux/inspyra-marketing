@@ -16,6 +16,7 @@ import {
   Prioridad,
   ProspectFuente,
   DetectadoPor,
+  ProspectEstado,
 } from '@prisma/client';
 
 export class CreateProspectDto {
@@ -146,4 +147,9 @@ export class CreateProspectDto {
   @IsOptional()
   @IsEnum(DetectadoPor)
   detectadoPor?: DetectadoPor;
+
+  @ApiPropertyOptional({ enum: ProspectEstado })
+  @IsOptional()
+  @IsEnum(ProspectEstado)
+  estado?: ProspectEstado;
 }

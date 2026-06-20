@@ -75,6 +75,19 @@ export function createMockPrisma() {
       create: jest.fn(),
       update: jest.fn(),
     },
+    proposal: {
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      findUnique: jest.fn(),
+    },
+    outreachActivity: {
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      count: jest.fn(),
+    },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     $transaction: jest.fn((fn: any) => (typeof fn === 'function' ? fn({} as any) : Promise.all(fn as Promise<unknown>[]))),
   };

@@ -84,12 +84,15 @@ async function req<T>(
       headers: buildHeaders(),
       body: fetchBody,
     })
+    if (retryRes.status === 204) return undefined as T
     const retryJson = await retryRes.json()
     if (!retryRes.ok || !retryJson.success) {
       throw new Error(retryJson?.error?.message ?? `HTTP ${retryRes.status}`)
     }
     return retryJson.data as T
   }
+
+  if (res.status === 204) return undefined as T
 
   const json = await res.json()
 
@@ -184,7 +187,24 @@ export const prospectsApi = {
 
   get: (id: string) => req<Prospect>('GET', `/prospects/${id}`),
 
+  create: (data: Record<string, unknown>) => req<Prospect>('POST', '/prospects', data),
+
   update: (id: string, data: Record<string, unknown>) => req<Prospect>('PATCH', `/prospects/${id}`, data),
+
+  remove: (id: string) => req<void>('DELETE', `/prospects/${id}`),
+
+  bulk: (prospects: Record<string, unknown>[]) =>
+    req<{ created: number; duplicates: number; errors: { row: number; error: string }[] }>('POST', '/prospects/bulk', { prospects }),
+
+  fromUrl: (url: string) =>
+    req<{
+      sourceType: string; url: string;
+      empresa: string | null; website: string | null; instagram: string | null;
+      linkedin: string | null; facebook: string | null; googleBusiness: string | null;
+      ciudad: string | null; rubro: string | null; descripcion: string | null;
+      oportunidades: Array<{ servicio: string; score: number; razon: string }>;
+      ticketEstimado: number; prioridad: string; oportunidadDetectada: string | null;
+    }>('POST', '/prospects/from-url', { url }),
 }
 
 // ─── Prospect Validations ─────────────────────────────────────────────────────
@@ -316,6 +336,30 @@ export interface ResearchCandidate {
   createdAt: string
 }
 
+export interface WebsiteAuditResult {
+  empresa: string
+  dominio: string
+  rubroEstimado: string
+  auditScore: number
+  commercialOpportunityScore: number
+  erroresVisibles: string[]
+  hallazgos: {
+    seo:          { score: number; issues: string[] }
+    frontend:     { score: number; issues: string[] }
+    performance:  { score: number; issues: string[] }
+    seguridad:    { score: number; issues: string[] }
+    arquitectura: { stack: string[]; cms: string | null; issues: string[] }
+  }
+  severidad: {
+    critico: string[]
+    alto:    string[]
+    medio:   string[]
+    bajo:    string[]
+  }
+  serviciosSugeridos: string[]
+  outreachBrief: string
+}
+
 export const researchApi = {
   createJob: (query: string, limit = 50) =>
     req<ResearchJob>('POST', '/research/jobs', { query, limit }),
@@ -328,6 +372,9 @@ export const researchApi = {
 
   getCandidates: (jobId: string) =>
     req<ResearchCandidate[]>('GET', `/research/jobs/${jobId}/candidates`),
+
+  websiteAudit: (url: string) =>
+    req<WebsiteAuditResult>('POST', '/research/website-audit', { url }),
 }
 
 // ─── Enrichment ──────────────────────────────────────────────────────────────
@@ -565,6 +612,10 @@ export interface OutreachActivity {
   responseType?: ResponseType | null
   proposalId?: string | null
   mensajeUtilizado?: string | null
+  provider?: string | null
+  messageId?: string | null
+  providerMessageId?: string | null
+  fechaEnvio?: string | null
   createdById?: string | null
   createdAt: string
 }
@@ -608,6 +659,54 @@ export const outreachApi = {
 
   getFunnel: () =>
     req<OutreachFunnel>('GET', '/outreach/funnel'),
+}
+
+export interface MailboxItem {
+  id: string
+  email: string
+  quotaMB: number
+  password?: string
+}
+
+export interface MailDraft {
+  id: string
+  to: string
+  subject: string
+  externalRef: string | null
+  status: 'draft' | 'sent'
+  sesMessageId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export const mailApi = {
+  sendFree: (body: { from?: string; to: string; subject: string; body?: string; bodyHtml?: string }) =>
+    req<{ messageId: string }>('POST', '/outreach/mail/send', body),
+  getMessages: (email: string, folder: string, limit = 50, offset = 0) =>
+    req<{ items: any[]; meta: any }>('GET', '/outreach/mail/messages', undefined, { email, folder, limit, offset }),
+  getMessage: (uid: number, email: string, folder: string) =>
+    req<any>('GET', `/outreach/mail/messages/${uid}`, undefined, { email, folder }),
+  getSentEmails: () =>
+    req<{ items: any[] }>('GET', '/outreach/mail/sent'),
+  getDrafts: () =>
+    req<{ items: MailDraft[] }>('GET', '/outreach/mail/drafts'),
+  createDraft: (body: { to: string; subject: string; html: string; externalRef?: string }) =>
+    req<MailDraft>('POST', '/outreach/mail/drafts', body),
+  sendDraft: (draftId: string, prospectId?: string) =>
+    req<{ status: string; sesMessageId: string | null }>('POST', `/outreach/mail/drafts/${draftId}/send`, { prospectId }),
+  deleteDraft: (draftId: string) =>
+    req<void>('DELETE', `/outreach/mail/drafts/${draftId}`),
+}
+
+export const mailboxApi = {
+  list: () =>
+    req<{ items: MailboxItem[] }>('GET', '/outreach/mail/mailboxes'),
+  create: (body: { localPart: string; quotaMB?: number }) =>
+    req<MailboxItem>('POST', '/outreach/mail/mailboxes', body),
+  delete: (email: string) =>
+    req<void>('DELETE', `/outreach/mail/mailboxes/${encodeURIComponent(email)}`),
+  resetPassword: (email: string) =>
+    req<{ password: string }>('POST', `/outreach/mail/mailboxes/${encodeURIComponent(email)}/reset-password`),
 }
 
 export const agentRoiApi = {
