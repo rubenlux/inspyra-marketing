@@ -270,12 +270,26 @@ export class ProspectValidationService {
 
     // ── ERP-052: Service Match First ──────────────────────────────────────────
 
-    // Gate 1: datos suficientes
-    if (problems.length === 0) {
+    // Gate 1: Data Sufficiency — ¿Tengo información para evaluar?
+    // NO es suficiente con "sin problemas detectados". Necesito presencia digital real.
+    const hasContactData = Boolean(
+      prospect.email || prospect.telefono || prospect.whatsapp ||
+      prospect.instagram || prospect.facebook || prospect.linkedin ||
+      prospect.website
+    );
+
+    if (!hasContactData) {
       return this.createDiscardedValidation(tenantId, prospectId, 'INSUFFICIENT_DATA', problems);
     }
 
     // Gate 2: buscar match entre problemas verificados y servicios INSPYRA
+    // Si no encontré problemas específicos, eso NO es un descarte
+    // es simplemente una oportunidad baja/media sin brechas obvias
+    if (problems.length === 0) {
+      return this.createLowOpportunityValidation(tenantId, prospectId, problems);
+    }
+
+    // Gate 3: buscar match entre problemas verificados y servicios INSPYRA
     const allMatches = findAllServiceMatches(problems, INSPYRA_SERVICE_IDS);
 
     if (allMatches.length === 0) {
@@ -511,6 +525,46 @@ export class ProspectValidationService {
         decisionFactors: {
           discardReason,
           problemsAnalyzed: problemsAnalyzed.slice(0, 10),
+        },
+      },
+    });
+  }
+
+  private async createLowOpportunityValidation(
+    tenantId: string,
+    prospectId: string,
+    problemsAnalyzed: string[],
+  ) {
+    const existing = await this.prisma.prospectValidation.findUnique({ where: { prospectId } });
+    if (existing) throw new ConflictException('Validation already exists for this prospect');
+
+    const prospect = await this.prisma.prospect.findFirst({
+      where: { id: prospectId, tenantId, deletedAt: null },
+    });
+    if (!prospect) throw new NotFoundException(`Prospect ${prospectId} not found`);
+
+    const ctx = buildProspectContext(prospect);
+
+    return this.prisma.prospectValidation.create({
+      data: {
+        tenantId,
+        prospectId,
+        agentScore:           35,
+        status:               'PENDING',
+        servicesRecommended:  [],
+        estimatedTicketUsd:   0,
+        prioridad:            'BAJA',
+        reasoning: `OPORTUNIDAD BAJA — Prospecto verificado con presencia digital completa pero sin brechas obvias detectadas. ` +
+          `Empresa está activa en web y redes. Sin problemas específicos en catálogo INSPYRA. ` +
+          `Requiere análisis comercial para identificar oportunidades de valor agregado.`,
+        decisionFactors: {
+          dataVerified: true,
+          hasWebsite: ctx.hasWebsite,
+          hasInstagram: ctx.hasInstagram,
+          hasLinkedIn: ctx.hasLinkedIn,
+          problemsDetected: problemsAnalyzed.length,
+          opportunityLevel: 'LOW',
+          notes: 'Sin brechas evidentes. Requiere revisión humana para identificar oportunidad de venta cruzada o valor agregado.',
         },
       },
     });
