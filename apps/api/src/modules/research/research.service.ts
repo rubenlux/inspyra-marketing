@@ -379,25 +379,28 @@ export class ResearchService {
 
       // ── Phase 3: Crear Prospect automáticamente (sin Claude) ─────────────────
       await this.updateJobOutput(jobId, `[Fase 3/3] Promoviendo a Prospect…`);
-      let prospectsCreated = 0;
 
-      await Promise.all(
+      const promotionResults = await Promise.all(
         validatedIndices.map(async (i) => {
           try {
             const company = rawCompanies[i];
             const prospect = await this.createProspectFromDiscovery(tenantId, company);
-            if (prospect) {
-              prospectsCreated++;
+            if (prospect?.id) {
               await this.prisma.researchCandidate.update({
                 where: { id: savedCandidates[i].id },
                 data: { status: 'PROMOTED', prospectId: prospect.id },
               });
+              return true;
             }
+            return false;
           } catch (err) {
-            this.logger.error(`[Job ${jobId}] Failed to promote ${rawCompanies[i].nombreEmpresa}: ${err.message}`);
+            this.logger.error(`[Job ${jobId}] Failed to promote ${rawCompanies[i].nombreEmpresa}: ${(err as Error).message}`);
+            return false;
           }
         }),
       );
+
+      const prospectsCreated = promotionResults.filter(Boolean).length;
 
       await this.prisma.researchJob.update({
         where: { id: jobId },
