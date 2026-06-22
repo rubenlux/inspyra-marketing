@@ -7,24 +7,9 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateEnrichmentJobDto } from './dto/create-enrichment-job.dto';
-import { ClaudeRunnerService } from '../ia-core/services/claude-runner.service';
 import { PlaywrightAuditService } from './playwright-audit.service';
-import { COMMERCIAL_REASONING_PROMPT, AuditSignals } from '../research/prompts/commercial-reasoning.prompt';
-
-interface Opportunity {
-  service: string;
-  impact: 'HIGH' | 'MEDIUM' | 'LOW';
-  confidence: number;
-  evidence: string[];
-}
-
-interface OpportunityAnalysis {
-  priority: 'HIGH' | 'MEDIUM' | 'LOW';
-  estimatedTicket: number;
-  confianza: 'ALTA' | 'MEDIA' | 'BAJA';
-  summary: string;
-  opportunities: Opportunity[];
-}
+import { OpportunityEngineService } from './opportunity-engine.service';
+import { OpportunityAnalysis } from './analyzers/types';
 
 @Injectable()
 export class EnrichmentService {
@@ -32,8 +17,8 @@ export class EnrichmentService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly claude: ClaudeRunnerService,
     private readonly playwrightAudit: PlaywrightAuditService,
+    private readonly opportunityEngine: OpportunityEngineService,
   ) {}
 
   async createJob(dto: CreateEnrichmentJobDto, tenantId: string, userId: string) {
@@ -180,14 +165,19 @@ export class EnrichmentService {
       this.logger.log(`[Job ${jobId}] Fase A: Playwright auditando ${prospect.website ?? 'sin web'}`);
       const signals = await this.playwrightAudit.auditWebsite(prospect.website);
 
-      // ── Fase B: Razonamiento comercial — única llamada a Claude ───────────
-      this.logger.log(`[Job ${jobId}] Fase B: razonamiento comercial`);
-      const reasoningRaw = await this.reasonCommercially(prospect, signals);
-      const data = this.parseJson<Partial<OpportunityAnalysis>>(reasoningRaw) ?? {};
+      // ── Fase B: Opportunity Engine ─────────────────────────────────────────
+      const opportunities = this.opportunityEngine.detect(signals, prospect.rubro || 'Mixed');
 
-      const opportunityScore = this.computeOpportunityScore(data);
-      const oppsJson = (data.opportunities ?? []) as unknown as import('@prisma/client').Prisma.InputJsonValue;
+      // Calculate score based on number of activated opportunities
+      let opportunityScore = 0;
+      const activatedCount = opportunities.filter(o => o.activated).length;
+      if (activatedCount > 0) {
+        opportunityScore = Math.min(100, activatedCount * 25);
+      }
+      const oppsJson = opportunities as unknown as import('@prisma/client').Prisma.InputJsonValue;
       const signalsJson = signals as unknown as import('@prisma/client').Prisma.InputJsonValue;
+
+      const rawData = { opportunities, signals };
 
       await this.prisma.enrichmentResult.upsert({
         where: { prospectId: prospect.id },
@@ -197,25 +187,25 @@ export class EnrichmentService {
           jobId,
           opportunities: oppsJson,
           signals: signalsJson,
-          estimatedTicket: data.estimatedTicket ?? null,
-          priority: data.priority ?? null,
+          estimatedTicket: null,
+          priority: null,
           opportunityScore,
-          confianza: data.confianza ?? null,
-          summary: data.summary ?? null,
+          confianza: null,
+          summary: `Detected ${opportunities.length} opportunities (${activatedCount} activated)`,
           contactable: true,
           reviewStatus: 'PENDING',
-          rawOutput: reasoningRaw,
+          rawOutput: JSON.stringify(rawData, null, 2),
         },
         update: {
           opportunities: oppsJson,
           signals: signalsJson,
-          estimatedTicket: data.estimatedTicket ?? null,
-          priority: data.priority ?? null,
+          estimatedTicket: null,
+          priority: null,
           opportunityScore,
-          confianza: data.confianza ?? null,
-          summary: data.summary ?? null,
+          confianza: null,
+          summary: `Detected ${opportunities.length} opportunities (${activatedCount} activated)`,
           reviewStatus: 'PENDING',
-          rawOutput: reasoningRaw,
+          rawOutput: JSON.stringify(rawData, null, 2),
           jobId,
         },
       });
@@ -230,32 +220,17 @@ export class EnrichmentService {
         data: {
           status: 'COMPLETED',
           completedAt: new Date(),
-          agentOutput: `Score: ${opportunityScore} | Prioridad: ${data.priority ?? 'N/A'} | Ticket: USD ${data.estimatedTicket ?? 0} | Oportunidades: ${data.opportunities?.length ?? 0} | Web: ${signals.accessible ? 'OK' : signals.noWebsite ? 'sin web' : 'inaccesible'}`,
+          agentOutput: `Score: ${opportunityScore} | Oportunidades: ${opportunities.length} (${activatedCount} activated) | Web: ${signals.accessible ? 'OK' : signals.noWebsite ? 'sin web' : 'inaccesible'}`,
         },
       });
     } catch (err) {
-      this.logger.error(`[AnalysisJob ${jobId}] Failed: ${err.message}`);
+      const msg = String((err as Error).message ?? 'unknown');
+      this.logger.error(`[AnalysisJob ${jobId}] Failed: ${msg}`);
       await this.prisma.enrichmentJob.update({
         where: { id: jobId },
-        data: { status: 'FAILED', completedAt: new Date(), errorMessage: String(err.message) },
+        data: { status: 'FAILED', completedAt: new Date(), errorMessage: msg },
       });
     }
-  }
-
-  private async reasonCommercially(prospect: any, signals: AuditSignals): Promise<string> {
-    const prompt = COMMERCIAL_REASONING_PROMPT(prospect, signals);
-    const signalsJson = JSON.stringify(signals);
-
-    this.logger.log(`[Phase B diag] signals keys: ${Object.keys(signals).length} | signals size: ${signalsJson.length} chars | prompt size: ${prompt.length} chars`);
-
-    const start = Date.now();
-    const result = await this.claude.runText(prompt, {
-      model: 'claude-sonnet-4-6',
-      timeoutMs: 120_000,
-    });
-    this.logger.log(`[Phase B diag] Claude ms: ${Date.now() - start} | output size: ${result.length} chars`);
-
-    return result;
   }
 
   private computeOpportunityScore(data: Partial<OpportunityAnalysis>): number {

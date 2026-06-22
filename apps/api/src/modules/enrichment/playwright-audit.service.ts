@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { chromium, Browser, BrowserContext, Page } from 'playwright';
-import { AuditSignals } from '../research/prompts/commercial-reasoning.prompt';
+import { AuditSignals } from './analyzers/types';
 
 interface CacheEntry {
   signals: AuditSignals;

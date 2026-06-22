@@ -1,0 +1,7 @@
+CAPTURA REAL DE PIPELINE
+
+Endpoint: POST /api/v1/research/website-audit
+URL: https://casa-vigil.com
+
+SIGNALS RESPONSE:
+{"success":false,"data":null,"error":{"code":"Bad Request","message":"No se pudo acceder a https://casa-vigil.com: fetch failed","path":"/api/v1/research/website-audit","timestamp":"2026-06-22T15:05:51.361Z"}}

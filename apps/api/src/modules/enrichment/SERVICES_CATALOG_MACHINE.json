@@ -1,0 +1,570 @@
+{
+  "version": "2.1",
+  "description": "Machine-readable services catalog — Deterministic oportunity detection",
+  "semantics": {
+    "match": "all(requiredSignals) AND optionalMatches >= minOptionalMatches AND no(forbiddenSignals)",
+    "optionalGroups": "Each group is an OR alternative. Need at least minOptionalMatches groups to evaluate true.",
+    "businessValue": "0-100 scale. Used to order opportunities without AI."
+  },
+  "services": [
+    {
+      "serviceId": "ecommerce",
+      "tier": 1,
+      "name": "Ecommerce",
+      "businessValue": 95,
+      "estimatedValueUSD": {
+        "min": 3000,
+        "max": 8000
+      },
+      "problem": "No vender productos online",
+      "requiredSignals": [
+        {
+          "signal": "hasEcommerce",
+          "operator": "equals",
+          "value": false
+        }
+      ],
+      "optionalGroups": [
+        [
+          {
+            "signal": "industry",
+            "operator": "in",
+            "value": ["Wine/Beverages", "Food Service", "Retail", "Tourism"]
+          }
+        ],
+        [
+          {
+            "signal": "navContains",
+            "operator": "includes_any",
+            "value": ["TIENDA", "PRODUCTOS", "SHOP"]
+          }
+        ]
+      ],
+      "minOptionalMatches": 1,
+      "forbiddenSignals": [
+        {
+          "signal": "isB2BPure",
+          "operator": "equals",
+          "value": true
+        }
+      ],
+      "realCases": ["Bodegas López"]
+    },
+    {
+      "serviceId": "online-booking",
+      "tier": 1,
+      "name": "Sistema de Reservas Online",
+      "businessValue": 95,
+      "estimatedValueUSD": {
+        "min": 1500,
+        "max": 3500
+      },
+      "problem": "Las reservas se gestionan manualmente",
+      "requiredSignals": [
+        {
+          "signal": "hasOnlineBooking",
+          "operator": "equals",
+          "value": false
+        }
+      ],
+      "optionalGroups": [
+        [
+          {
+            "signal": "navContains",
+            "operator": "includes_any",
+            "value": ["RESERVA", "RESERVAS", "BOOKING"]
+          }
+        ],
+        [
+          {
+            "signal": "navContains",
+            "operator": "includes_any",
+            "value": ["TOURS", "VISITAS", "EXPERIENCIAS", "TASTINGS", "DEGUSTACIONES"]
+          }
+        ],
+        [
+          {
+            "signal": "tourism",
+            "operator": "equals",
+            "value": true
+          }
+        ],
+        [
+          {
+            "signal": "hasWooCommerce",
+            "operator": "equals",
+            "value": true
+          },
+          {
+            "signal": "industry",
+            "operator": "in",
+            "value": ["Wine/Beverages", "Food Service"]
+          }
+        ]
+      ],
+      "minOptionalMatches": 1,
+      "forbiddenSignals": [
+        {
+          "signal": "isWalkInOnly",
+          "operator": "equals",
+          "value": true
+        }
+      ],
+      "realCases": ["Casa Vigil", "Norton"]
+    },
+    {
+      "serviceId": "crm-automation",
+      "tier": 1,
+      "name": "CRM + Automatización",
+      "businessValue": 90,
+      "estimatedValueUSD": {
+        "min": 1500,
+        "max": 4000
+      },
+      "problem": "Vende pero sin seguimiento post-venta",
+      "requiredSignals": [
+        {
+          "signal": "hasEcommerce",
+          "operator": "equals",
+          "value": true
+        },
+        {
+          "signal": "hasMetaPixel",
+          "operator": "equals",
+          "value": false
+        }
+      ],
+      "optionalGroups": [
+        [
+          {
+            "signal": "hasLeadForm",
+            "operator": "equals",
+            "value": false
+          }
+        ],
+        [
+          {
+            "signal": "hasContactForm",
+            "operator": "equals",
+            "value": false
+          }
+        ],
+        [
+          {
+            "signal": "hasHubSpot",
+            "operator": "equals",
+            "value": false
+          }
+        ]
+      ],
+      "minOptionalMatches": 1,
+      "forbiddenSignals": [
+        {
+          "signal": "hasProfessionalCRM",
+          "operator": "equals",
+          "value": true
+        }
+      ],
+      "realCases": ["Casa Vigil", "Norton"]
+    },
+    {
+      "serviceId": "web-new",
+      "tier": 2,
+      "name": "Sitio Web Nuevo",
+      "businessValue": 70,
+      "estimatedValueUSD": {
+        "min": 2500,
+        "max": 6000
+      },
+      "problem": "No tiene sitio web",
+      "requiredSignals": [
+        {
+          "signal": "hasWebsite",
+          "operator": "equals",
+          "value": false
+        }
+      ],
+      "optionalGroups": [
+        [
+          {
+            "signal": "hasSocialLinks",
+            "operator": "equals",
+            "value": true
+          }
+        ]
+      ],
+      "minOptionalMatches": 0,
+      "forbiddenSignals": [],
+      "realCases": []
+    },
+    {
+      "serviceId": "web-redesign",
+      "tier": 2,
+      "name": "Rediseño Web",
+      "businessValue": 75,
+      "estimatedValueUSD": {
+        "min": 3000,
+        "max": 7000
+      },
+      "problem": "Sitio desactualizado o con UX deficiente",
+      "requiredSignals": [
+        {
+          "signal": "hasWebsite",
+          "operator": "equals",
+          "value": true
+        }
+      ],
+      "optionalGroups": [
+        [
+          {
+            "signal": "hasViewport",
+            "operator": "equals",
+            "value": false
+          }
+        ],
+        [
+          {
+            "signal": "estimatedPageWeightKb",
+            "operator": "greater_than",
+            "value": 500
+          }
+        ],
+        [
+          {
+            "signal": "imageCount",
+            "operator": "less_than",
+            "value": 3
+          }
+        ],
+        [
+          {
+            "signal": "h1Count",
+            "operator": "equals",
+            "value": 0
+          }
+        ]
+      ],
+      "minOptionalMatches": 2,
+      "forbiddenSignals": [
+        {
+          "signal": "isModernDesign",
+          "operator": "equals",
+          "value": true
+        }
+      ],
+      "realCases": []
+    },
+    {
+      "serviceId": "landing-pages",
+      "tier": 2,
+      "name": "Landing Pages de Conversión",
+      "businessValue": 85,
+      "estimatedValueUSD": {
+        "min": 1200,
+        "max": 3000
+      },
+      "problem": "Sitio general no convierte clientes específicos",
+      "requiredSignals": [
+        {
+          "signal": "hasWebsite",
+          "operator": "equals",
+          "value": true
+        },
+        {
+          "signal": "hasLeadForm",
+          "operator": "equals",
+          "value": false
+        }
+      ],
+      "optionalGroups": [
+        [
+          {
+            "signal": "mainNavIsGeneric",
+            "operator": "equals",
+            "value": true
+          }
+        ],
+        [
+          {
+            "signal": "hasEcommerce",
+            "operator": "equals",
+            "value": true
+          }
+        ],
+        [
+          {
+            "signal": "navContains",
+            "operator": "includes_any",
+            "value": ["TOURS", "EXPERIENCIAS", "PAQUETES"]
+          }
+        ]
+      ],
+      "minOptionalMatches": 1,
+      "forbiddenSignals": [
+        {
+          "signal": "hasSegmentedLandingPages",
+          "operator": "equals",
+          "value": true
+        }
+      ],
+      "realCases": ["Casa Vigil"]
+    },
+    {
+      "serviceId": "local-visibility",
+      "tier": 3,
+      "name": "Local Visibility (GBP + SEO Local)",
+      "businessValue": 65,
+      "estimatedValueUSD": {
+        "min": 1200,
+        "max": 2500
+      },
+      "problem": "No aparece en Google Maps / búsqueda local",
+      "requiredSignals": [
+        {
+          "signal": "hasGoogleBusiness",
+          "operator": "equals",
+          "value": false
+        }
+      ],
+      "optionalGroups": [
+        [
+          {
+            "signal": "tourism",
+            "operator": "equals",
+            "value": true
+          }
+        ],
+        [
+          {
+            "signal": "hasWebsite",
+            "operator": "equals",
+            "value": true
+          }
+        ],
+        [
+          {
+            "signal": "navContains",
+            "operator": "includes_any",
+            "value": ["TURISMO", "VISITANOS", "TOURS", "UBICACION"]
+          }
+        ],
+        [
+          {
+            "signal": "industry",
+            "operator": "in",
+            "value": ["Wine/Beverages", "Food Service", "Tourism", "Health & Wellness"]
+          }
+        ]
+      ],
+      "minOptionalMatches": 1,
+      "forbiddenSignals": [
+        {
+          "signal": "isB2BPure",
+          "operator": "equals",
+          "value": true
+        },
+        {
+          "signal": "isRemoteOnly",
+          "operator": "equals",
+          "value": true
+        }
+      ],
+      "realCases": ["Norton", "Pulenta Estate"]
+    },
+    {
+      "serviceId": "social-presence",
+      "tier": 3,
+      "name": "Social Presence",
+      "businessValue": 60,
+      "estimatedValueUSD": {
+        "min": 800,
+        "max": 2500
+      },
+      "problem": "No tiene presencia en redes o está abandonada",
+      "requiredSignals": [
+        {
+          "signal": "hasSocialLinks",
+          "operator": "equals",
+          "value": false
+        }
+      ],
+      "optionalGroups": [
+        [
+          {
+            "signal": "industry",
+            "operator": "in",
+            "value": ["Wine/Beverages", "Food Service", "Retail", "Tourism", "Beauty"]
+          }
+        ],
+        [
+          {
+            "signal": "hasInstagram",
+            "operator": "equals",
+            "value": false
+          }
+        ]
+      ],
+      "minOptionalMatches": 1,
+      "forbiddenSignals": [
+        {
+          "signal": "hasSocialPresenceActive",
+          "operator": "equals",
+          "value": true
+        }
+      ],
+      "realCases": ["Pulenta Estate"]
+    },
+    {
+      "serviceId": "search-visibility",
+      "tier": 4,
+      "name": "Search Visibility (SEO Técnico + Schema)",
+      "businessValue": 50,
+      "estimatedValueUSD": {
+        "min": 1200,
+        "max": 2800
+      },
+      "problem": "Problemas técnicos impiden ranking y rich results",
+      "requiredSignals": [
+        {
+          "signal": "hasWebsite",
+          "operator": "equals",
+          "value": true
+        }
+      ],
+      "optionalGroups": [
+        [
+          {
+            "signal": "hasMetaDescription",
+            "operator": "equals",
+            "value": false
+          }
+        ],
+        [
+          {
+            "signal": "hasSitemap",
+            "operator": "equals",
+            "value": false
+          }
+        ],
+        [
+          {
+            "signal": "hasCanonical",
+            "operator": "equals",
+            "value": false
+          }
+        ],
+        [
+          {
+            "signal": "h1Count",
+            "operator": "equals",
+            "value": 0
+          }
+        ],
+        [
+          {
+            "signal": "h1Count",
+            "operator": "greater_than",
+            "value": 2
+          }
+        ],
+        [
+          {
+            "signal": "hasSchema",
+            "operator": "equals",
+            "value": false
+          }
+        ]
+      ],
+      "minOptionalMatches": 3,
+      "forbiddenSignals": [],
+      "realCases": ["Casa Vigil", "Norton", "Pulenta Estate"]
+    },
+    {
+      "serviceId": "site-stability",
+      "tier": 4,
+      "name": "Site Stability (Seguridad Web)",
+      "businessValue": 30,
+      "estimatedValueUSD": {
+        "min": 500,
+        "max": 2000
+      },
+      "problem": "Sitio con problemas de seguridad",
+      "requiredSignals": [
+        {
+          "signal": "httpsOk",
+          "operator": "equals",
+          "value": false
+        }
+      ],
+      "optionalGroups": [
+        [
+          {
+            "signal": "hasEcommerce",
+            "operator": "equals",
+            "value": true
+          }
+        ]
+      ],
+      "minOptionalMatches": 0,
+      "forbiddenSignals": [],
+      "realCases": []
+    }
+  ],
+  "tierHierarchy": {
+    "TIER_1": ["ecommerce", "online-booking", "crm-automation"],
+    "TIER_2": ["web-new", "web-redesign", "landing-pages"],
+    "TIER_3": ["local-visibility", "social-presence"],
+    "TIER_4": ["search-visibility", "site-stability"]
+  },
+  "displayRules": [
+    {
+      "rule": "If TIER_1.count > 0, hide TIER_4",
+      "priority": 1
+    },
+    {
+      "rule": "If TIER_1.count === 0, show TIER_2",
+      "priority": 2
+    },
+    {
+      "rule": "Always show TIER_3",
+      "priority": 3
+    },
+    {
+      "rule": "If TIER_1.count === 0, show TIER_4",
+      "priority": 4
+    },
+    {
+      "rule": "Order by: TIER asc, businessValue desc",
+      "priority": 5
+    }
+  ],
+  "operators": {
+    "equals": "signal value === expected value",
+    "in": "signal value in array of expected values",
+    "includes_any": "signal contains any of the expected values (for strings/arrays)",
+    "greater_than": "signal value > expected value",
+    "less_than": "signal value < expected value",
+    "not_empty": "signal value is not null/undefined/empty"
+  },
+  "validation": {
+    "total_services": 10,
+    "validated_cases": 3,
+    "validation_results": {
+      "Casa Vigil": {
+        "expected": ["online-booking", "crm-automation"],
+        "detected": ["online-booking", "crm-automation"],
+        "status": "PASS"
+      },
+      "Norton": {
+        "expected": ["online-booking", "crm-automation", "local-visibility"],
+        "detected": ["online-booking", "crm-automation", "local-visibility"],
+        "status": "PASS"
+      },
+      "Pulenta Estate": {
+        "expected": ["local-visibility"],
+        "detected": ["local-visibility"],
+        "status": "PASS"
+      }
+    }
+  }
+}
