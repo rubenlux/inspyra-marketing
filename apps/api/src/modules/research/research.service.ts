@@ -15,6 +15,7 @@ import { ClaudeRunnerService } from '../ia-core/services/claude-runner.service';
 import { WEBSITE_AUDIT_PROMPT } from './prompts/website-audit.prompt';
 import { BUSINESS_OPPORTUNITY_PROMPT } from './prompts/business-opportunity.prompt';
 import { ProspectPromoter } from './prospect/prospect-promoter';
+import { deriveMapsProblems } from './domain/derive-maps-problems';
 
 export interface WebsiteAuditResult {
   empresa: string;
@@ -446,6 +447,7 @@ export class ResearchService {
       const score = 65;
       const nivel = score >= 80 ? 'ALTA' : score >= 50 ? 'MEDIA' : 'BAJA';
       const prioridad = score >= 80 ? 'ALTA' : score >= 50 ? 'MEDIA' : 'BAJA';
+      const problemasEncontrados = deriveMapsProblems(company);
 
       return await this.prisma.prospect.create({
         data: {
@@ -462,7 +464,7 @@ export class ResearchService {
           facebook: cd?.facebook?.[0] ?? null,
           linkedin: cd?.linkedin?.[0] ?? company.linkedin ?? null,
           empleadosEstimado: company.empleadosEstimado ?? null,
-          problemasEncontrados: [],
+          problemasEncontrados,
           currentProblems: [],
           nivelOportunidad: nivel,
           score,
