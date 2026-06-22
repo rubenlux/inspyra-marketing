@@ -6,12 +6,11 @@ import {
   NotFoundException,
   OnModuleDestroy,
 } from '@nestjs/common';
-import { spawn } from 'child_process';
-import * as path from 'path';
-import type { DiscoveryCampaign } from '@prisma/client';
+import { DiscoveryCampaign } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
+import { ClaudeRunnerService } from '../ia-core/services/claude-runner.service';
 import type { WebsiteAuditResult } from './research.service';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -115,9 +114,11 @@ Descartar empresas sin presupuesto visible (microemprendimientos sin empleados).
 @Injectable()
 export class CampaignsService implements OnModuleDestroy {
   private readonly logger = new Logger(CampaignsService.name);
-  private readonly projectRoot = path.resolve(__dirname, '../../../../../');
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly claude: ClaudeRunnerService,
+  ) {}
 
   async onModuleDestroy() {
     // Mark any RUNNING discovery jobs as FAILED so they don't stay orphaned on hot reload / shutdown
@@ -1024,48 +1025,7 @@ Devuelve ÚNICAMENTE este JSON (sin markdown):
     ) as Partial<T>;
   }
 
-  private spawnClaude(prompt: string, model: string, timeoutMs: number): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const args = [
-        '-p', '-',
-        '--output-format', 'text',
-        '--dangerously-skip-permissions',
-        '--model', model,
-      ];
-      this.logger.log(`Spawning claude | model: ${model}`);
-
-      const child = spawn('claude', args, {
-        cwd: this.projectRoot,
-        env: { ...process.env },
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-      child.stdin.write(prompt, 'utf8');
-      child.stdin.end();
-
-      let stdout = '';
-      let stderr = '';
-      let settled = false;
-
-      const done = (err?: Error) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        if (err) reject(err);
-        else resolve(stdout);
-      };
-
-      const timer = setTimeout(() => {
-        child.kill('SIGTERM');
-        done(new Error(`Timeout ${model} after ${timeoutMs / 60000}min`));
-      }, timeoutMs);
-
-      child.stdout.on('data', (c: Buffer) => { stdout += c.toString(); });
-      child.stderr.on('data', (c: Buffer) => { stderr += c.toString(); });
-      child.on('close', code => {
-        if (code === 0) done();
-        else done(new Error(`claude exited ${code}. stderr: ${stderr.slice(-400)}`));
-      });
-      child.on('error', done);
-    });
+  private async spawnClaude(prompt: string, model: string, timeoutMs: number): Promise<string> {
+    return this.claude.runText(prompt, { model: model as any, timeoutMs });
   }
 }

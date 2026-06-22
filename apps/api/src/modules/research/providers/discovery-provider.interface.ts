@@ -1,3 +1,6 @@
+import type { QualificationSignals } from '../qualification/qualification-signals';
+import type { ContactAcquisitionResult } from '../contact/contact-acquisition.types';
+
 // Shared types and error class for all Discovery providers
 
 export class DiscoveryInfrastructureError extends Error {
@@ -24,11 +27,11 @@ export interface RawCompany {
   empleadosEstimado?: number;
   añosFundacion?: string;
   presenciaDigital?: {
-    tieneWeb?: boolean;
-    tieneSeo?: boolean;
-    tieneRedes?: boolean;
-    tieneEcommerce?: boolean;
-    tieneAgendaOnline?: boolean;
+    tieneWeb?: boolean | null;
+    tieneSeo?: boolean | null;
+    tieneRedes?: boolean | null;
+    tieneEcommerce?: boolean | null;
+    tieneAgendaOnline?: boolean | null;
   };
   facturacionEstimada?: string;
   // Google Maps provider fields
@@ -39,6 +42,10 @@ export interface RawCompany {
   rating?: number;
   reviewCount?: number;
   source?: 'google_maps' | 'agentic_web_search';
+  // Populated by QualificationSignalsDetector (Phase 2b)
+  qualificationSignals?: QualificationSignals;
+  // Populated by ContactAcquisitionService (Phase 2b)
+  contactData?: ContactAcquisitionResult;
 }
 
 export interface DiscoveryResult {

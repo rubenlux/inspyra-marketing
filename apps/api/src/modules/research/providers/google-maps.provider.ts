@@ -109,10 +109,10 @@ export class GoogleMapsDiscoveryProvider implements DiscoveryProvider {
       source: 'google_maps',
       presenciaDigital: {
         tieneWeb: !!place.websiteUri,
-        tieneSeo: false,
-        tieneRedes: false,
-        tieneEcommerce: false,
-        tieneAgendaOnline: false,
+        tieneSeo: null,       // Google Maps no verifica SEO
+        tieneRedes: null,     // Google Maps no verifica redes sociales
+        tieneEcommerce: null, // Google Maps no verifica ecommerce
+        tieneAgendaOnline: null, // Google Maps no verifica agenda online
       },
     };
   }
@@ -120,7 +120,8 @@ export class GoogleMapsDiscoveryProvider implements DiscoveryProvider {
   private extractComponent(components: MapsAddressComponent[] | undefined, types: string[]): string | null {
     if (!components) return null;
     for (const type of types) {
-      const comp = components.find(c => c.types.includes(type));
+      const comp = components.find(c => c.types?.includes(type));
+
       if (comp) return comp.longText;
     }
     return null;

@@ -33,6 +33,11 @@ export class ResearchController {
     return this.researchService.getCandidates(id, req.user.tenantId);
   }
 
+  @Post('candidates/:id/analyze')
+  analyzeCandidate(@Param('id') id: string, @Request() req: AuthRequest) {
+    return this.researchService.analyzeCandidate(id, req.user.tenantId);
+  }
+
   @Post('website-audit')
   websiteAudit(
     @Body() body: { url: string },

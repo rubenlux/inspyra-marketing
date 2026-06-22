@@ -30,11 +30,13 @@ Estos invariantes no necesitan verificación en spec ni en código. Son reglas a
 - Prospectos `isLegacy = true` (creados antes de 2026-06-17) → `runAgent` lanza BadRequestException. Excluir de todas las queries con `where: { isLegacy: false }`.
 - `PATCH /prospect-validations/:id/reactivate` revierte DISCARDED → PENDING. Solo acción humana, nunca automática.
 
-**Google Maps Discovery**
+**Google Maps Discovery (Migración Completada - Junio 2026)**
 - Los prospectos importados desde Google Maps entran en estado `NUEVO`.
-- `enrichmentApi.createJob()` avanza NUEVO → INVESTIGADO automáticamente antes de correr el enriquecimiento. VALID_TRANSITIONS lo permite.
-- El score heurístico (campo `score`) se setea en el import; no requiere Opportunity Agent para tener score > 0.
-- `problemasEncontrados` se puebla con los gaps detectados (Sin sitio web, Sin GBP, etc.) para habilitar el Opportunity Agent inmediatamente.
+- **Motor de Búsqueda:** ✅ Operativo (Google Places API New). Empresas 100% reales.
+- **Validación de Evidencia:** ✅ Operativo.
+- **Promoción a Prospectos:** ✅ Fix aplicado para `currentProblems` (Prisma constraint).
+- **problemasEncontrados** se puebla con los gaps detectados (Sin sitio web, Sin GBP, etc.) para habilitar el Opportunity Agent inmediatamente.
+
 
 **Criterio de priorización**
 > ¿Esta tarea acerca un prospecto a convertirse en cliente?
@@ -157,3 +159,20 @@ En caso de conflicto:
 4. Local implementation details
 
 Security siempre tiene prioridad.
+
+## Auditoría Post-Migración: Opportunity Engine (ERP-052) — Junio 2026
+
+Tras la exitosa migración de Discovery a Google Maps, se realizó una auditoría forense del motor de oportunidades con datos reales (Bodegas Mendoza).
+
+**Hallazgos Críticos:**
+1.  **Bloqueador Externo:** El sistema falló al intentar evaluar candidatos debido a falta de saldo/tokens en la cuenta de Claude vía CLI (`You've hit your monthly spend limit`).
+2.  **Integridad de Datos:** Se corrigió un error de persistencia donde `currentProblems` no se inicializaba al promocionar prospectos, lo que causaba fallos de integridad en Prisma.
+3.  **Robustez de Provider:** Se corrigió un bug en `google-maps.provider.ts` que provocaba fallos con direcciones de Google Maps que no contenían el array de `types`.
+
+**Estado de Validación:**
+- **Discovery:** 100% Funcional. Datos estructurados de empresas reales.
+- **Pipeline:** 100% Funcional. Los candidatos llegan hasta la fase de evaluación.
+- **Evaluation:** Pendiente de recarga de saldo en Claude para validar el scoring y lógica de `PROMOTE/DISCARD`.
+
+**Conclusión:** Discovery Crisis: **CLOSED**. Próximo foco de auditoría: **Validación funcional ERP-052**.
+

@@ -148,6 +148,7 @@ model Prospect {
   instagram      String?
   linkedin       String?
   facebook       String?
+  whatsapp       String?
   googleBusiness String?
 
   // Opportunity Detection
@@ -1153,6 +1154,9 @@ model ResearchCandidate {
   // Prospect link (if promoted)
   prospectId          String?
 
+  // Contact Acquisition — emails, phones, social URLs (HTTP scraping, no AI)
+  contactData         Json?
+
   // ERP-045 — Discovery deduplication + audit results
   domainNormalized    String?
   isDuplicate         Boolean  @default(false)
@@ -1217,46 +1221,32 @@ model EnrichmentResult {
   jobId      String        @unique
   job        EnrichmentJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
-  // Datos de contacto
-  email         String?
-  telefono      String?
-  whatsapp      String?
-  formularioWeb String?
-  contactable   Boolean @default(false)
+  // Opportunity Analysis (Commercial Intelligence Agent)
+  opportunities   Json?   // Array<{ service, impact, confidence, evidence[] }>
+  estimatedTicket Int?    // USD ticket estimate
+  priority        String? // HIGH | MEDIUM | LOW
+  opportunityScore Int    @default(0) // 0-100, replaces contactabilityScore
+  confianza       String? // ALTA | MEDIA | BAJA (agent confidence)
+  summary         String? // one-line commercial summary
 
-  // Contactability Score (0-100, weighted channels × confianza multiplier)
+  // Legacy contact fields — kept for backward compatibility, populated by Contact Acquisition now
   contactabilityScore Int     @default(0)
-  confianza           String? // ALTA | MEDIA | BAJA
+  contactable         Boolean @default(false)
 
-  // Presencia digital verificada
-  googleBusiness   String?
-  linkedin         String?
-  facebook         String?
-  instagram        String?
-
-  // Info empresa
-  direccion      String?
-  anioFundacion  Int?
-  empleadosReal  Int?
-
-  // Decisor
-  nombreDecidsor   String?
-  rolDecidsor      String?
-  linkedinDecidsor String?
-
-  // Validación humana (Fase B) — APPROVED/REJECTED son solo acción humana
+  // Validación humana — APPROVED/REJECTED son solo acción humana
   reviewStatus EnrichmentReviewStatus @default(PENDING)
   reviewedBy   String?
   reviewedAt   DateTime?
   reviewNotes  String?
 
-  // Sugerencia de agente IA (Fase C) — agentes solo pueden SUGGEST, no aprobar
-  recommendedStatus String?  // SUGGEST_APPROVE | SUGGEST_REJECT
+  // Sugerencia de agente IA — agentes solo pueden SUGGEST, no aprobar
+  recommendedStatus String?
   recommendNotes    String?
-  recommendedBy     String?  // agentId que hizo la sugerencia
+  recommendedBy     String?
 
   // Trazabilidad
-  rawOutput String? @db.Text
+  rawOutput  String? @db.Text
+  signals    Json?   // Playwright deterministic signals v2 (AuditSignals)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -6,8 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { spawn } from 'child_process';
-import * as path from 'path';
+import { ClaudeRunnerService } from '../ia-core/services/claude-runner.service';
 
 // ── Tipos de salida del agente ───────────────────────────────────────────────
 
@@ -259,9 +258,11 @@ const LANGUAGE_LABELS: Record<string, string> = {
 @Injectable()
 export class ProposalsService {
   private readonly logger = new Logger(ProposalsService.name);
-  private readonly projectRoot = path.resolve(__dirname, '../../../../../');
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly claude: ClaudeRunnerService,
+  ) {}
 
   // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -1063,48 +1064,7 @@ Respond ONLY with valid JSON:
 
   // ── Claude spawner ────────────────────────────────────────────────────────────
 
-  private spawnClaude(prompt: string, model: string, timeoutMs: number): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const args = [
-        '-p', '-',
-        '--output-format', 'text',
-        '--dangerously-skip-permissions',
-        '--model', model,
-      ];
-      this.logger.log(`Spawning claude | model: ${model}`);
-
-      const child = spawn('claude', args, {
-        cwd: this.projectRoot,
-        env: { ...process.env },
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-      child.stdin.write(prompt, 'utf8');
-      child.stdin.end();
-
-      let stdout = '';
-      let stderr = '';
-      let settled = false;
-
-      const done = (err?: Error) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        if (err) reject(err);
-        else resolve(stdout);
-      };
-
-      const timer = setTimeout(() => {
-        child.kill('SIGTERM');
-        done(new Error(`Timeout ${model} after ${timeoutMs / 60000}min`));
-      }, timeoutMs);
-
-      child.stdout.on('data', (c: Buffer) => { stdout += c.toString(); });
-      child.stderr.on('data', (c: Buffer) => { stderr += c.toString(); });
-      child.on('close', code => {
-        if (code === 0) done();
-        else done(new Error(`claude exited ${code}. stderr: ${stderr.slice(-400)}`));
-      });
-      child.on('error', done);
-    });
+  private async spawnClaude(prompt: string, model: string, timeoutMs: number): Promise<string> {
+    return this.claude.runText(prompt, { model: model as any, timeoutMs });
   }
 }

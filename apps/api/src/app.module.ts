@@ -19,7 +19,9 @@ import { ResearchModule } from './modules/research/research.module';
 import { EnrichmentModule } from './modules/enrichment/enrichment.module';
 import { ProposalsModule } from './modules/proposals/proposals.module';
 import { OutreachModule } from './modules/outreach/outreach.module';
+import { IACoreModule } from './modules/ia-core/ia-core.module';
 import configuration from './config/configuration';
+
 
 @Module({
   imports: [
@@ -47,6 +49,8 @@ import configuration from './config/configuration';
     EnrichmentModule,
     ProposalsModule,
     OutreachModule,
+    IACoreModule,
   ],
 })
+
 export class AppModule {}

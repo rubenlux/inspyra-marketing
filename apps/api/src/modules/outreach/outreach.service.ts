@@ -245,15 +245,12 @@ export class OutreachService {
       );
     }
 
-    // Email lives in enrichmentResult (authoritative) with fallback to prospect.email
-    const enrichmentResult = await this.prisma.enrichmentResult.findFirst({
-      where: { prospectId, tenantId },
-    });
-    const recipientEmail = enrichmentResult?.email ?? prospect.email;
+    // Email is stored directly on the Prospect (populated by Contact Acquisition)
+    const recipientEmail = prospect.email;
 
     if (!recipientEmail) {
       throw new BadRequestException(
-        'El prospecto no tiene email registrado (ni en el perfil ni en el resultado de enriquecimiento)',
+        'El prospecto no tiene email registrado. Verificar datos de contacto.',
       );
     }
 

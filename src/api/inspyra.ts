@@ -128,6 +128,8 @@ export interface Prospect {
   website?: string
   instagram?: string
   linkedin?: string
+  facebook?: string
+  whatsapp?: string
   oportunidadDetectada?: string
   problemasEncontrados: string[]
   servicioSugerido?: string
@@ -297,12 +299,20 @@ export interface ResearchJob {
   completedAt?: string | null
 }
 
+export interface ContactData {
+  emails:    string[]
+  phones:    string[]
+  whatsapp:  string[]
+  instagram: string[]
+  facebook:  string[]
+  linkedin:  string[]
+}
+
 export interface ResearchCandidate {
   id: string
   jobId: string
   tenantId: string
   candidateIndex: number
-  // Haiku data
   nombreEmpresa: string
   ciudad?: string
   pais?: string
@@ -314,25 +324,26 @@ export interface ResearchCandidate {
   empleadosEstimado?: number
   anosFundacion?: string
   presenciaDigital?: {
-    tieneWeb?: boolean
-    tieneSeo?: boolean
-    tieneRedes?: boolean
-    tieneEcommerce?: boolean
-    tieneAgendaOnline?: boolean
+    tieneWeb?: boolean | null
+    tieneSeo?: boolean | null
+    tieneRedes?: boolean | null
+    tieneEcommerce?: boolean | null
+    tieneAgendaOnline?: boolean | null
   }
   facturacionEstimada?: string
-  // Sonnet evaluation
+  // Contact Acquisition (HTTP scraping)
+  contactData?: ContactData | null
+  // On-demand analysis result
   status: 'DISCOVERED' | 'DISCARDED' | 'PROMOTED'
-  score?: number
+  score?: number | null
   scoreBreakdown?: Record<string, number>
-  reasoning?: string
-  discardReason?: string
+  reasoning?: string | null
+  discardReason?: string | null
   problemasDetectados?: string[]
-  oportunidadDetectada?: string
-  servicioSugerido?: string
-  estimatedTicketUsd?: number
-  // Prospect link
-  prospectId?: string
+  oportunidadDetectada?: string | null
+  servicioSugerido?: string | null
+  estimatedTicketUsd?: number | null
+  prospectId?: string | null
   createdAt: string
 }
 
@@ -373,6 +384,9 @@ export const researchApi = {
   getCandidates: (jobId: string) =>
     req<ResearchCandidate[]>('GET', `/research/jobs/${jobId}/candidates`),
 
+  analyzeCandidate: (id: string) =>
+    req<{ index: number; nombreEmpresa: string; action: string; score: number; scoreBreakdown?: Record<string, number>; reasoning?: string; discardReason?: string; problemasDetectados?: string[]; oportunidadDetectada?: string; servicioSugerido?: string; estimatedTicketUsd?: number }>('POST', `/research/candidates/${id}/analyze`),
+
   websiteAudit: (url: string) =>
     req<WebsiteAuditResult>('POST', '/research/website-audit', { url }),
 }
@@ -391,26 +405,27 @@ export interface EnrichmentJob {
   result?: EnrichmentResult | null
 }
 
+export interface CommercialOpportunity {
+  service: string
+  impact: 'HIGH' | 'MEDIUM' | 'LOW'
+  confidence: number
+  evidence: string[]
+}
+
 export interface EnrichmentResult {
   id: string
   prospectId: string
-  contactable: boolean
-  contactabilityScore: number
+  // Opportunity Analysis (Commercial Intelligence Agent)
+  opportunities?: CommercialOpportunity[]
+  estimatedTicket?: number
+  priority?: 'HIGH' | 'MEDIUM' | 'LOW'
+  opportunityScore: number
   confianza?: 'ALTA' | 'MEDIA' | 'BAJA'
-  email?: string
-  telefono?: string
-  whatsapp?: string
-  formularioWeb?: string
-  googleBusiness?: string
-  linkedin?: string
-  facebook?: string
-  instagram?: string
-  direccion?: string
-  anioFundacion?: number
-  empleadosReal?: number
-  nombreDecidsor?: string
-  rolDecidsor?: string
-  linkedinDecidsor?: string
+  summary?: string
+  // Legacy (kept for backward compat)
+  contactabilityScore: number
+  contactable: boolean
+  // Human review workflow
   reviewStatus: 'PENDING' | 'APPROVED' | 'REJECTED'
   reviewedBy?: string
   reviewedAt?: string

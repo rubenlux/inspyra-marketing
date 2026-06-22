@@ -2088,11 +2088,11 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                           {enrichingFromDrawer
                             ? "Iniciando…"
                             : (isEnriching || rowData?.estado === "ENRIQUECIDO")
-                            ? "⏳ Enriquecimiento en curso"
-                            : "Iniciar enriquecimiento"}
+                            ? "⏳ Análisis en curso"
+                            : "Análisis comercial"}
                         </button>
                         <div style={{ fontSize: 11.5, color: "var(--ink-400)", textAlign: "center", marginTop: 8 }}>
-                          El Agente de Enriquecimiento buscará contactos y datos de la empresa
+                          El Commercial Intelligence Agent detectará oportunidades de negocio reales
                         </div>
                       </>
                     )}
@@ -2193,7 +2193,7 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
         )}
 
         {/* ═══════════════════════════════════════════════
-            TAB: CONTACTO (Enrichment Agent output)
+            TAB: CONTACTO (Contact data + Commercial Analysis)
         ═══════════════════════════════════════════════ */}
         {tab === "contacto" && prospect && (
           <div>
@@ -2203,8 +2203,8 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                 <SLabel>Commercial Score</SLabel>
                 {(() => {
                   const opp = prospect.score ?? 0;
-                  const cont = enrichmentResult?.contactabilityScore ?? 0;
-                  const cs = prospect.commercialScore ?? Math.floor((opp + cont) / 2);
+                  const analysis = enrichmentResult?.opportunityScore ?? 0;
+                  const cs = prospect.commercialScore ?? Math.floor((opp + analysis) / 2);
                   const csColor = cs >= 70 ? "#10B981" : cs >= 45 ? "#F59E0B" : "#9CA3AF";
                   return (
                     <>
@@ -2219,12 +2219,12 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                       <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
                         <div style={{ textAlign: "center" }}>
                           <div style={{ fontSize: 18, fontWeight: 700, color: "var(--ink-800)" }}>{opp}</div>
-                          <div style={{ fontSize: 10, color: "var(--ink-400)", textTransform: "uppercase", fontWeight: 600 }}>Oportunidad</div>
+                          <div style={{ fontSize: 10, color: "var(--ink-400)", textTransform: "uppercase", fontWeight: 600 }}>Research</div>
                         </div>
                         <div style={{ color: "var(--ink-300)", alignSelf: "center", fontSize: 16 }}>+</div>
                         <div style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--ink-800)" }}>{cont}</div>
-                          <div style={{ fontSize: 10, color: "var(--ink-400)", textTransform: "uppercase", fontWeight: 600 }}>Contactabilidad</div>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--ink-800)" }}>{analysis}</div>
+                          <div style={{ fontSize: 10, color: "var(--ink-400)", textTransform: "uppercase", fontWeight: 600 }}>Análisis</div>
                         </div>
                         <div style={{ color: "var(--ink-300)", alignSelf: "center", fontSize: 16 }}>=</div>
                         <div style={{ textAlign: "center" }}>
@@ -2248,108 +2248,132 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
               </div>
             )}
 
-            {/* No enrichment yet */}
-            {!enrichmentResult && (
-              <div style={{ textAlign: "center", padding: "32px 20px", background: "var(--bg-2)", borderRadius: 12, marginBottom: 20 }}>
-                <div style={{ fontSize: 28, marginBottom: 10 }}>🔍</div>
-                <div style={{ fontWeight: 600, fontSize: 14, color: "var(--ink-700)", marginBottom: 6 }}>Sin datos de contacto</div>
-                <div style={{ fontSize: 13, color: "var(--ink-400)", lineHeight: 1.6 }}>
-                  El Enrichment Agent aún no buscó datos de contacto para esta empresa.
-                  {(prospect.score >= 75) && (
-                    <div style={{ marginTop: 12, fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>
-                      Score {prospect.score} ≥ 75 — elegible para enriquecimiento
+            {/* Contact data — always from prospect fields (populated by Contact Acquisition) */}
+            {(() => {
+              const contactRows = [
+                { icon: "✉",  label: "Email",    value: prospect.email,    link: prospect.email    ? `mailto:${prospect.email}` : undefined },
+                { icon: "📞", label: "Teléfono", value: prospect.telefono, link: prospect.telefono ? `tel:${prospect.telefono}` : undefined },
+                { icon: "💬", label: "WhatsApp", value: prospect.whatsapp, link: prospect.whatsapp ? `https://wa.me/${prospect.whatsapp.replace(/\D/g,"")}` : undefined },
+              ];
+              const socialRows = [
+                { icon: "💼", label: "LinkedIn",  value: prospect.linkedin },
+                { icon: "👥", label: "Facebook",  value: prospect.facebook },
+                { icon: "📸", label: "Instagram", value: prospect.instagram },
+              ];
+              const hasAnyContact = !!(prospect.email || prospect.telefono || prospect.whatsapp || prospect.linkedin || prospect.facebook || prospect.instagram);
+
+              return (
+                <>
+                  {!hasAnyContact && (
+                    <div style={{ textAlign: "center", padding: "28px 20px", background: "var(--bg-2)", borderRadius: 12, marginBottom: 20 }}>
+                      <div style={{ fontSize: 24, marginBottom: 8 }}>📭</div>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: "var(--ink-700)", marginBottom: 4 }}>Sin datos de contacto</div>
+                      <div style={{ fontSize: 12.5, color: "var(--ink-400)" }}>Contact Acquisition no encontró datos para esta empresa.</div>
                     </div>
                   )}
+                  {hasAnyContact && (
+                    <>
+                      <div style={{ marginBottom: 18 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                          <SLabel>Datos de contacto</SLabel>
+                          <span style={{ fontSize: 10, color: "var(--ink-400)", fontWeight: 500 }}>vía Research (HTTP)</span>
+                        </div>
+                        {contactRows.map(({ icon, label, value, link }) => (
+                          <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--border-soft)" }}>
+                            <span style={{ width: 26, textAlign: "center", fontSize: 14 }}>{icon}</span>
+                            <span style={{ width: 80, fontSize: 12, color: "var(--ink-400)", flexShrink: 0 }}>{label}</span>
+                            {value && link ? (
+                              <a href={link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--primary)", fontWeight: 600, wordBreak: "break-all" }}>{value}</a>
+                            ) : value ? (
+                              <span style={{ fontSize: 13, color: "var(--ink-900)", fontWeight: 600 }}>{value}</span>
+                            ) : (
+                              <span style={{ fontSize: 12, color: "var(--ink-300)", fontStyle: "italic" }}>no encontrado</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {socialRows.filter(x => x.value).length > 0 && (
+                        <div style={{ marginBottom: 18 }}>
+                          <SLabel>Presencia digital</SLabel>
+                          {socialRows.filter(x => x.value).map(({ icon, label, value }) => (
+                            <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--border-soft)" }}>
+                              <span style={{ width: 26, textAlign: "center", fontSize: 14 }}>{icon}</span>
+                              <span style={{ width: 80, fontSize: 12, color: "var(--ink-400)", flexShrink: 0 }}>{label}</span>
+                              <a href={value} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--primary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 280 }}>{value}</a>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              );
+            })()}
+
+            {/* Commercial Opportunities (from Commercial Intelligence Agent) */}
+            {enrichmentResult && enrichmentResult.opportunities && enrichmentResult.opportunities.length > 0 && (
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <SLabel>Oportunidades detectadas</SLabel>
+                  {enrichmentResult.estimatedTicket && (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#10B981", background: "#d1fae5", padding: "2px 8px", borderRadius: 6 }}>
+                      USD {enrichmentResult.estimatedTicket.toLocaleString()}
+                    </span>
+                  )}
+                </div>
+                {enrichmentResult.summary && (
+                  <div style={{ fontSize: 12.5, color: "var(--ink-600)", background: "var(--bg-2)", borderRadius: 8, padding: "8px 12px", marginBottom: 10, lineHeight: 1.5, fontStyle: "italic" }}>
+                    {enrichmentResult.summary}
+                  </div>
+                )}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {enrichmentResult.opportunities.map((opp, i) => {
+                    const impactColor = opp.impact === "HIGH" ? { bg: "#fef2f2", border: "#fecaca", dot: "#EF4444", label: "#b91c1c" }
+                      : opp.impact === "MEDIUM" ? { bg: "#fffbeb", border: "#fde68a", dot: "#F59E0B", label: "#92400e" }
+                      : { bg: "var(--bg-2)", border: "var(--border-soft)", dot: "#9CA3AF", label: "#6b7280" };
+                    return (
+                      <div key={i} style={{ background: impactColor.bg, border: `1px solid ${impactColor.border}`, borderRadius: 10, padding: "10px 12px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: opp.evidence?.length ? 6 : 0 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: impactColor.dot, flexShrink: 0 }}/>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-900)", flex: 1 }}>{opp.service}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: impactColor.label, textTransform: "uppercase" }}>{opp.impact}</span>
+                          <span style={{ fontSize: 11, color: "var(--ink-400)" }}>{opp.confidence}%</span>
+                        </div>
+                        {opp.evidence?.length > 0 && (
+                          <ul style={{ margin: "4px 0 0 16px", padding: 0, fontSize: 11.5, color: "var(--ink-600)", lineHeight: 1.6 }}>
+                            {opp.evidence.map((e, j) => <li key={j}>{e}</li>)}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            {/* Contact data */}
+            {/* Review status (commercial analysis) */}
             {enrichmentResult && (
-              <>
-                <div style={{ marginBottom: 18 }}>
-                  <SLabel>Datos de contacto</SLabel>
-                  {[
-                    { icon: "✉", label: "Email",     value: enrichmentResult.email,         link: enrichmentResult.email ? `mailto:${enrichmentResult.email}` : undefined },
-                    { icon: "📞", label: "Teléfono",  value: enrichmentResult.telefono,      link: enrichmentResult.telefono ? `tel:${enrichmentResult.telefono}` : undefined },
-                    { icon: "💬", label: "WhatsApp",  value: enrichmentResult.whatsapp,      link: enrichmentResult.whatsapp ? `https://wa.me/${enrichmentResult.whatsapp.replace(/\D/g,"")}` : undefined },
-                    { icon: "🌐", label: "Formulario",value: enrichmentResult.formularioWeb, link: enrichmentResult.formularioWeb },
-                  ].map(({ icon, label, value, link }) => (
-                    <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--border-soft)" }}>
-                      <span style={{ width: 26, textAlign: "center", fontSize: 14 }}>{icon}</span>
-                      <span style={{ width: 80, fontSize: 12, color: "var(--ink-400)", flexShrink: 0 }}>{label}</span>
-                      {value && link ? (
-                        <a href={link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--primary)", fontWeight: 600, wordBreak: "break-all" }}>{value}</a>
-                      ) : value ? (
-                        <span style={{ fontSize: 13, color: "var(--ink-900)", fontWeight: 600 }}>{value}</span>
-                      ) : (
-                        <span style={{ fontSize: 12, color: "var(--ink-300)", fontStyle: "italic" }}>no encontrado</span>
-                      )}
-                    </div>
-                  ))}
+              <div style={{ marginTop: 8, padding: "12px 14px", background: "var(--bg-2)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-400)", textTransform: "uppercase", marginBottom: 4 }}>Estado análisis</div>
+                  <div style={{ fontSize: 13, fontWeight: 700,
+                    color: enrichmentResult.reviewStatus === "APPROVED" ? "#10B981" : enrichmentResult.reviewStatus === "REJECTED" ? "#EF4444" : "#F59E0B",
+                  }}>
+                    {enrichmentResult.reviewStatus === "APPROVED" ? "✅ Aprobado → Propuesta"
+                     : enrichmentResult.reviewStatus === "REJECTED" ? "✗ Rechazado"
+                     : "⏳ Pendiente revisión humana"}
+                  </div>
+                  {enrichmentResult.reviewNotes && <div style={{ fontSize: 11.5, color: "var(--ink-500)", marginTop: 3 }}>{enrichmentResult.reviewNotes}</div>}
                 </div>
-
-                {/* Digital presence */}
-                {(enrichmentResult.googleBusiness || enrichmentResult.linkedin || enrichmentResult.facebook || enrichmentResult.instagram) && (
-                  <div style={{ marginBottom: 18 }}>
-                    <SLabel>Presencia digital</SLabel>
-                    {[
-                      { icon: "📍", label: "G. Business", value: enrichmentResult.googleBusiness },
-                      { icon: "💼", label: "LinkedIn",    value: enrichmentResult.linkedin },
-                      { icon: "👥", label: "Facebook",    value: enrichmentResult.facebook },
-                      { icon: "📸", label: "Instagram",   value: enrichmentResult.instagram },
-                    ].filter(x => x.value).map(({ icon, label, value }) => (
-                      <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--border-soft)" }}>
-                        <span style={{ width: 26, textAlign: "center", fontSize: 14 }}>{icon}</span>
-                        <span style={{ width: 80, fontSize: 12, color: "var(--ink-400)", flexShrink: 0 }}>{label}</span>
-                        <a href={value} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--primary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 280 }}>{value}</a>
-                      </div>
-                    ))}
-                  </div>
+                {enrichmentResult.reviewStatus === "PENDING" && onReviewEnrichment && (
+                  <button
+                    onClick={onReviewEnrichment}
+                    style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #F59E0B", background: "transparent", color: "#92400E", cursor: "pointer", fontWeight: 600, fontSize: 12, whiteSpace: "nowrap" }}
+                  >
+                    Revisar análisis
+                  </button>
                 )}
-
-                {/* Decision maker */}
-                {enrichmentResult.nombreDecidsor && (
-                  <div style={{ marginBottom: 18 }}>
-                    <SLabel>Decisor</SLabel>
-                    <div style={{ padding: "12px 14px", background: "var(--bg-2)", borderRadius: 10, display: "flex", gap: 12, alignItems: "flex-start" }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 999, background: "#e0e7ff", color: "#4338ca", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 700, flexShrink: 0 }}>
-                        {enrichmentResult.nombreDecidsor.split(" ").map(s => s[0]).slice(0,2).join("")}
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--ink-900)" }}>{enrichmentResult.nombreDecidsor}</div>
-                        {enrichmentResult.rolDecidsor && <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 2 }}>{enrichmentResult.rolDecidsor}</div>}
-                        {enrichmentResult.linkedinDecidsor && (
-                          <a href={enrichmentResult.linkedinDecidsor} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--primary)", marginTop: 4, display: "block" }}>Ver LinkedIn →</a>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Review status + action */}
-                <div style={{ marginTop: 8, padding: "12px 14px", background: "var(--bg-2)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-400)", textTransform: "uppercase", marginBottom: 4 }}>Estado revisión</div>
-                    <div style={{ fontSize: 13, fontWeight: 700,
-                      color: enrichmentResult.reviewStatus === "APPROVED" ? "#10B981" : enrichmentResult.reviewStatus === "REJECTED" ? "#EF4444" : "#F59E0B",
-                    }}>
-                      {enrichmentResult.reviewStatus === "APPROVED" ? "✅ Aprobado → Outreach"
-                       : enrichmentResult.reviewStatus === "REJECTED" ? "✗ Rechazado"
-                       : "⏳ Pendiente revisión humana"}
-                    </div>
-                    {enrichmentResult.reviewNotes && <div style={{ fontSize: 11.5, color: "var(--ink-500)", marginTop: 3 }}>{enrichmentResult.reviewNotes}</div>}
-                  </div>
-                  {enrichmentResult.reviewStatus === "PENDING" && onReviewEnrichment && (
-                    <button
-                      onClick={onReviewEnrichment}
-                      style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #F59E0B", background: "transparent", color: "#92400E", cursor: "pointer", fontWeight: 600, fontSize: 12, whiteSpace: "nowrap" }}
-                    >
-                      Revisar datos
-                    </button>
-                  )}
-                </div>
-              </>
+              </div>
             )}
 
             {/* ── Outreach Actions (ERP-032) ────────────────────────── */}
@@ -3132,112 +3156,188 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
 // ── Research Job Detail Drawer ────────────────────────────────────────────────
 
 function ResearchJobDetailDrawer({ jobId, onClose }) {
-  const [tab, setTab] = useState('discovered');
+  const [tab, setTab] = useState<'pending' | 'analyzed' | 'all'>('pending');
+  const qc = useQueryClient();
 
   const { data: candidates, isLoading } = useQuery({
     queryKey: ['research-candidates', jobId],
     queryFn: () => researchApi.getCandidates(jobId),
     enabled: Boolean(jobId),
-    staleTime: 60000,
+    staleTime: 30000,
   });
 
-  const discovered = candidates ?? [];
-  const promoted = discovered.filter(c => c.status === 'PROMOTED');
-  const discarded = discovered.filter(c => c.status === 'DISCARDED');
-  const pending = discovered.filter(c => c.status === 'DISCOVERED');
+  const all      = candidates ?? [];
+  const analyzed = all.filter(c => c.score != null);
+  const pending  = all.filter(c => c.score == null);
 
-  const ScoreBar = ({ score }: { score?: number }) => {
-    if (!score) return <span style={{ color: "var(--ink-400)", fontSize: 12 }}>—</span>;
-    const color = score >= 80 ? "#059669" : score >= 60 ? "#d97706" : "#dc2626";
+  const ScoreBar = ({ score }: { score?: number | null }) => {
+    if (score == null) return null;
+    const pct   = Math.max(0, Math.min(100, score + 20)); // visual offset for negative scores
+    const color = score >= 55 ? "#059669" : score >= 30 ? "#d97706" : "#dc2626";
     return (
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <div style={{ flex: 1, height: 4, background: "var(--border-soft)", borderRadius: 2 }}>
-          <div style={{ width: `${score}%`, height: "100%", background: color, borderRadius: 2 }}/>
+        <div style={{ width: 60, height: 4, background: "var(--border-soft)", borderRadius: 2 }}>
+          <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 2 }}/>
         </div>
-        <span style={{ fontSize: 12, fontWeight: 700, color, minWidth: 28 }}>{score}</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color, minWidth: 24 }}>{score}</span>
       </div>
     );
   };
 
-  const CandidateCard = ({ c }) => {
-    const [open, setOpen] = useState(false);
-    const statusColor = c.status === 'PROMOTED' ? "#059669" : c.status === 'DISCARDED' ? "#dc2626" : "#6b7280";
-    const statusLabel = c.status === 'PROMOTED' ? "Promovido" : c.status === 'DISCARDED' ? "Descartado" : "Descubierto";
+  const CandidateCard = ({ c }: { c: ResearchCandidate }) => {
+    const [open, setOpen]         = useState(false);
+    const [analyzing, setAnalyzing] = useState(false);
+
+    const cd  = c.contactData;
+    const hasAnalysis = c.score != null;
+
+    const handleAnalyze = async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setOpen(true);
+      setAnalyzing(true);
+      try {
+        await researchApi.analyzeCandidate(c.id);
+        qc.invalidateQueries({ queryKey: ['research-candidates', jobId] });
+      } catch (err: any) {
+        alert('Error en análisis: ' + (err?.message ?? 'desconocido'));
+      } finally {
+        setAnalyzing(false);
+      }
+    };
+
+    const actionColor = c.score != null
+      ? (c.score >= 55 ? "#059669" : "#dc2626")
+      : "#6b7280";
 
     return (
       <div style={{ border: "1px solid var(--border-soft)", borderRadius: 8, marginBottom: 8, overflow: "hidden" }}>
+        {/* Header row */}
         <div
           onClick={() => setOpen(o => !o)}
           style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", background: "var(--bg-1)" }}
         >
-          <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <span style={{ fontWeight: 700, fontSize: 13 }}>{c.nombreEmpresa}</span>
-              <span style={{ fontSize: 10, fontWeight: 600, color: statusColor, background: `${statusColor}18`, padding: "2px 7px", borderRadius: 10 }}>{statusLabel}</span>
+              {hasAnalysis && (
+                <span style={{ fontSize: 10, fontWeight: 600, color: actionColor, background: `${actionColor}18`, padding: "2px 7px", borderRadius: 10 }}>
+                  {c.score! >= 55 ? "OPORTUNIDAD" : "DESCARTAR"}
+                </span>
+              )}
             </div>
             <div style={{ fontSize: 11, color: "var(--ink-500)", marginTop: 2 }}>
               {[c.rubro, c.ciudad, c.pais].filter(Boolean).join(" · ")}
             </div>
           </div>
-          {c.score !== undefined && <ScoreBar score={c.score}/>}
-          <span style={{ fontSize: 12, color: "var(--ink-400)" }}>{open ? "▲" : "▼"}</span>
+          <ScoreBar score={c.score}/>
+          {!hasAnalysis && !analyzing && (
+            <button
+              onClick={handleAnalyze}
+              style={{ fontSize: 11, fontWeight: 600, background: "var(--primary)", color: "#fff", border: "none", borderRadius: 6, padding: "4px 10px", cursor: "pointer", whiteSpace: "nowrap" }}
+            >
+              Analizar
+            </button>
+          )}
+          {analyzing && (
+            <span style={{ fontSize: 11, color: "var(--ink-400)", whiteSpace: "nowrap" }}>Analizando…</span>
+          )}
+          <span style={{ fontSize: 12, color: "var(--ink-400)", flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
         </div>
+
+        {/* Expanded body */}
         {open && (
           <div style={{ padding: "12px 14px", background: "var(--bg-0)", borderTop: "1px solid var(--border-soft)" }}>
-            {/* Digital presence */}
-            {c.presenciaDigital && (
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
-                {[
-                  { k: "tieneWeb", label: "Web" }, { k: "tieneSeo", label: "SEO" },
-                  { k: "tieneRedes", label: "Redes" }, { k: "tieneEcommerce", label: "Ecommerce" },
-                  { k: "tieneAgendaOnline", label: "Agenda" },
-                ].map(({ k, label }) => {
-                  const has = c.presenciaDigital?.[k as keyof typeof c.presenciaDigital];
-                  return (
-                    <span key={k} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, fontWeight: 600,
-                      background: has ? "#d1fae5" : "#fee2e2", color: has ? "#065f46" : "#991b1b" }}>
-                      {has ? "✓" : "✗"} {label}
-                    </span>
-                  );
-                })}
+
+            {/* ── Contactos (Contact Acquisition) ── */}
+            {cd && (cd.emails.length > 0 || cd.phones.length > 0 || cd.whatsapp.length > 0 || cd.instagram.length > 0 || cd.facebook.length > 0 || cd.linkedin.length > 0) ? (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--ink-500)", marginBottom: 6, letterSpacing: "0.05em" }}>CONTACTOS</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {cd.emails.map((e, i) => (
+                    <a key={i} href={`mailto:${e}`} style={{ fontSize: 12, color: "var(--primary)", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 13 }}>✉</span> {e}
+                    </a>
+                  ))}
+                  {cd.phones.map((p, i) => (
+                    <a key={i} href={`tel:${p}`} style={{ fontSize: 12, color: "var(--ink-700)", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 13 }}>📞</span> {p}
+                    </a>
+                  ))}
+                  {cd.whatsapp.map((w, i) => (
+                    <a key={i} href={`https://wa.me/${w}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#25d366", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 13 }}>💬</span> WhatsApp {w}
+                    </a>
+                  ))}
+                  {cd.instagram.map((ig, i) => (
+                    <a key={i} href={ig} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#e1306c", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 13 }}>📸</span> {ig.replace('https://instagram.com/', '@')}
+                    </a>
+                  ))}
+                  {cd.facebook.map((fb, i) => (
+                    <a key={i} href={fb} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#1877f2", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 13 }}>f</span> {fb.replace('https://facebook.com/', 'facebook.com/')}
+                    </a>
+                  ))}
+                  {cd.linkedin.map((li, i) => (
+                    <a key={i} href={li} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#0077b5", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 13 }}>in</span> {li.replace('https://linkedin.com/', 'linkedin.com/')}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: 11, color: "var(--ink-400)", marginBottom: 12, fontStyle: "italic" }}>
+                {cd ? "Sin contactos encontrados en el sitio web" : "Sin sitio web — sin extracción de contactos"}
               </div>
             )}
-            {c.descripcion && <p style={{ fontSize: 12, color: "var(--ink-700)", margin: "0 0 8px", lineHeight: 1.5 }}>{c.descripcion}</p>}
-            {/* Sonnet evaluation */}
-            {c.reasoning && (
-              <div style={{ background: "var(--bg-2)", borderRadius: 6, padding: "8px 10px", marginBottom: 8 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--ink-500)", marginBottom: 4 }}>EVALUACIÓN SONNET</div>
-                <p style={{ fontSize: 12, color: "var(--ink-800)", margin: 0, lineHeight: 1.5 }}>{c.reasoning}</p>
+
+            {/* ── Análisis ── */}
+            {hasAnalysis && (
+              <div style={{ borderTop: "1px solid var(--border-soft)", paddingTop: 10 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--ink-500)", marginBottom: 6, letterSpacing: "0.05em" }}>ANÁLISIS</div>
+
+                {c.reasoning && (
+                  <p style={{ fontSize: 12, color: "var(--ink-700)", margin: "0 0 8px", lineHeight: 1.5 }}>{c.reasoning}</p>
+                )}
+                {c.oportunidadDetectada && (
+                  <div style={{ fontSize: 12, color: "var(--ink-700)", marginBottom: 6 }}>
+                    <strong>Oportunidad:</strong> {c.oportunidadDetectada}
+                  </div>
+                )}
+                {c.servicioSugerido && (
+                  <div style={{ marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 11, background: "var(--primary-soft)", color: "var(--primary)", padding: "2px 8px", borderRadius: 10, fontWeight: 600 }}>{c.servicioSugerido}</span>
+                    {c.estimatedTicketUsd && <span style={{ fontSize: 11, color: "var(--ink-500)" }}>~USD {c.estimatedTicketUsd}/mes</span>}
+                  </div>
+                )}
+                {c.problemasDetectados && c.problemasDetectados.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
+                    {c.problemasDetectados.map((p, i) => (
+                      <span key={i} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 8, background: "#fef3c7", color: "#92400e", fontWeight: 600 }}>{p}</span>
+                    ))}
+                  </div>
+                )}
+                {c.scoreBreakdown && Object.keys(c.scoreBreakdown).length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                    {Object.entries(c.scoreBreakdown).filter(([, v]) => v !== 0).map(([k, v]) => (
+                      <span key={k} style={{ fontSize: 10, padding: "2px 6px", borderRadius: 6, background: Number(v) > 0 ? "#d1fae5" : "#fee2e2", color: Number(v) > 0 ? "#065f46" : "#991b1b", fontWeight: 600 }}>
+                        {k}: {Number(v) > 0 ? "+" : ""}{v}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-            {c.discardReason && (
-              <div style={{ fontSize: 11, color: "#dc2626", fontWeight: 600 }}>Motivo descarte: {c.discardReason}</div>
-            )}
-            {c.oportunidadDetectada && (
-              <div style={{ fontSize: 12, color: "var(--ink-700)", marginTop: 6 }}>
-                <strong>Oportunidad:</strong> {c.oportunidadDetectada}
-              </div>
-            )}
-            {c.servicioSugerido && (
-              <div style={{ marginTop: 6 }}>
-                <span style={{ fontSize: 11, background: "var(--primary-soft)", color: "var(--primary)", padding: "2px 8px", borderRadius: 10, fontWeight: 600 }}>{c.servicioSugerido}</span>
-                {c.estimatedTicketUsd && <span style={{ fontSize: 11, color: "var(--ink-500)", marginLeft: 8 }}>~USD {c.estimatedTicketUsd}/mes</span>}
-              </div>
-            )}
-            {c.problemasDetectados && c.problemasDetectados.length > 0 && (
-              <ul style={{ margin: "8px 0 0", paddingLeft: 16, fontSize: 12, color: "var(--ink-600)" }}>
-                {c.problemasDetectados.map((p, i) => <li key={i}>{p}</li>)}
-              </ul>
-            )}
-            {/* Score breakdown */}
-            {c.scoreBreakdown && Object.keys(c.scoreBreakdown).length > 0 && (
-              <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 4 }}>
-                {Object.entries(c.scoreBreakdown).filter(([, v]) => v !== 0).map(([k, v]) => (
-                  <span key={k} style={{ fontSize: 10, padding: "2px 7px", borderRadius: 8, background: Number(v) > 0 ? "#d1fae5" : "#fee2e2", color: Number(v) > 0 ? "#065f46" : "#991b1b", fontWeight: 600 }}>
-                    {k}: {Number(v) > 0 ? "+" : ""}{v}
-                  </span>
-                ))}
-              </div>
+
+            {/* ── Analizar button (dentro del card expandido) ── */}
+            {!hasAnalysis && (
+              <button
+                onClick={handleAnalyze}
+                disabled={analyzing}
+                style={{ marginTop: 8, fontSize: 12, fontWeight: 600, background: analyzing ? "var(--bg-2)" : "var(--primary)", color: analyzing ? "var(--ink-400)" : "#fff", border: "none", borderRadius: 6, padding: "6px 14px", cursor: analyzing ? "default" : "pointer", width: "100%" }}
+              >
+                {analyzing ? "Analizando con IA…" : "Analizar esta empresa"}
+              </button>
             )}
           </div>
         )}
@@ -3245,41 +3345,37 @@ function ResearchJobDetailDrawer({ jobId, onClose }) {
     );
   };
 
-  const tabItems: { id: typeof tab; label: string; count: number }[] = [
-    { id: 'discovered', label: 'Descubiertos por Haiku', count: discovered.length },
-    { id: 'evaluated', label: 'Evaluados por Sonnet', count: promoted.length + discarded.length },
-    { id: 'promoted', label: 'Promovidos a CRM', count: promoted.length },
+  const tabItems = [
+    { id: 'pending'  as const, label: 'Sin analizar', count: pending.length },
+    { id: 'analyzed' as const, label: 'Analizados',   count: analyzed.length },
+    { id: 'all'      as const, label: 'Todos',        count: all.length },
   ];
 
-  const tabContent = tab === 'discovered' ? discovered
-    : tab === 'evaluated' ? [...promoted, ...discarded]
-    : promoted;
+  const tabContent = tab === 'pending' ? pending : tab === 'analyzed' ? analyzed : all;
 
   return (
     <>
-      {/* Backdrop */}
       <div onClick={onClose} style={{ position: "fixed", inset: 0, top: 56, background: "rgba(0,0,0,0.35)", zIndex: 98 }}/>
-      {/* Drawer */}
       <div style={{ position: "fixed", top: 56, right: 0, bottom: 0, width: 560, background: "#ffffff", zIndex: 99, display: "flex", flexDirection: "column", boxShadow: "-4px 0 20px rgba(0,0,0,0.12)" }}>
         {/* Header */}
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border-soft)", display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>Research Job Detail</div>
-            <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 2 }}>Pipeline Haiku → Sonnet → CRM</div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>Empresas Descubiertas</div>
+            <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 2 }}>Google Maps → Contactos → Análisis Manual</div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink-400)", fontSize: 20, lineHeight: 1, padding: 4 }}>×</button>
         </div>
         {/* Stats */}
         <div style={{ padding: "12px 20px", background: "var(--bg-2)", borderBottom: "1px solid var(--border-soft)", display: "flex", gap: 24 }}>
           {[
-            { label: "Descubiertos", value: discovered.length, color: "#6b7280" },
-            { label: "Descartados", value: discarded.length, color: "#dc2626" },
-            { label: "Promovidos", value: promoted.length, color: "#059669" },
-            { label: "Tasa", value: discovered.length ? `${Math.round(promoted.length / discovered.length * 100)}%` : "—", color: "#7c3aed" },
+            { label: "Total",      value: all.length,      color: "#6b7280" },
+            { label: "Sin analizar", value: pending.length, color: "#d97706" },
+            { label: "Analizados", value: analyzed.length, color: "var(--primary)" },
+            { label: "0 tokens IA (discovery)", value: "", color: "#059669" },
           ].map(s => (
             <div key={s.label} style={{ textAlign: "center" }}>
-              <div style={{ fontWeight: 800, fontSize: 20, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: 11, color: "var(--ink-500)" }}>{s.label}</div>
+              <div style={{ fontWeight: 800, fontSize: s.value === "" ? 12 : 20, color: s.color, lineHeight: s.value === "" ? 2.2 : 1 }}>{s.value || "✓"}</div>
+              <div style={{ fontSize: 10, color: "var(--ink-500)" }}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -3289,16 +3385,16 @@ function ResearchJobDetailDrawer({ jobId, onClose }) {
             <button key={t.id} onClick={() => setTab(t.id)}
               style={{ padding: "10px 12px", border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: tab === t.id ? 700 : 400,
                 color: tab === t.id ? "var(--primary)" : "var(--ink-500)", borderBottom: tab === t.id ? "2px solid var(--primary)" : "2px solid transparent", whiteSpace: "nowrap" }}>
-              {t.label} {t.count > 0 && <span style={{ marginLeft: 4, background: tab === t.id ? "var(--primary-soft)" : "var(--bg-2)", color: tab === t.id ? "var(--primary)" : "var(--ink-500)", borderRadius: 10, padding: "0 6px", fontSize: 10, fontWeight: 700 }}>{t.count}</span>}
+              {t.label}{t.count > 0 && <span style={{ marginLeft: 4, background: tab === t.id ? "var(--primary-soft)" : "var(--bg-2)", color: tab === t.id ? "var(--primary)" : "var(--ink-500)", borderRadius: 10, padding: "0 6px", fontSize: 10, fontWeight: 700 }}>{t.count}</span>}
             </button>
           ))}
         </div>
         {/* Content */}
         <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
-          {isLoading && <div style={{ textAlign: "center", padding: 40, color: "var(--ink-400)", fontSize: 13 }}>Cargando candidatos…</div>}
+          {isLoading && <div style={{ textAlign: "center", padding: 40, color: "var(--ink-400)", fontSize: 13 }}>Cargando empresas…</div>}
           {!isLoading && tabContent.length === 0 && (
             <div style={{ textAlign: "center", padding: 40, color: "var(--ink-400)", fontSize: 13 }}>
-              {tab === 'promoted' ? "Ningún candidato promovido a CRM" : "Sin datos aún"}
+              {tab === 'analyzed' ? "Ninguna empresa analizada aún — hacé click en Analizar" : "Sin datos"}
             </div>
           )}
           {!isLoading && tabContent.map(c => <CandidateCard key={c.id} c={c}/>)}
@@ -4427,7 +4523,7 @@ function Prospects({ onNav }) {
       {hasToken && enrichQueue && (enrichQueue.pending > 0 || enrichQueue.running > 0 || enrichQueue.completed > 0) && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "9px 14px", background: "var(--bg-2)", borderRadius: 10, border: "1px solid var(--border-soft)", fontSize: 12 }}>
           <Icon.sparkles size={13} color="var(--primary)"/>
-          <span style={{ fontWeight: 600, color: "var(--ink-800)" }}>Cola de enriquecimiento</span>
+          <span style={{ fontWeight: 600, color: "var(--ink-800)" }}>Cola de análisis comercial</span>
           {enrichQueue.running > 0 && (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "#5B5BF7" }}>
               <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", border: "1.5px solid #5B5BF7", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }}/>
@@ -4467,15 +4563,15 @@ function Prospects({ onNav }) {
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
                     {p.enrichmentResult ? (
                       <>
-                        <span style={{ fontSize: 10, color: "var(--ink-400)" }}>Opp</span>
+                        <span style={{ fontSize: 10, color: "var(--ink-400)" }}>Research</span>
                         <span style={{ fontWeight: 700, color: "var(--ink-700)", fontSize: 12 }}>{p.score}</span>
                         <span style={{ fontSize: 10, color: "var(--ink-300)" }}>+</span>
-                        <span style={{ fontSize: 10, color: "var(--ink-400)" }}>Cont</span>
+                        <span style={{ fontSize: 10, color: "var(--ink-400)" }}>Análisis</span>
                         <span style={{ fontWeight: 700, color: "var(--ink-700)", fontSize: 12 }}>{p.enrichmentResult.contactabilityScore}</span>
                         <span style={{ fontSize: 10, color: "var(--ink-300)" }}>=</span>
                       </>
                     ) : (
-                      <span style={{ fontSize: 10, color: "var(--ink-400)", fontStyle: "italic" }}>sin enriquecer ·</span>
+                      <span style={{ fontSize: 10, color: "var(--ink-400)", fontStyle: "italic" }}>sin analizar ·</span>
                     )}
                     <span style={{ fontWeight: 800, color: csColor, fontSize: 14, minWidth: 28, textAlign: "right" }}>{cs || "—"}</span>
                   </div>
@@ -4822,7 +4918,7 @@ function EnrichmentReviewModal({ prospectId, onClose }: { prospectId: string; on
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <div>
-            <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Revisar datos de enriquecimiento</h3>
+            <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Revisar análisis comercial</h3>
             <p style={{ fontSize: 12, color: "var(--ink-400)", margin: "3px 0 0" }}>Validación humana · Fase B</p>
           </div>
           <button onClick={onClose} style={{ border: 0, background: "transparent", cursor: "pointer", fontSize: 20, color: "var(--ink-400)", lineHeight: 1 }}>×</button>
@@ -4834,31 +4930,28 @@ function EnrichmentReviewModal({ prospectId, onClose }: { prospectId: string; on
 
         {!isLoading && !result && (
           <div style={{ textAlign: "center", padding: 40, color: "var(--ink-400)", fontSize: 13 }}>
-            Sin datos de enriquecimiento para este prospecto.
+            Sin análisis comercial para este prospecto.
           </div>
         )}
 
         {result && (
           <>
-            {/* Contactability Score */}
-            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20, padding: "12px 16px", background: "var(--bg-2)", borderRadius: 10 }}>
+            {/* Opportunity Score header */}
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, padding: "12px 16px", background: "var(--bg-2)", borderRadius: 10 }}>
               <div style={{ textAlign: "center", minWidth: 56 }}>
-                <div style={{ fontSize: 30, fontWeight: 800, color: scoreColor(result.contactabilityScore ?? 0), lineHeight: 1 }}>
-                  {result.contactabilityScore ?? 0}
+                <div style={{ fontSize: 30, fontWeight: 800, color: scoreColor(result.opportunityScore ?? 0), lineHeight: 1 }}>
+                  {result.opportunityScore ?? 0}
                 </div>
                 <div style={{ fontSize: 10, color: "var(--ink-400)", fontWeight: 600, textTransform: "uppercase", marginTop: 2 }}>Score</div>
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ height: 8, background: "var(--bg-3)", borderRadius: 4, marginBottom: 8, overflow: "hidden" }}>
-                  <div style={{ width: `${result.contactabilityScore ?? 0}%`, height: "100%", background: scoreColor(result.contactabilityScore ?? 0), borderRadius: 4, transition: "width 600ms ease" }}/>
+                  <div style={{ width: `${result.opportunityScore ?? 0}%`, height: "100%", background: scoreColor(result.opportunityScore ?? 0), borderRadius: 4, transition: "width 600ms ease" }}/>
                 </div>
                 <div style={{ fontSize: 11.5, color: "var(--ink-500)", display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <span>Confianza: <strong>{result.confianza ?? "N/A"}</strong></span>
-                  <span>·</span>
-                  {result.contactable
-                    ? <span style={{ color: "#10B981", fontWeight: 600 }}>✔ Contactable</span>
-                    : <span style={{ color: "#EF4444", fontWeight: 600 }}>✗ No contactable</span>
-                  }
+                  {result.priority && <span>Prioridad: <strong>{result.priority}</strong></span>}
+                  {result.confianza && <><span>·</span><span>Confianza: <strong>{result.confianza}</strong></span></>}
+                  {result.estimatedTicket && <><span>·</span><span style={{ color: "#10B981", fontWeight: 600 }}>USD {result.estimatedTicket.toLocaleString()}</span></>}
                   {result.reviewStatus !== "PENDING" && (
                     <>
                       <span>·</span>
@@ -4871,40 +4964,38 @@ function EnrichmentReviewModal({ prospectId, onClose }: { prospectId: string; on
               </div>
             </div>
 
-            {/* Contact data */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-400)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Contacto</div>
-              <FieldRow label="Email" value={result.email}/>
-              <FieldRow label="Teléfono" value={result.telefono}/>
-              <FieldRow label="WhatsApp" value={result.whatsapp}/>
-              <FieldRow label="Formulario" value={result.formularioWeb}/>
-            </div>
-
-            {/* Digital presence */}
-            {(result.googleBusiness || result.linkedin || result.facebook || result.instagram) && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-400)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Presencia digital</div>
-                {result.googleBusiness && <FieldRow label="Google Business" value={result.googleBusiness}/>}
-                {result.linkedin && <FieldRow label="LinkedIn" value={result.linkedin}/>}
-                {result.facebook && <FieldRow label="Facebook" value={result.facebook}/>}
-                {result.instagram && <FieldRow label="Instagram" value={result.instagram}/>}
+            {/* Summary */}
+            {result.summary && (
+              <div style={{ marginBottom: 14, padding: "8px 12px", background: "#f0f9ff", borderRadius: 8, fontSize: 12.5, color: "var(--ink-700)", lineHeight: 1.6, borderLeft: "3px solid #38bdf8", fontStyle: "italic" }}>
+                {result.summary}
               </div>
             )}
 
-            {/* Decision maker */}
-            {result.nombreDecidsor && (
+            {/* Opportunities */}
+            {result.opportunities && result.opportunities.length > 0 && (
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-400)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Decisor</div>
-                <div style={{ padding: "8px 12px", background: "var(--bg-2)", borderRadius: 8, fontSize: 13 }}>
-                  <strong>{result.nombreDecidsor}</strong>
-                  {result.rolDecidsor && <span style={{ color: "var(--ink-500)", marginLeft: 8 }}>· {result.rolDecidsor}</span>}
-                  {result.linkedinDecidsor && (
-                    <div style={{ marginTop: 4 }}>
-                      <a href={result.linkedinDecidsor} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontSize: 12 }}>
-                        Ver LinkedIn →
-                      </a>
-                    </div>
-                  )}
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-400)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Oportunidades detectadas</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {result.opportunities.map((opp, i) => {
+                    const impactColor = opp.impact === "HIGH" ? { bg: "#fef2f2", border: "#fecaca", dot: "#EF4444", label: "#b91c1c" }
+                      : opp.impact === "MEDIUM" ? { bg: "#fffbeb", border: "#fde68a", dot: "#F59E0B", label: "#92400e" }
+                      : { bg: "var(--bg-2)", border: "var(--border-soft)", dot: "#9CA3AF", label: "#6b7280" };
+                    return (
+                      <div key={i} style={{ background: impactColor.bg, border: `1px solid ${impactColor.border}`, borderRadius: 8, padding: "8px 10px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: opp.evidence?.length ? 4 : 0 }}>
+                          <span style={{ width: 7, height: 7, borderRadius: "50%", background: impactColor.dot, flexShrink: 0 }}/>
+                          <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ink-900)", flex: 1 }}>{opp.service}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: impactColor.label, textTransform: "uppercase" }}>{opp.impact}</span>
+                          <span style={{ fontSize: 11, color: "var(--ink-400)" }}>{opp.confidence}%</span>
+                        </div>
+                        {opp.evidence?.length > 0 && (
+                          <ul style={{ margin: "2px 0 0 13px", padding: 0, fontSize: 11, color: "var(--ink-600)", lineHeight: 1.6 }}>
+                            {opp.evidence.map((e, j) => <li key={j}>{e}</li>)}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -4957,17 +5048,15 @@ function EnrichmentReviewModal({ prospectId, onClose }: { prospectId: string; on
               </button>
               <button
                 onClick={() => doReview("APPROVED")}
-                disabled={submitting || !result.contactable}
-                title={!result.contactable ? "No contactable — sin datos de contacto suficientes para aprobar" : ""}
+                disabled={submitting}
                 style={{
                   padding: "8px 18px", borderRadius: 8, border: 0,
-                  background: result.contactable ? "#10B981" : "var(--ink-200)",
-                  color: result.contactable ? "#fff" : "var(--ink-400)",
-                  cursor: result.contactable ? "pointer" : "not-allowed",
+                  background: "#10B981", color: "#fff",
+                  cursor: submitting ? "not-allowed" : "pointer",
                   fontWeight: 700, fontSize: 13,
                 }}
               >
-                {submitting ? "…" : "Aprobar → Outreach"}
+                {submitting ? "…" : "Aprobar → Propuesta"}
               </button>
             </div>
           </>
