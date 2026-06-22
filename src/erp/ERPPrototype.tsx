@@ -2197,48 +2197,64 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
         ═══════════════════════════════════════════════ */}
         {tab === "contacto" && prospect && (
           <div>
-            {/* Commercial Score breakdown */}
-            {(prospect.commercialScore != null || enrichmentResult) && (
+            {/* Research Score + Enrichment Status (Opción B) */}
+            {prospect.score != null && (
               <div style={{ marginBottom: 20, padding: "14px 16px", background: "var(--bg-2)", borderRadius: 12 }}>
-                <SLabel>Commercial Score</SLabel>
+                <SLabel>Evaluación Comercial</SLabel>
                 {(() => {
-                  const opp = prospect.score ?? 0;
-                  const analysis = enrichmentResult?.opportunityScore ?? 0;
-                  const cs = prospect.commercialScore ?? Math.floor((opp + analysis) / 2);
-                  const csColor = cs >= 70 ? "#10B981" : cs >= 45 ? "#F59E0B" : "#9CA3AF";
+                  const researchScore = prospect.score ?? 0;
+                  const researchColor = researchScore >= 70 ? "#10B981" : researchScore >= 50 ? "#F59E0B" : "#9CA3AF";
+                  const enrichmentStatus = enrichmentResult
+                    ? (enrichmentResult.status === "APPROVED" ? "Completo" : enrichmentResult.status === "PENDING" ? "En revisión" : "Pendiente")
+                    : "Pendiente";
+                  const enrichmentStatusColor = enrichmentResult
+                    ? (enrichmentResult.status === "APPROVED" ? "#10B981" : enrichmentResult.status === "PENDING" ? "#F59E0B" : "#9CA3AF")
+                    : "#9CA3AF";
+                  const opportunityScore = enrichmentResult?.opportunityScore ?? null;
+
                   return (
                     <>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-                        <div style={{ fontSize: 36, fontWeight: 800, color: csColor, lineHeight: 1 }}>{cs}</div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ height: 8, background: "var(--bg-3)", borderRadius: 4, overflow: "hidden" }}>
-                            <div style={{ width: `${cs}%`, height: "100%", background: csColor, borderRadius: 4, transition: "width 600ms ease" }}/>
+                      {/* Research Score — Fuente de Verdad Temporal */}
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                          <div style={{ fontSize: 36, fontWeight: 800, color: researchColor, lineHeight: 1 }}>{researchScore}</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ height: 8, background: "var(--bg-3)", borderRadius: 4, overflow: "hidden", marginBottom: 4 }}>
+                              <div style={{ width: `${researchScore}%`, height: "100%", background: researchColor, borderRadius: 4 }}/>
+                            </div>
+                            <div style={{ fontSize: 11, color: "var(--ink-400)", fontWeight: 500 }}>Research Score</div>
                           </div>
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
-                        <div style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--ink-800)" }}>{opp}</div>
-                          <div style={{ fontSize: 10, color: "var(--ink-400)", textTransform: "uppercase", fontWeight: 600 }}>Research</div>
+
+                      {/* Enrichment Status */}
+                      <div style={{ paddingTop: 12, borderTop: "1px solid var(--border-soft)" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                          <div style={{ fontSize: 12, color: "var(--ink-600)", fontWeight: 600 }}>Enriquecimiento</div>
+                          <span style={{
+                            fontSize: 11,
+                            padding: "4px 10px",
+                            borderRadius: 6,
+                            fontWeight: 600,
+                            background: enrichmentStatusColor + "22",
+                            color: enrichmentStatusColor
+                          }}>
+                            {enrichmentStatus}
+                          </span>
                         </div>
-                        <div style={{ color: "var(--ink-300)", alignSelf: "center", fontSize: 16 }}>+</div>
-                        <div style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--ink-800)" }}>{analysis}</div>
-                          <div style={{ fontSize: 10, color: "var(--ink-400)", textTransform: "uppercase", fontWeight: 600 }}>Análisis</div>
-                        </div>
-                        <div style={{ color: "var(--ink-300)", alignSelf: "center", fontSize: 16 }}>=</div>
-                        <div style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: 18, fontWeight: 800, color: csColor }}>{cs}</div>
-                          <div style={{ fontSize: 10, color: csColor, textTransform: "uppercase", fontWeight: 600 }}>Commercial</div>
-                        </div>
-                        {enrichmentResult?.confianza && (
-                          <div style={{ marginLeft: "auto", alignSelf: "center" }}>
-                            <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 8, fontWeight: 700,
-                              background: enrichmentResult.confianza === "ALTA" ? "#d1fae5" : enrichmentResult.confianza === "MEDIA" ? "#fef3c7" : "#f3f4f6",
-                              color: enrichmentResult.confianza === "ALTA" ? "#065f46" : enrichmentResult.confianza === "MEDIA" ? "#92400E" : "#6b7280",
-                            }}>
-                              {enrichmentResult.confianza}
-                            </span>
+
+                        {/* Opportunity Score if enrichment complete */}
+                        {opportunityScore != null && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
+                            <div>
+                              <div style={{ fontSize: 16, fontWeight: 700, color: enrichmentStatusColor }}>{opportunityScore}</div>
+                              <div style={{ fontSize: 10, color: "var(--ink-400)", fontWeight: 500, marginTop: 2 }}>Oportunidad</div>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ height: 6, background: "var(--bg-3)", borderRadius: 3, overflow: "hidden" }}>
+                                <div style={{ width: `${opportunityScore}%`, height: "100%", background: enrichmentStatusColor, borderRadius: 3 }}/>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -4549,12 +4565,12 @@ function Prospects({ onNav }) {
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", background: "#d1fae510", borderBottom: "1px solid #10B98120", fontSize: 12 }}>
             <span style={{ fontSize: 14 }}>🚀</span>
             <span style={{ fontWeight: 700, color: "#065f46" }}>Cola Outreach · {outreachQueue.total} listos</span>
-            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--ink-400)" }}>ordenado por Commercial Score</span>
+            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--ink-400)" }}>ordenado por Research + Enriquecimiento</span>
           </div>
           <div style={{ display: "flex", flexDirection: "column" }}>
             {outreachQueue.prospects.slice(0, 5).map((p, i) => {
-              const cs = p.commercialScore ?? 0;
-              const csColor = cs >= 70 ? "#10B981" : cs >= 45 ? "#F59E0B" : "#9CA3AF";
+              const researchScore = p.score ?? 0;
+              const scoreColor = researchScore >= 70 ? "#10B981" : researchScore >= 50 ? "#F59E0B" : "#9CA3AF";
               return (
                 <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 14px", borderBottom: i < 4 ? "1px solid var(--border-soft)" : "none", fontSize: 12 }}>
                   <span style={{ width: 18, height: 18, borderRadius: "50%", background: "var(--bg-2)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "var(--ink-500)", flexShrink: 0 }}>{i + 1}</span>
@@ -4571,9 +4587,9 @@ function Prospects({ onNav }) {
                         <span style={{ fontSize: 10, color: "var(--ink-300)" }}>=</span>
                       </>
                     ) : (
-                      <span style={{ fontSize: 10, color: "var(--ink-400)", fontStyle: "italic" }}>sin analizar ·</span>
+                      <span style={{ fontSize: 10, color: "var(--ink-400)", fontStyle: "italic" }}>sin enriquecimiento ·</span>
                     )}
-                    <span style={{ fontWeight: 800, color: csColor, fontSize: 14, minWidth: 28, textAlign: "right" }}>{cs || "—"}</span>
+                    <span style={{ fontWeight: 800, color: scoreColor, fontSize: 14, minWidth: 28, textAlign: "right" }}>{researchScore || "—"}</span>
                   </div>
                 </div>
               );
@@ -4714,7 +4730,7 @@ function Prospects({ onNav }) {
                       <>
                         <Score v={p.priorityScore}/>
                         <div style={{ fontSize: 10, color: "var(--ink-400)", marginTop: 1 }}>
-                          Pain {p.score}{p.commercialScore != null ? ` · BVS ${p.commercialScore}` : ""}
+                          Research {p.score}
                         </div>
                       </>
                     ) : (
