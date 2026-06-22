@@ -9,9 +9,11 @@ import { SonnetEvaluator } from './evaluation/sonnet-evaluator';
 import { ProspectPromoter } from './prospect/prospect-promoter';
 import { QualificationSignalsDetector } from './qualification/qualification-signals.detector';
 import { ContactAcquisitionService } from './contact/contact-acquisition.service';
+import { EnrichmentModule } from '../enrichment/enrichment.module';
+import { IACoreModule } from '../ia-core/ia-core.module';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, EnrichmentModule, IACoreModule],
   controllers: [ResearchController, CampaignsController],
   providers: [
     ResearchService,

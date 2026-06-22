@@ -13,6 +13,8 @@ import type { ContactAcquisitionResult } from './contact/contact-acquisition.typ
 import type { QualificationSignals } from './qualification/qualification-signals';
 import { ClaudeRunnerService } from '../ia-core/services/claude-runner.service';
 import { WEBSITE_AUDIT_PROMPT } from './prompts/website-audit.prompt';
+import { BUSINESS_OPPORTUNITY_PROMPT } from './prompts/business-opportunity.prompt';
+import { ProspectPromoter } from './prospect/prospect-promoter';
 
 export interface WebsiteAuditResult {
   empresa: string;
@@ -39,6 +41,15 @@ export interface WebsiteAuditResult {
   outreachBrief: string;
 }
 
+export interface BusinessOpportunityResult {
+  businessModel: string[];
+  revenueOpportunities: string[];
+  topServices: string[];
+  estimatedTicket: number;
+  reasoning: string;
+  summary: string;
+}
+
 @Injectable()
 export class ResearchService {
   private readonly logger = new Logger(ResearchService.name);
@@ -50,6 +61,7 @@ export class ResearchService {
     private readonly contactAcquisition: ContactAcquisitionService,
     private readonly sonnetEvaluator: SonnetEvaluator,
     private readonly claude: ClaudeRunnerService,
+    private readonly prospectPromoter: ProspectPromoter,
   ) {}
 
   // ── Public API ───────────────────────────────────────────────────────────────
@@ -228,6 +240,45 @@ export class ResearchService {
     }
   }
 
+  async analyzeBusinessOpportunity(
+    empresa: string,
+    rubro: string,
+    website: string,
+    googleMapsData?: Record<string, any>,
+    websiteAudit?: Record<string, any>,
+    contactData?: Record<string, any>,
+  ): Promise<BusinessOpportunityResult> {
+    const prompt = BUSINESS_OPPORTUNITY_PROMPT(
+      empresa,
+      rubro,
+      website,
+      googleMapsData || {},
+      websiteAudit || {},
+      contactData || {},
+    );
+
+    let raw: string;
+    try {
+      raw = await this.claude.runText(prompt, {
+        model: 'claude-sonnet-4-6',
+        timeoutMs: 180 * 1000,
+        allowedTools: 'none',
+      });
+    } catch (err) {
+      throw new BadRequestException(`Error en análisis de oportunidades: ${(err as Error).message}`);
+    }
+
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) throw new BadRequestException('El agente no devolvió JSON válido');
+
+    try {
+      const result = JSON.parse(match[0]) as BusinessOpportunityResult;
+      return result;
+    } catch {
+      throw new BadRequestException('Error al parsear resultado del agente');
+    }
+  }
+
   // ── Pipeline Orchestrator ───────────────────────────────────────────────────
 
   private async runPipeline(jobId: string, tenantId: string, query: string, limit: number) {
@@ -326,13 +377,35 @@ export class ResearchService {
         }),
       );
 
+      // ── Phase 3: Crear Prospect automáticamente (sin Claude) ─────────────────
+      await this.updateJobOutput(jobId, `[Fase 3/3] Promoviendo a Prospect…`);
+      let prospectsCreated = 0;
+
+      await Promise.all(
+        validatedIndices.map(async (i) => {
+          try {
+            const company = rawCompanies[i];
+            const prospect = await this.createProspectFromDiscovery(tenantId, company);
+            if (prospect) {
+              prospectsCreated++;
+              await this.prisma.researchCandidate.update({
+                where: { id: savedCandidates[i].id },
+                data: { status: 'PROMOTED', prospectId: prospect.id },
+              });
+            }
+          } catch (err) {
+            this.logger.error(`[Job ${jobId}] Failed to promote ${rawCompanies[i].nombreEmpresa}: ${err.message}`);
+          }
+        }),
+      );
+
       await this.prisma.researchJob.update({
         where: { id: jobId },
         data: {
           status: 'COMPLETED',
           completedAt: new Date(),
-          prospectsFound: 0,
-          agentOutput: `Discovery completo: ${validatedIndices.length} empresas con contactos. 0 tokens IA usados.`,
+          prospectsFound: prospectsCreated,
+          agentOutput: `Discovery completo: ${validatedIndices.length} empresas con contactos → ${prospectsCreated} Prospect creados. 0 tokens IA usados.`,
         },
       });
     } catch (err) {
@@ -362,6 +435,39 @@ export class ResearchService {
         }),
       ),
     );
+  }
+
+  private async createProspectFromDiscovery(tenantId: string, company: RawCompany) {
+    const cd = company.contactData;
+    const score = 65; // Default moderate score for discovered companies
+    const nivel = score >= 80 ? 'ALTA' : score >= 50 ? 'MEDIA' : 'BAJA';
+    const prioridad = score >= 80 ? 'ALTA' : score >= 50 ? 'MEDIA' : 'BAJA';
+
+    return this.prisma.prospect.create({
+      data: {
+        tenantId,
+        nombreEmpresa: company.nombreEmpresa,
+        ciudad: company.ciudad,
+        pais: company.pais,
+        rubro: company.rubro,
+        website: company.website,
+        email: cd?.emails?.[0] ?? null,
+        telefono: cd?.phones?.[0] ?? company.telefono ?? null,
+        whatsapp: cd?.whatsapp?.[0] ?? null,
+        instagram: cd?.instagram?.[0] ?? company.instagram ?? null,
+        facebook: cd?.facebook?.[0] ?? null,
+        linkedin: cd?.linkedin?.[0] ?? company.linkedin ?? null,
+        empleadosEstimado: company.empleadosEstimado,
+        problemasEncontrados: [],
+        currentProblems: [],
+        nivelOportunidad: nivel,
+        score,
+        prioridad,
+        fuente: company.source === 'google_maps' ? 'GOOGLE_MAPS' : 'MANUAL',
+        detectadoPor: 'IA',
+        estado: 'NUEVO',
+      },
+    });
   }
 
   private getDiscoveryProvider(): DiscoveryProvider {
