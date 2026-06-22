@@ -438,36 +438,41 @@ export class ResearchService {
   }
 
   private async createProspectFromDiscovery(tenantId: string, company: RawCompany) {
-    const cd = company.contactData;
-    const score = 65; // Default moderate score for discovered companies
-    const nivel = score >= 80 ? 'ALTA' : score >= 50 ? 'MEDIA' : 'BAJA';
-    const prioridad = score >= 80 ? 'ALTA' : score >= 50 ? 'MEDIA' : 'BAJA';
+    try {
+      const cd = company.contactData;
+      const score = 65;
+      const nivel = score >= 80 ? 'ALTA' : score >= 50 ? 'MEDIA' : 'BAJA';
+      const prioridad = score >= 80 ? 'ALTA' : score >= 50 ? 'MEDIA' : 'BAJA';
 
-    return this.prisma.prospect.create({
-      data: {
-        tenantId,
-        nombreEmpresa: company.nombreEmpresa,
-        ciudad: company.ciudad,
-        pais: company.pais,
-        rubro: company.rubro,
-        website: company.website,
-        email: cd?.emails?.[0] ?? null,
-        telefono: cd?.phones?.[0] ?? company.telefono ?? null,
-        whatsapp: cd?.whatsapp?.[0] ?? null,
-        instagram: cd?.instagram?.[0] ?? company.instagram ?? null,
-        facebook: cd?.facebook?.[0] ?? null,
-        linkedin: cd?.linkedin?.[0] ?? company.linkedin ?? null,
-        empleadosEstimado: company.empleadosEstimado,
-        problemasEncontrados: [],
-        currentProblems: [],
-        nivelOportunidad: nivel,
-        score,
-        prioridad,
-        fuente: company.source === 'google_maps' ? 'GOOGLE_MAPS' : 'MANUAL',
-        detectadoPor: 'IA',
-        estado: 'NUEVO',
-      },
-    });
+      return await this.prisma.prospect.create({
+        data: {
+          tenantId,
+          nombreEmpresa: company.nombreEmpresa || 'Unknown',
+          ciudad: company.ciudad ?? null,
+          pais: company.pais ?? null,
+          rubro: company.rubro ?? null,
+          website: company.website ?? null,
+          email: cd?.emails?.[0] ?? null,
+          telefono: cd?.phones?.[0] ?? company.telefono ?? null,
+          whatsapp: cd?.whatsapp?.[0] ?? null,
+          instagram: cd?.instagram?.[0] ?? company.instagram ?? null,
+          facebook: cd?.facebook?.[0] ?? null,
+          linkedin: cd?.linkedin?.[0] ?? company.linkedin ?? null,
+          empleadosEstimado: company.empleadosEstimado ?? null,
+          problemasEncontrados: [],
+          currentProblems: [],
+          nivelOportunidad: nivel,
+          score,
+          prioridad,
+          fuente: company.source === 'google_maps' ? 'GOOGLE_MAPS' : 'MANUAL',
+          detectadoPor: 'IA',
+          estado: 'NUEVO',
+        },
+      });
+    } catch (err) {
+      this.logger.error(`Failed to create prospect from discovery: ${(err as Error).message}`);
+      throw err;
+    }
   }
 
   private getDiscoveryProvider(): DiscoveryProvider {
