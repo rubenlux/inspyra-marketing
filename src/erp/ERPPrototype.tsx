@@ -3903,7 +3903,7 @@ function Prospects({ onNav }) {
           'PASO_A_PIPELINE', 'CONVERTIDO',
         ];
         if (POST_APPROVAL_STATES.includes(p.estado)) return 'APROBADO_IA';
-        if (val?.status === 'REJECTED') return 'DESCARTADO_IA';
+        if (val?.status === 'REJECTED' || val?.status === 'DISCARDED') return 'DESCARTADO_IA';
         return aiStateFromScore(val?.agentScore);
       })(),
       state: ESTADO_LABEL[p.estado] ?? p.estado,
