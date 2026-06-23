@@ -8,8 +8,6 @@ import {
 import { PrismaService } from '../../database/prisma.service';
 import { CreateEnrichmentJobDto } from './dto/create-enrichment-job.dto';
 import { PlaywrightAuditService } from './playwright-audit.service';
-import { OpportunityEngineService } from './opportunity-engine.service';
-import { OpportunityAnalysis } from './analyzers/types';
 
 @Injectable()
 export class EnrichmentService {
@@ -18,7 +16,6 @@ export class EnrichmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly playwrightAudit: PlaywrightAuditService,
-    private readonly opportunityEngine: OpportunityEngineService,
   ) {}
 
   async createJob(dto: CreateEnrichmentJobDto, tenantId: string, userId: string) {
@@ -165,15 +162,14 @@ export class EnrichmentService {
       this.logger.log(`[Job ${jobId}] Fase A: Playwright auditando ${prospect.website ?? 'sin web'}`);
       const signals = await this.playwrightAudit.auditWebsite(prospect.website);
 
-      // ── Fase B: Opportunity Engine ─────────────────────────────────────────
-      const opportunities = this.opportunityEngine.detect(signals, prospect.rubro || 'Mixed');
+      // ── Fase B DESHABILITADA ─────────────────────────────────────────────────
+      // OpportunityEngine (deterministic rule-based analysis) has been removed.
+      // Placeholder pending EnrichmentEvaluatorService (Claude-based commercial analysis).
+      this.logger.log(`[Job ${jobId}] Fase B: Commercial analysis pending`);
 
-      // Calculate score based on number of activated opportunities
-      let opportunityScore = 0;
-      const activatedCount = opportunities.filter(o => o.activated).length;
-      if (activatedCount > 0) {
-        opportunityScore = Math.min(100, activatedCount * 25);
-      }
+      const opportunities: any[] = [];
+      let opportunityScore: number | undefined = undefined;
+      const activatedCount = 0;
       const oppsJson = opportunities as unknown as import('@prisma/client').Prisma.InputJsonValue;
       const signalsJson = signals as unknown as import('@prisma/client').Prisma.InputJsonValue;
 
@@ -231,21 +227,6 @@ export class EnrichmentService {
         data: { status: 'FAILED', completedAt: new Date(), errorMessage: msg },
       });
     }
-  }
-
-  private computeOpportunityScore(data: Partial<OpportunityAnalysis>): number {
-    const opps = data.opportunities ?? [];
-    if (!opps.length) return 0;
-
-    const highCount = opps.filter(o => o.impact === 'HIGH').length;
-    const medCount  = opps.filter(o => o.impact === 'MEDIUM').length;
-    const base = Math.min(highCount * 30 + medCount * 15, 80);
-
-    const avgConfidence = opps.reduce((s, o) => s + (o.confidence ?? 0), 0) / opps.length;
-    const confMult = data.confianza === 'ALTA' ? 1.0 : data.confianza === 'MEDIA' ? 0.85 : 0.65;
-    const ticketBonus = (data.estimatedTicket ?? 0) >= 3000 ? 10 : (data.estimatedTicket ?? 0) >= 1500 ? 5 : 0;
-
-    return Math.round(Math.min(base * confMult * (avgConfidence / 100) + ticketBonus, 100));
   }
 
   private parseJson<T>(raw: string): T | null {

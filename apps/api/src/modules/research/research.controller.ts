@@ -4,7 +4,6 @@ import { ResearchService } from './research.service';
 import { CreateResearchJobDto } from './dto/create-research-job.dto';
 import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.decorator';
 import { PlaywrightAuditService } from '../enrichment/playwright-audit.service';
-import { OpportunityEngineService } from '../enrichment/opportunity-engine.service';
 
 interface AuthRequest {
   user: { id: string; tenantId: string };
@@ -15,7 +14,6 @@ export class ResearchController {
   constructor(
     private readonly researchService: ResearchService,
     private readonly playwrightAudit: PlaywrightAuditService,
-    private readonly opportunityEngine: OpportunityEngineService,
   ) {}
 
   @Post('jobs')
@@ -86,24 +84,16 @@ export class ResearchController {
       // Step 1: Ejecutar Playwright
       const signals = await this.playwrightAudit.auditWebsite(body.url);
 
-      // Step 2: Ejecutar Opportunity Engine
-      const industry = signals.noWebsite ? 'Unknown' : 'Mixed';
-      const opportunities = this.opportunityEngine.detect(signals, industry);
-
+      // OpportunityEngine has been removed. This endpoint is now deprecated.
       return {
         url: body.url,
         timestamp: new Date().toISOString(),
         signals,
-        opportunities,
-        summary: {
-          totalSignals: Object.keys(signals).length,
-          totalOpportunities: opportunities.length,
-          activatedOpportunities: opportunities.filter(o => o.activated).length,
-        }
+        message: 'OpportunityEngine has been removed. Use /enrichment/jobs instead.'
       };
     } catch (error) {
       throw new HttpException(
-        `Error in opportunity engine test: ${error.message}`,
+        `Error in test: ${error.message}`,
         HttpStatus.INTERNAL_SERVER_ERROR
       );
     }

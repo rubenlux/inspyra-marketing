@@ -2344,16 +2344,17 @@ function ProspectDrawer({ prospectId, rowData, validationById, onClose, onReview
                 )}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {enrichmentResult.opportunities.map((opp, i) => {
-                    const impactColor = opp.impact === "HIGH" ? { bg: "#fef2f2", border: "#fecaca", dot: "#EF4444", label: "#b91c1c" }
-                      : opp.impact === "MEDIUM" ? { bg: "#fffbeb", border: "#fde68a", dot: "#F59E0B", label: "#92400e" }
+                    const tierColor = opp.tier === 1 ? { bg: "#fef2f2", border: "#fecaca", dot: "#EF4444", label: "#b91c1c" }
+                      : opp.tier === 2 ? { bg: "#fffbeb", border: "#fde68a", dot: "#F59E0B", label: "#92400e" }
+                      : opp.tier === 3 ? { bg: "#f0fdf4", border: "#bbf7d0", dot: "#10B981", label: "#065f46" }
                       : { bg: "var(--bg-2)", border: "var(--border-soft)", dot: "#9CA3AF", label: "#6b7280" };
                     return (
-                      <div key={i} style={{ background: impactColor.bg, border: `1px solid ${impactColor.border}`, borderRadius: 10, padding: "10px 12px" }}>
+                      <div key={i} style={{ background: tierColor.bg, border: `1px solid ${tierColor.border}`, borderRadius: 10, padding: "10px 12px", opacity: opp.activated ? 1 : 0.6 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: opp.evidence?.length ? 6 : 0 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: impactColor.dot, flexShrink: 0 }}/>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-900)", flex: 1 }}>{opp.service}</span>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: impactColor.label, textTransform: "uppercase" }}>{opp.impact}</span>
-                          <span style={{ fontSize: 11, color: "var(--ink-400)" }}>{opp.confidence}%</span>
+                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: tierColor.dot, flexShrink: 0 }}/>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-900)", flex: 1 }}>{opp.name}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: tierColor.label, textTransform: "uppercase" }}>T{opp.tier}</span>
+                          <span style={{ fontSize: 11, color: "var(--ink-400)", fontWeight: 600 }}>{opp.activated ? "✓" : "✗"}</span>
                         </div>
                         {opp.evidence?.length > 0 && (
                           <ul style={{ margin: "4px 0 0 16px", padding: 0, fontSize: 11.5, color: "var(--ink-600)", lineHeight: 1.6 }}>
