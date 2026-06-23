@@ -124,11 +124,6 @@
       "problem": "Vende pero sin seguimiento post-venta",
       "requiredSignals": [
         {
-          "signal": "hasEcommerce",
-          "operator": "equals",
-          "value": true
-        },
-        {
           "signal": "hasMetaPixel",
           "operator": "equals",
           "value": false
@@ -290,13 +285,6 @@
             "operator": "equals",
             "value": true
           }
-        ],
-        [
-          {
-            "signal": "navContains",
-            "operator": "includes_any",
-            "value": ["TOURS", "EXPERIENCIAS", "PAQUETES"]
-          }
         ]
       ],
       "minOptionalMatches": 1,
@@ -346,13 +334,6 @@
             "signal": "navContains",
             "operator": "includes_any",
             "value": ["TURISMO", "VISITANOS", "TOURS", "UBICACION"]
-          }
-        ],
-        [
-          {
-            "signal": "industry",
-            "operator": "in",
-            "value": ["Wine/Beverages", "Food Service", "Tourism", "Health & Wellness"]
           }
         ]
       ],
