@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../database/prisma.service';
 import { CreateEnrichmentJobDto } from './dto/create-enrichment-job.dto';
 import { PlaywrightAuditService } from './playwright-audit.service';
+import { EnrichmentEvaluatorService } from './enrichment-evaluator.service';
 
 @Injectable()
 export class EnrichmentService {
@@ -16,6 +17,7 @@ export class EnrichmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly playwrightAudit: PlaywrightAuditService,
+    private readonly evaluator: EnrichmentEvaluatorService,
   ) {}
 
   async createJob(dto: CreateEnrichmentJobDto, tenantId: string, userId: string) {
@@ -162,14 +164,32 @@ export class EnrichmentService {
       this.logger.log(`[Job ${jobId}] Fase A: Playwright auditando ${prospect.website ?? 'sin web'}`);
       const signals = await this.playwrightAudit.auditWebsite(prospect.website);
 
-      // ── Fase B DESHABILITADA ─────────────────────────────────────────────────
-      // OpportunityEngine (deterministic rule-based analysis) has been removed.
-      // Placeholder pending EnrichmentEvaluatorService (Claude-based commercial analysis).
-      this.logger.log(`[Job ${jobId}] Fase B: Commercial analysis pending`);
+      // ── Fase B: Claude Commercial Evaluation ──────────────────────────────────
+      this.logger.log(`[Job ${jobId}] Fase B: Claude evaluating ${prospect.nombreEmpresa}`);
 
-      const opportunities: any[] = [];
-      let opportunityScore: number | undefined = undefined;
-      const activatedCount = 0;
+      const claudeResult = await this.evaluator.evaluate({
+        prospect: {
+          id: prospect.id,
+          nombreEmpresa: prospect.nombreEmpresa,
+          rubro: prospect.rubro,
+          ciudad: prospect.ciudad,
+          website: prospect.website,
+        },
+        contact: {
+          email: prospect.email,
+          telefono: prospect.telefono,
+          whatsapp: prospect.whatsapp,
+          instagram: prospect.instagram,
+          facebook: prospect.facebook,
+          linkedin: prospect.linkedin,
+        },
+        signals,
+      });
+
+      this.logger.log(`[Job ${jobId}] Claude evaluation complete: score=${claudeResult.score}, opps=${claudeResult.opportunities.length}`);
+
+      const opportunities = claudeResult.opportunities;
+      const opportunityScore = claudeResult.score;
       const oppsJson = opportunities as unknown as import('@prisma/client').Prisma.InputJsonValue;
       const signalsJson = signals as unknown as import('@prisma/client').Prisma.InputJsonValue;
 
@@ -183,25 +203,25 @@ export class EnrichmentService {
           jobId,
           opportunities: oppsJson,
           signals: signalsJson,
-          estimatedTicket: null,
+          estimatedTicket: claudeResult.totalEstimatedTicketUsd,
           priority: null,
           opportunityScore,
           confianza: null,
-          summary: `Detected ${opportunities.length} opportunities (${activatedCount} activated)`,
+          summary: claudeResult.reasoning.substring(0, 255),
           contactable: true,
           reviewStatus: 'PENDING',
-          rawOutput: JSON.stringify(rawData, null, 2),
+          rawOutput: JSON.stringify(claudeResult, null, 2),
         },
         update: {
           opportunities: oppsJson,
           signals: signalsJson,
-          estimatedTicket: null,
+          estimatedTicket: claudeResult.totalEstimatedTicketUsd,
           priority: null,
           opportunityScore,
           confianza: null,
-          summary: `Detected ${opportunities.length} opportunities (${activatedCount} activated)`,
+          summary: claudeResult.reasoning.substring(0, 255),
           reviewStatus: 'PENDING',
-          rawOutput: JSON.stringify(rawData, null, 2),
+          rawOutput: JSON.stringify(claudeResult, null, 2),
           jobId,
         },
       });
@@ -216,7 +236,7 @@ export class EnrichmentService {
         data: {
           status: 'COMPLETED',
           completedAt: new Date(),
-          agentOutput: `Score: ${opportunityScore} | Oportunidades: ${opportunities.length} (${activatedCount} activated) | Web: ${signals.accessible ? 'OK' : signals.noWebsite ? 'sin web' : 'inaccesible'}`,
+          agentOutput: `Score: ${opportunityScore} | Oportunidades: ${opportunities.length} | Web: ${signals.accessible ? 'OK' : signals.noWebsite ? 'sin web' : 'inaccesible'}`,
         },
       });
     } catch (err) {
