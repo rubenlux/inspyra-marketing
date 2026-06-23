@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "npx rimraf dist && nest build",
+    "build": "npx rimraf dist && nest build && npm run copy:assets",
+    "copy:assets": "node -e \"const fs = require('fs'); const path = require('path'); ['SERVICES_CATALOG_MACHINE.json'].forEach(f => { const src = path.join('src/modules/enrichment', f); const dst = path.join('dist/modules/enrichment', f); if (fs.existsSync(src)) { require('fs').copyFileSync(src, dst); console.log('✓ Copied ' + f); } })\"",
     "clean": "npx rimraf dist",
     "start": "nest start",
     "start:dev": "nest start --watch",
