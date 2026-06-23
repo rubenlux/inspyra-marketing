@@ -176,3 +176,113 @@ Tras la exitosa migración de Discovery a Google Maps, se realizó una auditorí
 
 **Conclusión:** Discovery Crisis: **CLOSED**. Próximo foco de auditoría: **Validación funcional ERP-052**.
 
+## OpportunityEngine Elimination & Claude Commercial Evaluation — 2026-06-22
+
+**Status:** ✅ COMPLETADO
+
+**Decisión de Producto:** OpportunityEngine determinístico (SERVICES_CATALOG_MACHINE.json) fue eliminado y reemplazado con evaluación comercial basada en Claude API.
+
+**Root Cause del Cambio:**
+- OpportunityEngine tenía catálogo hardcodeado por industria (restrictive rules para Inmobiliaria, Abogado, Contador)
+- Problemas: Cambios a catálogo no se reflejaban sin server restart, industrias unsupported recibían 0 opportunities
+- Auditoría con datos reales (LACANNA) mostró falsos negativos (Meta Pixel bloqueaba CRM)
+
+**Arquitectura Nueva:** `Playwright (signals) → Claude (reasoning) → enrichment_results (persistent)`
+
+### Implementación: 2 commits separados y limpios
+
+**Commit 1: Eliminación de OpportunityEngine** 
+```
+Eliminados:
+- apps/api/src/modules/enrichment/opportunity-engine.service.ts (300+ líneas)
+- apps/api/src/modules/enrichment/opportunity-engine.spec.ts
+- apps/api/src/modules/enrichment/SERVICES_CATALOG_MACHINE.json
+```
+
+**Commit 2: Claude-based Commercial Evaluation**
+```
+Creado:
+- apps/api/src/modules/enrichment/enrichment-evaluator.service.ts (140 líneas)
+  ├─ Inyección ConfigService para ANTHROPIC_API_KEY
+  ├─ evaluate(prospect, contact, signals) → Promise<{ score, problems, opportunities, recommendedServices, totalEstimatedTicketUsd, reasoning }>
+  ├─ callClaudeAPI(prompt) → fetch a https://api.anthropic.com/v1/messages (modelo claude-opus-4-1-20250805)
+  └─ formatSignals() para limitar output a 15 top signals
+
+Modificado:
+- enrichment.module.ts: agregar EnrichmentEvaluatorService provider/export
+- enrichment.service.ts:
+  ├─ Inyectar EnrichmentEvaluatorService
+  ├─ Reemplazar Fase B: OpportunityEngine.detect() → this.evaluator.evaluate()
+  ├─ opportunityScore ahora = claudeResult.score (no más activatedCount*25)
+  └─ Persistencia: opportunityScore, opportunities[], summary, estimatedTicket desde Claude
+- research.controller.ts: deprecar @Post('opportunity-test'), remover OpportunityEngineService
+```
+
+### Flujo Operacional
+
+```mermaid
+1. Usuario: "Generar análisis comercial"
+   ↓
+2. Estado: NUEVO → INVESTIGADO (ingresa job a queue)
+   ↓
+3. Fase A: Playwright Audit (0 tokens, determinístico)
+   Input: prospect.website
+   Output: { accessible, hasMetaPixel, structuredData, ... 41+ signals }
+   ↓
+4. Fase B: Claude Commercial Evaluation (1 API call ~500-800 tokens)
+   Input: { prospect: {id, nombreEmpresa, rubro, ciudad, website}, contact: {email, telefono, ...}, signals }
+   Output: {
+     score: 0-100,
+     problems: ["gap1", "gap2"],
+     opportunities: [{title, description, estimatedTicketUsd, priority, reasoning}],
+     recommendedServices: ["service1", "service2"],
+     totalEstimatedTicketUsd: 5000,
+     reasoning: "clear digital gap in..."
+   }
+   ↓
+5. Persistencia: enrichment_results
+   ├─ opportunityScore = Claude score
+   ├─ opportunities = Claude array
+   ├─ summary = Claude reasoning.substring(0, 255)
+   ├─ estimatedTicket = Claude totalEstimatedTicketUsd
+   └─ signals = Playwright completos
+   ↓
+6. Estado: INVESTIGADO → ENRIQUECIDO
+   ↓
+7. UI: Mostrar opportunities + score + reasoning
+   ↓
+8. Human: Aprobar/rechazar en enrichment review
+```
+
+### Base de Datos
+✅ **Sin cambios de schema.** Reutiliza enrichment_results existente:
+- `opportunityScore` (int): antes = activatedCount*25, ahora = Claude score (0-100)
+- `opportunities` (JSON): antes = OpportunityEngine array, ahora = Claude array (estructura compatible)
+- `summary` (varchar): antes = "Detected N opp", ahora = Claude reasoning
+- `estimatedTicket` (decimal): antes = NULL, ahora = Claude totalEstimatedTicketUsd
+
+### UI (ERPPrototype.tsx)
+✅ **Sin cambios de estructura.** Opportunities ahora de Claude pero schema compatible:
+- Renderiza `opp.title`, `opp.description`, `opp.priority`, `opp.estimatedTicketUsd`
+- Progress bar con `opportunityScore` (0-100)
+- Muestra `summary` de Claude como reasoning
+
+### Impacto Comercial
+
+| Aspecto | Before | After |
+|---------|--------|-------|
+| **Cobertura de industrias** | 4 rubros soportados (Wine, Food, Retail, Tourism) | ✅ Todos los rubros (Inmobiliaria, Abogado, Veterinaria, etc.) |
+| **Falsos negativos** | Meta Pixel=true bloqueaba CRM | ✅ Claude evalúa en contexto |
+| **Score** | Regla: activatedCount*25 | ✅ Razonamiento comercial (0-100) |
+| **Dinámico** | Requería server restart | ✅ Instant (sin cache) |
+| **Reasoning** | Determinístico (sin explicación) | ✅ Detallado de Claude |
+
+### Monitoreo Post-Deploy
+- ✅ npm run build sin errores
+- ✅ enrichmentJob.status: PENDING → RUNNING → COMPLETED
+- ✅ prospects: NUEVO → INVESTIGADO → ENRIQUECIDO
+- ✅ opportunityScore: 0-100 (no más 25, 50, 75, 100)
+- ✅ opportunities: array con title/description/ticket/priority
+- ✅ enrichmentResult.reviewStatus: PENDING → APPROVED/REJECTED
+- ✅ ANTHROPIC_API_KEY en .env configurada
+
